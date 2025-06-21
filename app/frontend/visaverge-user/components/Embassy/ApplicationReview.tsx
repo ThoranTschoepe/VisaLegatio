@@ -430,11 +430,6 @@ export default function ApplicationReview({
       return
     }
     
-    if (decision === 'approve' && isJohnDoe) {
-      alert('Cannot approve application: AI risk assessment indicates high risk factors')
-      return
-    }
-    
     if (decision) {
       const newStatus = decision === 'approve' ? 'approved' : 'rejected'
       onUpdateStatus(application.id, newStatus)
