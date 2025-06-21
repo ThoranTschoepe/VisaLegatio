@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Save, Send, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Save, Send, AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Shield } from 'lucide-react'
 import { Question, VisaType } from '@/types'
 import { api } from '@/utils/api'
 
 interface DynamicFormProps {
   visaType: VisaType
-  onSubmit?: (answers: Record<string, any>) => void
+  onSubmit?: (answers: Record<string, any>, password: string) => void
   onBack?: () => void
 }
 
@@ -18,6 +18,12 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [showPasswordStep, setShowPasswordStep] = useState(false)
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
 
   // Load questions when visa type changes
   useEffect(() => {
@@ -30,6 +36,26 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
       autoSave()
     }
   }, [answers])
+
+  // Generate a secure password suggestion
+  useEffect(() => {
+    if (showPasswordStep && !password) {
+      const generatePassword = () => {
+        const adjectives = ['Swift', 'Bright', 'Clear', 'Quick', 'Smart', 'Safe', 'Fast', 'Bold']
+        const nouns = ['Lion', 'Eagle', 'Tiger', 'Star', 'Moon', 'Sun', 'Wave', 'Wind']
+        const numbers = Math.floor(Math.random() * 999) + 100
+        
+        const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
+        const noun = nouns[Math.floor(Math.random() * nouns.length)]
+        
+        return `${adj}${noun}${numbers}`
+      }
+      
+      const suggestedPassword = generatePassword()
+      setPassword(suggestedPassword)
+      setConfirmPassword(suggestedPassword)
+    }
+  }, [showPasswordStep])
 
   const loadQuestions = async () => {
     setIsLoading(true)
@@ -76,6 +102,22 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
     return null
   }
 
+  const validatePassword = (): boolean => {
+    setPasswordError('')
+    
+    if (!password || password.length < 6) {
+      setPasswordError('Password must be at least 6 characters long')
+      return false
+    }
+    
+    if (password !== confirmPassword) {
+      setPasswordError('Passwords do not match')
+      return false
+    }
+    
+    return true
+  }
+
   const handleAnswer = (questionId: string, value: any) => {
     const question = questions.find(q => q.id === questionId)
     if (!question) return
@@ -102,18 +144,27 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
   const goToNext = () => {
     if (canProceed && !isLastQuestion) {
       setCurrentQuestionIndex(prev => prev + 1)
+    } else if (canProceed && isLastQuestion) {
+      // Go to password step
+      setShowPasswordStep(true)
     }
   }
 
   const goToPrevious = () => {
-    if (currentQuestionIndex > 0) {
+    if (showPasswordStep) {
+      setShowPasswordStep(false)
+    } else if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(prev => prev - 1)
     }
   }
 
   const handleSubmit = () => {
+    if (!validatePassword()) {
+      return
+    }
+    
     if (onSubmit) {
-      onSubmit(answers)
+      onSubmit(answers, password)
     }
   }
 
@@ -140,12 +191,145 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
     )
   }
 
-  if (!currentQuestion) {
+  if (!currentQuestion && !showPasswordStep) {
     return (
       <div className="text-center p-8">
         <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-gray-800 mb-2">No questions available</h3>
         <p className="text-gray-600">Please try again or contact support.</p>
+      </div>
+    )
+  }
+
+  if (showPasswordStep) {
+    return (
+      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold">Secure Your Application</h2>
+              <p className="text-green-100 text-sm mt-1">
+                Set a password to access your application later
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Shield className="w-5 h-5" />
+              <span>Secure</span>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="mt-4">
+            <div className="flex justify-between text-sm text-green-100 mb-2">
+              <span>Ready to Submit</span>
+              <span>100% complete</span>
+            </div>
+            <div className="w-full bg-green-500 bg-opacity-30 rounded-full h-2">
+              <div className="bg-white h-2 rounded-full w-full" />
+            </div>
+          </div>
+        </div>
+
+        {/* Password Form */}
+        <div className="p-6">
+          <div className="space-y-6">
+            <div className="text-center mb-6">
+              <Lock className="w-12 h-12 text-blue-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                Create Your Access Password
+              </h3>
+              <p className="text-gray-600 text-sm">
+                You'll use this password to check your application status and upload documents later
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12 font-mono"
+                    placeholder="Enter a secure password..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12 font-mono"
+                    placeholder="Confirm your password..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {passwordError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-red-600 text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {passwordError}
+                  </p>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-semibold text-blue-900 text-sm mb-2">💡 Password Tips</h4>
+                <ul className="text-blue-800 text-sm space-y-1">
+                  <li>• We've suggested a secure password for you</li>
+                  <li>• You can change it to something memorable</li>
+                  <li>• Minimum 6 characters required</li>
+                  <li>• You'll need this to access your application later</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Navigation */}
+            <div className="flex justify-between items-center pt-6 border-t">
+              <button
+                onClick={goToPrevious}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Back to Questions
+              </button>
+
+              <button
+                onClick={handleSubmit}
+                disabled={!password || !confirmPassword}
+                className="flex items-center gap-2 px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Send className="w-4 h-4" />
+                Submit Application
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -304,27 +488,14 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
             {currentQuestionIndex === 0 && onBack ? 'Back to Chat' : 'Previous'}
           </button>
 
-          <div className="flex gap-3">
-            {!isLastQuestion ? (
-              <button
-                onClick={goToNext}
-                disabled={!canProceed}
-                className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Next
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <button
-                onClick={handleSubmit}
-                disabled={!canProceed}
-                className="flex items-center gap-2 px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send className="w-4 h-4" />
-                Submit Application
-              </button>
-            )}
-          </div>
+          <button
+            onClick={goToNext}
+            disabled={!canProceed}
+            className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {isLastQuestion ? 'Continue to Security' : 'Next'}
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -341,6 +512,14 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
               )}
             </div>
           ))}
+        </div>
+        
+        {/* Next Step Preview */}
+        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <h5 className="font-semibold text-green-900 text-sm mb-1">Next Step</h5>
+          <p className="text-green-800 text-xs">
+            Set your access password and submit your application for immediate processing!
+          </p>
         </div>
       </div>
     </div>

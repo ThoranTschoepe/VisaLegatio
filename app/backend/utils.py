@@ -3,6 +3,7 @@
 import random
 import string
 import json
+import hashlib
 from datetime import datetime, timedelta
 from typing import Dict, Any, List
 from sqlalchemy.orm import Session
@@ -18,6 +19,10 @@ def generate_id(prefix: str = "") -> str:
     if prefix:
         return f"{prefix}-{timestamp}-{random_part}"
     return f"{timestamp}-{random_part}"
+
+def hash_password(password: str) -> str:
+    """Simple password hashing for demo (use proper hashing in production)"""
+    return hashlib.sha256(password.encode()).hexdigest()
 
 def calculate_risk_score(visa_type: str, answers: Dict[str, Any]) -> int:
     """Calculate risk score based on visa type and answers"""
@@ -414,13 +419,16 @@ def seed_demo_data():
         for officer in officers:
             db.add(officer)
         
-        # Create demo users and applications
+        # Create demo users and applications with FIXED IDs and passwords
         demo_applications = [
             {
+                "id": "VSV-240101-A1B2",  # Fixed ID for demo
+                "user_id": "user-sarah-johnson",
                 "applicant_name": "Sarah Johnson",
                 "visa_type": "business",
                 "status": "officer_review",
                 "country": "United States",
+                "demo_password": "DEMO123",  # Demo password
                 "answers": {
                     "applicant_name": "Sarah Johnson",
                     "destination_country": "Germany",
@@ -429,14 +437,19 @@ def seed_demo_data():
                     "invitation_company": "Berlin Tech Conference",
                     "duration": "7",
                     "email": "sarah.johnson@techsolutions.com",
-                    "phone": "+1-555-0123"
+                    "phone": "+1-555-0123",
+                    "nationality": "American",
+                    "passport_number": "US1234567"
                 }
             },
             {
+                "id": "VSV-240102-C3D4",  # Fixed ID for demo
+                "user_id": "user-miguel-rodriguez",
                 "applicant_name": "Miguel Rodriguez",
                 "visa_type": "tourist",
                 "status": "document_review",
                 "country": "Spain",
+                "demo_password": "DEMO456",  # Demo password
                 "answers": {
                     "applicant_name": "Miguel Rodriguez",
                     "destination_country": "Germany",
@@ -444,14 +457,19 @@ def seed_demo_data():
                     "duration": "14",
                     "accommodation": "Hotel",
                     "email": "miguel.rodriguez@email.com",
-                    "phone": "+34-666-123456"
+                    "phone": "+34-666-123456",
+                    "nationality": "Spanish",
+                    "passport_number": "ES9876543"
                 }
             },
             {
+                "id": "VSV-240103-E5F6",  # Fixed ID for demo
+                "user_id": "user-anna-chen",
                 "applicant_name": "Anna Chen",
                 "visa_type": "student",
                 "status": "background_check",
                 "country": "China",
+                "demo_password": "DEMO789",  # Demo password
                 "answers": {
                     "applicant_name": "Anna Chen",
                     "destination_country": "Germany",
@@ -459,14 +477,19 @@ def seed_demo_data():
                     "study_level": "Master's degree",
                     "study_duration": "24",
                     "email": "anna.chen@student.tum.de",
-                    "phone": "+86-138-0013-8000"
+                    "phone": "+86-138-0013-8000",
+                    "nationality": "Chinese",
+                    "passport_number": "CN5555666"
                 }
             },
             {
+                "id": "VSV-240104-G7H8",  # Fixed ID for demo
+                "user_id": "user-james-wilson",
                 "applicant_name": "James Wilson",
                 "visa_type": "work",
                 "status": "submitted",
                 "country": "United Kingdom",
+                "demo_password": "DEMO999",  # Demo password
                 "answers": {
                     "applicant_name": "James Wilson",
                     "destination_country": "Germany",
@@ -474,16 +497,17 @@ def seed_demo_data():
                     "employer_name": "German Tech Corp",
                     "contract_duration": "36",
                     "email": "james.wilson@germantech.de",
-                    "phone": "+44-20-7946-0958"
+                    "phone": "+44-20-7946-0958",
+                    "nationality": "British",
+                    "passport_number": "GB7777888"
                 }
             }
         ]
         
         for i, app_data in enumerate(demo_applications):
-            # Create user
-            user_id = generate_id("user")
+            # Create user with fixed ID
             user = User(
-                id=user_id,
+                id=app_data["user_id"],
                 email=app_data["answers"]["email"],
                 name=app_data["applicant_name"],
                 phone=app_data["answers"]["phone"],
@@ -491,18 +515,22 @@ def seed_demo_data():
             )
             db.add(user)
             
-            # Create application
-            app_id = generate_id("VSV")
-            risk_score = calculate_risk_score(app_data["visa_type"], app_data["answers"])
+            # Add demo password hash to answers
+            answers_with_password = app_data["answers"].copy()
+            answers_with_password["access_password_hash"] = hash_password(app_data["demo_password"])
             
+            # Calculate risk score
+            risk_score = calculate_risk_score(app_data["visa_type"], answers_with_password)
+            
+            # Create application with fixed ID
             application = Application(
-                id=app_id,
-                user_id=user_id,
+                id=app_data["id"],  # Use fixed ID
+                user_id=app_data["user_id"],
                 visa_type=app_data["visa_type"],
                 status=app_data["status"],
                 priority=["high", "normal", "normal", "urgent"][i],
                 risk_score=risk_score,
-                answers=json.dumps(app_data["answers"]),
+                answers=json.dumps(answers_with_password),
                 submitted_at=datetime.utcnow() - timedelta(days=random.randint(1, 5)),
                 approval_probability=calculate_approval_probability(risk_score),
                 assigned_officer_id="maria.schmidt" if i < 2 else "john.davis"
@@ -514,7 +542,7 @@ def seed_demo_data():
             for j, doc_type in enumerate(doc_types[:3 + i]):  # Varying number of documents
                 document = Document(
                     id=generate_id("doc"),
-                    application_id=app_id,
+                    application_id=app_data["id"],
                     name=f"{doc_type.replace('_', ' ').title()}",
                     type=doc_type,
                     size=random.randint(100000, 2000000),  # 100KB - 2MB
@@ -522,9 +550,35 @@ def seed_demo_data():
                     uploaded_at=datetime.utcnow() - timedelta(hours=random.randint(1, 48))
                 )
                 db.add(document)
+            
+            # Create status updates
+            initial_status = StatusUpdate(
+                id=generate_id("status"),
+                application_id=app_data["id"],
+                status="submitted",
+                notes=f"Application submitted by {app_data['applicant_name']}",
+                timestamp=datetime.utcnow() - timedelta(days=random.randint(1, 5))
+            )
+            db.add(initial_status)
+            
+            if app_data["status"] != "submitted":
+                current_status = StatusUpdate(
+                    id=generate_id("status"),
+                    application_id=app_data["id"],
+                    status=app_data["status"],
+                    notes=f"Status updated to {app_data['status']}",
+                    officer_id="maria.schmidt" if i < 2 else "john.davis",
+                    timestamp=datetime.utcnow() - timedelta(hours=random.randint(1, 24))
+                )
+                db.add(current_status)
         
         db.commit()
         print("✅ Demo data seeded successfully!")
+        print("📋 Demo Application Credentials:")
+        print("   VSV-240101-A1B2 / DEMO123 (Business - Sarah Johnson)")
+        print("   VSV-240102-C3D4 / DEMO456 (Tourist - Miguel Rodriguez)")
+        print("   VSV-240103-E5F6 / DEMO789 (Student - Anna Chen)")
+        print("   VSV-240104-G7H8 / DEMO999 (Work - James Wilson)")
         
     except Exception as e:
         print(f"❌ Error seeding demo data: {e}")

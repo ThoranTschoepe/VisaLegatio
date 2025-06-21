@@ -1,4 +1,4 @@
-// app/frontend/visaverge-user/utils/api.ts - Updated API integration with Python backend
+// app/frontend/visaverge-user/utils/api.ts - Updated API integration with new flow
 
 import { ChatResponse, Question, VisaApplication, VisaType } from '@/types'
 
@@ -61,18 +61,20 @@ class APIClient {
     return response.questions
   }
 
-  // Submit visa application
+  // Submit visa application (NEW: without requiring documents)
   async submitApplication(application: {
     visaType: VisaType
     answers: Record<string, any>
-    documents: any[]
+    documents?: any[]
+    password?: string
   }): Promise<VisaApplication> {
     const response = await this.request<any>('/applications/', {
       method: 'POST',
       body: JSON.stringify({
         visa_type: application.visaType,
         answers: application.answers,
-        documents: application.documents
+        documents: application.documents || [], // Empty array if no documents
+        password: application.password // Store password for later access
       }),
     })
 
@@ -80,7 +82,42 @@ class APIClient {
     return this.transformApplicationResponse(response)
   }
 
-  // Get application status
+  // Upload documents to existing application (NEW)
+  async uploadDocumentsToApplication(
+    applicationId: string,
+    documents: Array<{ file: File; type: string }>
+  ): Promise<any[]> {
+    const uploadPromises = documents.map(async ({ file, type }) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('application_id', applicationId)
+      formData.append('document_type', type)
+
+      const response = await fetch(`${API_BASE}/documents/upload`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error(`Upload failed for ${file.name}: ${response.statusText}`)
+      }
+
+      return await response.json()
+    })
+
+    return await Promise.all(uploadPromises)
+  }
+
+  // Get application status with password validation (NEW)
+  async getApplicationWithPassword(applicationId: string, password: string): Promise<VisaApplication> {
+    const response = await this.request<any>(`/applications/${applicationId}/verify`, {
+      method: 'POST',
+      body: JSON.stringify({ password }),
+    })
+    return this.transformApplicationResponse(response)
+  }
+
+  // Get application status (existing)
   async getApplicationStatus(applicationId: string): Promise<VisaApplication> {
     const response = await this.request<any>(`/applications/${applicationId}`)
     return this.transformApplicationResponse(response)
@@ -136,7 +173,7 @@ class APIClient {
     return await this.request<any>(endpoint)
   }
 
-  // Upload document
+  // Upload single document (legacy support)
   async uploadDocument(
     applicationId: string,
     documentType: string,
@@ -167,6 +204,39 @@ class APIClient {
   // Health check
   async healthCheck(): Promise<{ status: string }> {
     return await this.request<{ status: string }>('/health')
+  }
+
+  // Generate QR code data (NEW)
+  generateQRCodeData(applicationId: string): string {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://visaverge.com'
+    return `${baseUrl}/status?id=${applicationId}`
+  }
+
+  // Validate application access (NEW)
+  validateApplicationAccess(applicationId: string, password: string): boolean {
+    // In a real app, this would make an API call
+    // For demo, we check localStorage
+    if (typeof window !== 'undefined') {
+      const storedPassword = localStorage.getItem(`app_${applicationId}_password`)
+      return storedPassword === password
+    }
+    return false
+  }
+
+  // Store application credentials (NEW)
+  storeApplicationCredentials(applicationId: string, password: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`app_${applicationId}_password`, password)
+      localStorage.setItem(`app_${applicationId}_created`, new Date().toISOString())
+    }
+  }
+
+  // Clear application credentials (NEW)
+  clearApplicationCredentials(applicationId: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`app_${applicationId}_password`)
+      localStorage.removeItem(`app_${applicationId}_created`)
+    }
   }
 
   // Transform backend application response to frontend format
@@ -215,6 +285,25 @@ export const apiUtils = {
   // Generate session ID for chat
   generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  },
+
+  // Generate application ID (NEW)
+  generateApplicationId(): string {
+    const timestamp = Date.now().toString().slice(-6)
+    const random = Math.random().toString(36).substring(2, 6).toUpperCase()
+    return `VSV-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${random}`
+  },
+
+  // Generate secure password (NEW)
+  generateSecurePassword(): string {
+    const adjectives = ['Swift', 'Bright', 'Clear', 'Quick', 'Smart', 'Safe', 'Fast', 'Bold', 'Strong', 'Secure']
+    const nouns = ['Lion', 'Eagle', 'Tiger', 'Star', 'Moon', 'Sun', 'Wave', 'Wind', 'Rock', 'Tree']
+    const numbers = Math.floor(Math.random() * 999) + 100
+    
+    const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
+    const noun = nouns[Math.floor(Math.random() * nouns.length)]
+    
+    return `${adj}${noun}${numbers}`
   },
 
   // Format error messages for users
@@ -269,5 +358,64 @@ export const apiUtils = {
     if (score < 10) return 'text-green-600'
     if (score < 20) return 'text-yellow-600'
     return 'text-red-600'
+  },
+
+  // Create QR code URL (NEW)
+  createQRCodeUrl(data: string, size: number = 200): string {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`
+  },
+
+  // Estimate processing time (NEW)
+  estimateProcessingTime(visaType: VisaType, hasDocuments: boolean = false): number {
+    const baseDays = {
+      tourist: 7,
+      business: 10,
+      student: 21,
+      work: 30,
+      family_visit: 14,
+      transit: 3
+    }
+    
+    let days = baseDays[visaType] || 10
+    
+    // Reduce time if documents are provided
+    if (hasDocuments) {
+      days = Math.max(days - 2, 1)
+    }
+    
+    return days
+  },
+
+  // Calculate approval probability (NEW)
+  calculateApprovalProbability(
+    visaType: VisaType, 
+    answers: Record<string, any>, 
+    documentCount: number = 0
+  ): number {
+    let probability = 70 // Base probability
+    
+    // Visa type factor
+    const typeBonus = {
+      tourist: 5,
+      business: 0,
+      student: -5,
+      work: -10,
+      family_visit: 5,
+      transit: 10
+    }
+    
+    probability += typeBonus[visaType] || 0
+    
+    // Document bonus
+    probability += documentCount * 3
+    
+    // Answer quality (simplified)
+    if (answers.employment_status === 'employed') probability += 5
+    if (answers.previous_violations === false) probability += 10
+    
+    // Random factor for demo
+    probability += Math.random() * 10 - 5
+    
+    return Math.max(Math.min(Math.round(probability), 95), 60)
   }
 }
