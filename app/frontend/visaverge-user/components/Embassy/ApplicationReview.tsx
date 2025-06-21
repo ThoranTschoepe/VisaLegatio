@@ -369,14 +369,7 @@ export default function ApplicationReview({
                               View
                             </button>
                             
-                            <button
-                              onClick={() => handleDownloadDocument(documents[selectedDocumentIndex])}
-                              className="btn btn-outline btn-sm flex-1"
-                              disabled={!documents[selectedDocumentIndex].download_url}
-                            >
-                              <Download className="w-4 h-4 mr-1" />
-                              Download
-                            </button>
+
                             
                             <button
                               onClick={() => handleOpenInNewTab(documents[selectedDocumentIndex])}
