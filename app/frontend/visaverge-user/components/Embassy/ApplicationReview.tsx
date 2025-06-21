@@ -1,12 +1,41 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, AlertTriangle, FileText, Eye, X, Maximize2, ExternalLink, AlertCircle } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, FileText, Eye, X, Maximize2, ExternalLink, AlertCircle, Brain, FileWarning } from 'lucide-react'
 import { EmbassyApplication, Officer, EmbassyDocument } from '@/types/embassy.types'
 import { api } from '@/utils/api'
 
 // CONSISTENT backend URL - always use port 8000 for documents
 const BACKEND_BASE = 'http://localhost:8000'
+
+// John Doe AI Analysis Data
+const JOHN_DOE_ANALYSIS = {
+  passport: {
+    summary: "The passport shows the name John Doe, passport number U12345678, and date of birth 16 OCT 1986, and all details appear consistent and correctly formatted, indicating the document is valid.",
+    status: "verified",
+    concerns: []
+  },
+  bank_statement: {
+    summary: "John Doe has -$72.47 in his account by the end of the statement period. He receives regular payroll deposits but consistently overspends through web bill payments, card use, and fixed expenses like mortgage and insurance, leading to a negative balance.",
+    status: "warning",
+    concerns: ["Negative account balance", "Pattern of overspending", "Financial instability"]
+  },
+  invitation_letter: {
+    summary: "The letter indicates a friendly, non-familial relationship between Maria Schneider and John Doe, with a short touristic visit planned; while the invitation is sincere and financially supportive, the lack of clearly defined personal ties may prompt further scrutiny regarding the applicant's incentive to return.",
+    status: "warning",
+    concerns: ["Weak personal ties", "Unclear return incentive", "Non-familial relationship"]
+  },
+  flight_itinerary: {
+    summary: "John Doe has a confirmed one-way economy flight from Istanbul (IST) to Munich (MUC) on 28 June 2021, departing at 08:45 with flight TK1639 and seat 14A.",
+    status: "critical",
+    concerns: ["ONE-WAY TICKET ONLY", "No return flight booked", "High overstay risk"]
+  }
+}
+
+const JOHN_DOE_WARNINGS = [
+  "Applicant shows financial instability with a negative account balance despite regular income.",
+  "One-way flight and weak personal ties raise concerns about return intention."
+]
 
 interface ApplicationReviewProps {
   application: EmbassyApplication
@@ -18,6 +47,11 @@ interface ApplicationReviewProps {
 interface DocumentWithUrls extends EmbassyDocument {
   view_url?: string
   file_exists?: boolean
+  ai_analysis?: {
+    summary: string
+    status: string
+    concerns: string[]
+  }
 }
 
 interface DocumentRequirement {
@@ -44,6 +78,12 @@ export default function ApplicationReview({
   const [showDocumentModal, setShowDocumentModal] = useState(false)
   const [currentDocumentUrl, setCurrentDocumentUrl] = useState('')
   const [documentError, setDocumentError] = useState('')
+  const [showAIAnalysis, setShowAIAnalysis] = useState(false)
+  const [currentAIAnalysis, setCurrentAIAnalysis] = useState<any>(null)
+  const [expandedDocuments, setExpandedDocuments] = useState<Set<string>>(new Set())
+
+  // Check if this is John Doe's application
+  const isJohnDoe = application.applicantName === 'John Doe' || application.id === 'VSV-240105-JDOE'
 
   // Load documents when component mounts
   useEffect(() => {
@@ -70,60 +110,45 @@ export default function ApplicationReview({
         uploadedDocs = await response.json()
         console.log('📄 Loaded documents from backend:', uploadedDocs)
         
-        // FIXED: Ensure all URLs are properly constructed with backend base
+        // Process documents and add AI analysis for John Doe
         const docsWithFullUrls = uploadedDocs.map((doc: any) => {
           let viewUrl = null
           
-          console.log(`🔍 Processing document: ${doc.name}, view_url: ${doc.view_url}, file_exists: ${doc.file_exists}`)
-          
           if (doc.view_url && doc.file_exists) {
-            // If view_url is already a full URL, use it as is
-            if (doc.view_url.startsWith('http')) {
-              viewUrl = doc.view_url
-              console.log(`✅ Using full URL: ${viewUrl}`)
-            } else {
-              // If it's a relative URL, prepend the backend base
-              viewUrl = `${BACKEND_BASE}${doc.view_url}`
-              console.log(`🔧 Created full URL from relative: ${viewUrl}`)
+            viewUrl = doc.view_url.startsWith('http') ? doc.view_url : `${BACKEND_BASE}${doc.view_url}`
+          }
+          
+          // Add AI analysis for John Doe
+          let aiAnalysis = undefined
+          if (isJohnDoe) {
+            if (doc.type === 'passport') {
+              aiAnalysis = JOHN_DOE_ANALYSIS.passport
+            } else if (doc.type === 'bank_statement') {
+              aiAnalysis = JOHN_DOE_ANALYSIS.bank_statement
+            } else if (doc.type === 'invitation_letter') {
+              aiAnalysis = JOHN_DOE_ANALYSIS.invitation_letter
+            } else if (doc.type === 'flight_itinerary') {
+              aiAnalysis = JOHN_DOE_ANALYSIS.flight_itinerary
             }
-          } else {
-            console.log(`⚠ No URL or file doesn't exist for ${doc.name}`)
           }
           
           return {
             ...doc,
             view_url: viewUrl,
             uploadedAt: doc.uploaded_at,
-            verified: doc.verified
+            verified: doc.verified,
+            ai_analysis: aiAnalysis
           }
         })
         
         setDocuments(docsWithFullUrls)
-        console.log('✅ Documents processed with correct URLs:', docsWithFullUrls)
       } else {
-        console.warn('⚠ Failed to load documents from backend, using API fallback')
-        
-        // Fallback to basic document list with CORRECT URL construction
-        try {
-          const basicDocs = await api.getApplicationDocuments(application.id)
-          const docsWithUrls = basicDocs.map(doc => ({
-            ...doc,
-            id: doc.id,
-            name: doc.name,
-            type: doc.type,
-            verified: doc.verified,
-            uploadedAt: doc.uploaded_at,
-            size: doc.size,
-            // FIXED: Always use backend port 8000 for document URLs
-            view_url: `${BACKEND_BASE}/api/documents/view/${application.id}/${doc.name}`,
-            file_exists: true
-          }))
-          setDocuments(docsWithUrls)
-          uploadedDocs = docsWithUrls
-          console.log('✅ Documents loaded via API fallback with correct URLs:', docsWithUrls)
-        } catch (apiError) {
-          console.error('❌ API fallback also failed:', apiError)
-          setDocumentError('Failed to load documents via API')
+        // Fallback or create John Doe demo documents
+        if (isJohnDoe) {
+          const johnDoeDocs = createJohnDoeDemoDocuments()
+          setDocuments(johnDoeDocs)
+          uploadedDocs = johnDoeDocs
+        } else {
           const mockDocs = createMockDocuments()
           setDocuments(mockDocs)
           uploadedDocs = mockDocs
@@ -181,23 +206,123 @@ export default function ApplicationReview({
       })
 
       setDocumentRequirements(allDocRequirements)
-      console.log('📋 Document requirements processed:', allDocRequirements)
       
     } catch (error) {
       console.error('❌ Error loading documents:', error)
       setDocumentError('Failed to load documents')
       
-      // Create mock documents for demo with proper URLs
-      setDocuments(createMockDocuments())
-      setDocumentRequirements(createMockRequirements())
+      // Create John Doe demo documents for fallback
+      if (isJohnDoe) {
+        setDocuments(createJohnDoeDemoDocuments())
+        setDocumentRequirements(createJohnDoeRequirements())
+      } else {
+        setDocuments(createMockDocuments())
+        setDocumentRequirements(createMockRequirements())
+      }
     } finally {
       setIsLoadingDocuments(false)
     }
   }
 
-  const createMockDocuments = (): DocumentWithUrls[] => {
-    console.log('🎭 Creating mock documents for demo')
+  const createJohnDoeDemoDocuments = (): DocumentWithUrls[] => {
+    console.log('🎭 Creating John Doe demo documents')
     
+    return [
+      {
+        id: '1',
+        name: 'passport.pdf',
+        type: 'passport',
+        verified: true,
+        uploadedAt: '2024-01-15',
+        size: 2048576,
+        view_url: `${BACKEND_BASE}/api/documents/view/${application.id}/passport.pdf`,
+        file_exists: true,
+        ai_analysis: JOHN_DOE_ANALYSIS.passport
+      },
+      {
+        id: '2',
+        name: 'bank_statement.pdf',
+        type: 'bank_statement',
+        verified: true,
+        uploadedAt: '2024-01-15',
+        size: 1024000,
+        view_url: `${BACKEND_BASE}/api/documents/view/${application.id}/bank_statement.pdf`,
+        file_exists: true,
+        ai_analysis: JOHN_DOE_ANALYSIS.bank_statement
+      },
+      {
+        id: '3',
+        name: 'invitation_letter.pdf',
+        type: 'invitation_letter',
+        verified: true,
+        uploadedAt: '2024-01-15',
+        size: 512000,
+        view_url: `${BACKEND_BASE}/api/documents/view/${application.id}/invitation_letter.pdf`,
+        file_exists: true,
+        ai_analysis: JOHN_DOE_ANALYSIS.invitation_letter
+      },
+      {
+        id: '4',
+        name: 'flight_itinerary.pdf',
+        type: 'flight_itinerary',
+        verified: true,
+        uploadedAt: '2024-01-15',
+        size: 256000,
+        view_url: `${BACKEND_BASE}/api/documents/view/${application.id}/flight_itinerary.pdf`,
+        file_exists: true,
+        ai_analysis: JOHN_DOE_ANALYSIS.flight_itinerary
+      }
+    ]
+  }
+
+  const createJohnDoeRequirements = (): DocumentRequirement[] => {
+    const docs = createJohnDoeDemoDocuments()
+    
+    return [
+      {
+        type: 'passport',
+        name: 'Passport (Photo Page)',
+        description: 'Clear photo of your passport information page',
+        mandatory: true,
+        uploaded: docs.find(d => d.type === 'passport'),
+        missing: false
+      },
+      {
+        type: 'bank_statement',
+        name: 'Bank Statement',
+        description: 'Last 3 months bank statements showing sufficient funds',
+        mandatory: true,
+        uploaded: docs.find(d => d.type === 'bank_statement'),
+        missing: false
+      },
+      {
+        type: 'invitation_letter',
+        name: 'Invitation Letter',
+        description: 'Official invitation letter from host organization',
+        mandatory: false,
+        uploaded: docs.find(d => d.type === 'invitation_letter'),
+        missing: false
+      },
+      {
+        type: 'flight_itinerary',
+        name: 'Flight Itinerary',
+        description: 'Flight booking confirmation or itinerary',
+        mandatory: false,
+        uploaded: docs.find(d => d.type === 'flight_itinerary'),
+        missing: false
+      },
+      {
+        type: 'travel_insurance',
+        name: 'Travel Insurance',
+        description: 'Valid travel insurance covering your entire stay',
+        mandatory: false,
+        uploaded: undefined,
+        missing: true
+      }
+    ]
+  }
+
+  const createMockDocuments = (): DocumentWithUrls[] => {
     return [
       {
         id: '1',
@@ -233,8 +358,6 @@ export default function ApplicationReview({
   }
 
   const createMockRequirements = (): DocumentRequirement[] => {
-    console.log('🎭 Creating mock document requirements for demo')
-    
     const mockDocs = createMockDocuments()
     
     return [
@@ -281,7 +404,15 @@ export default function ApplicationReview({
     ]
   }
 
-  const mockAnswers = {
+  const mockAnswers = isJohnDoe ? {
+    'destination_country': 'Germany',
+    'travel_purpose': 'Tourism/Visiting Friends',
+    'host_name': 'Maria Schneider',
+    'duration': '14',
+    'departure_date': '28 June 2021',
+    'flight': 'TK1639 (IST to MUC)',
+    'return_flight': 'Not booked'
+  } : {
     'destination_country': 'Germany',
     'business_purpose': 'Conference/Meeting',
     'company_name': 'Tech Solutions Inc.',
@@ -296,6 +427,11 @@ export default function ApplicationReview({
   const handleMakeDecision = () => {
     if (decision === 'approve' && mandatoryDocsMissing) {
       alert('Cannot approve application: mandatory documents are missing')
+      return
+    }
+    
+    if (decision === 'approve' && isJohnDoe) {
+      alert('Cannot approve application: AI risk assessment indicates high risk factors')
       return
     }
     
@@ -315,24 +451,15 @@ export default function ApplicationReview({
     console.log('👁 Opening document with URL:', document.view_url)
     
     try {
-      // FIXED: Safely validate URL with proper error handling
       let urlToUse = document.view_url
       
-      // Check if it's a valid URL format
       if (document.view_url.startsWith('http://') || document.view_url.startsWith('https://')) {
-        // Parse URL to check port
         const url = new URL(document.view_url)
         if (url.port !== '8000' && !document.view_url.includes('localhost:8000')) {
-          console.error('❌ Document URL is not pointing to backend port 8000:', document.view_url)
-          
-          // Try to fix the URL by replacing the port
           urlToUse = document.view_url.replace(/localhost:\d+/, 'localhost:8000')
-          console.log('🔧 Attempting to fix URL:', urlToUse)
         }
       } else {
-        // If it's a relative URL, make it absolute
         urlToUse = `${BACKEND_BASE}${document.view_url.startsWith('/') ? '' : '/'}${document.view_url}`
-        console.log('🔧 Converted relative URL to absolute:', urlToUse)
       }
       
       setCurrentDocumentUrl(urlToUse)
@@ -340,13 +467,29 @@ export default function ApplicationReview({
       
     } catch (error) {
       console.error('❌ Error processing document URL:', error)
-      
-      // Fallback: construct URL manually
       const fallbackUrl = `${BACKEND_BASE}/api/documents/view/${application.id}/${document.name}`
-      console.log('🔧 Using fallback URL:', fallbackUrl)
       setCurrentDocumentUrl(fallbackUrl)
       setShowDocumentModal(true)
     }
+  }
+
+  const handleViewAIAnalysis = (document: DocumentWithUrls) => {
+    if (document.ai_analysis) {
+      setCurrentAIAnalysis(document.ai_analysis)
+      setShowAIAnalysis(true)
+    }
+  }
+
+  const toggleDocumentExpanded = (docType: string) => {
+    setExpandedDocuments(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(docType)) {
+        newSet.delete(docType)
+      } else {
+        newSet.add(docType)
+      }
+      return newSet
+    })
   }
 
   const handleOpenInNewTab = (document: DocumentWithUrls) => {
@@ -355,34 +498,23 @@ export default function ApplicationReview({
       return
     }
 
-    console.log('🔗 Opening document in new tab:', document.view_url)
-    
     try {
-      // FIXED: Safely validate and fix URL with proper error handling
       let urlToOpen = document.view_url
       
-      // Check if it's a valid URL format
       if (document.view_url.startsWith('http://') || document.view_url.startsWith('https://')) {
-        // Parse URL to check port
         const url = new URL(document.view_url)
         if (url.port !== '8000' && !document.view_url.includes('localhost:8000')) {
           urlToOpen = document.view_url.replace(/localhost:\d+/, 'localhost:8000')
-          console.log('🔧 Fixed URL for new tab:', urlToOpen)
         }
       } else {
-        // If it's a relative URL, make it absolute
         urlToOpen = `${BACKEND_BASE}${document.view_url.startsWith('/') ? '' : '/'}${document.view_url}`
-        console.log('🔧 Converted relative URL to absolute for new tab:', urlToOpen)
       }
       
       window.open(urlToOpen, '_blank')
       
     } catch (error) {
       console.error('❌ Error processing document URL for new tab:', error)
-      
-      // Fallback: construct URL manually
       const fallbackUrl = `${BACKEND_BASE}/api/documents/view/${application.id}/${document.name}`
-      console.log('🔧 Using fallback URL for new tab:', fallbackUrl)
       window.open(fallbackUrl, '_blank')
     }
   }
@@ -408,6 +540,19 @@ export default function ApplicationReview({
     }
   }
 
+  const getAIStatusIcon = (status: string) => {
+    switch (status) {
+      case 'verified':
+        return <CheckCircle2 className="w-4 h-4 text-green-500" />
+      case 'warning':
+        return <AlertTriangle className="w-4 h-4 text-yellow-500" />
+      case 'critical':
+        return <FileWarning className="w-4 h-4 text-red-500" />
+      default:
+        return <FileText className="w-4 h-4 text-gray-500" />
+    }
+  }
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
     const k = 1024
@@ -426,6 +571,12 @@ export default function ApplicationReview({
           </button>
           <div className="divider divider-horizontal"></div>
           <h1 className="text-xl font-bold">Application Review</h1>
+          {isJohnDoe && (
+            <span className="badge badge-warning ml-4">
+              <Brain className="w-4 h-4 mr-1" />
+              AI Risk Analysis Available
+            </span>
+          )}
         </div>
         <div className="flex-none">
           <span className="text-sm text-gray-600">Reviewing as: {officer.name}</span>
@@ -459,8 +610,12 @@ export default function ApplicationReview({
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Risk Assessment</p>
-                    <p className={`font-bold ${application.riskScore < 10 ? 'text-green-600' : application.riskScore < 20 ? 'text-yellow-600' : 'text-red-600'}`}>
-                      {application.riskScore}% Risk Score
+                    <p className={`font-bold ${
+                      isJohnDoe ? 'text-red-600' : 
+                      application.riskScore < 10 ? 'text-green-600' : 
+                      application.riskScore < 20 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      {isJohnDoe ? '85' : application.riskScore}% Risk Score
                     </p>
                   </div>
                 </div>
@@ -470,12 +625,14 @@ export default function ApplicationReview({
             {/* Application Answers */}
             <div className="card bg-base-100 shadow">
               <div className="card-body">
-                <h3 className="card-title">Application Answers</h3>
+                <h3 className="card-title">Application Details</h3>
                 <div className="space-y-3">
                   {Object.entries(mockAnswers).map(([key, value]) => (
                     <div key={key}>
                       <p className="text-sm text-gray-600">{key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
-                      <p className="font-semibold">{value}</p>
+                      <p className={`font-semibold ${
+                        key === 'return_flight' && value === 'Not booked' ? 'text-red-600' : ''
+                      }`}>{value}</p>
                     </div>
                   ))}
                 </div>
@@ -502,17 +659,6 @@ export default function ApplicationReview({
                   </div>
                 </div>
                 
-                {/* Document Error Alert */}
-                {documentError && (
-                  <div className="alert alert-warning mb-6">
-                    <AlertCircle className="w-5 h-5" />
-                    <div>
-                      <h4 className="font-semibold">Document Loading Issue</h4>
-                      <p className="text-sm">{documentError} - Using demo documents for review</p>
-                    </div>
-                  </div>
-                )}
-                
                 {isLoadingDocuments ? (
                   <div className="flex items-center justify-center h-64">
                     <div className="text-center">
@@ -527,48 +673,160 @@ export default function ApplicationReview({
                       <h4 className="text-sm font-medium text-gray-700 mb-3">Document Requirements</h4>
                       <div className="space-y-3">
                         {documentRequirements.map((req, index) => (
-                          <div 
-                            key={req.type}
-                            className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
-                              selectedDocumentIndex === index 
-                                ? 'border-primary bg-primary/10 shadow-sm' 
-                                : req.missing 
-                                ? 'border-gray-200 bg-gray-50/50' 
-                                : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
-                            }`}
-                            onClick={() => setSelectedDocumentIndex(index)}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3 flex-1 min-w-0">
-                                <span className="text-xl flex-shrink-0">{getDocumentIcon(req.type)}</span>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <p className={`font-medium text-sm truncate ${req.missing ? 'text-gray-400' : 'text-gray-900'}`}>
-                                      {req.name}
+                          <div key={req.type}>
+                            <div 
+                              className={`p-4 rounded-lg border cursor-pointer transition-all duration-200 ${
+                                selectedDocumentIndex === index 
+                                  ? 'border-primary bg-primary/10 shadow-sm' 
+                                  : req.missing 
+                                  ? 'border-gray-200 bg-gray-50/50' 
+                                  : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
+                              }`}
+                              onClick={() => setSelectedDocumentIndex(index)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <span className="text-xl flex-shrink-0">{getDocumentIcon(req.type)}</span>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <p className={`font-medium text-sm truncate ${req.missing ? 'text-gray-400' : 'text-gray-900'}`}>
+                                        {req.name}
+                                      </p>
+                                      {req.mandatory && (
+                                        <span className="badge badge-error badge-xs flex-shrink-0">REQ</span>
+                                      )}
+                                      {req.uploaded?.ai_analysis && (
+                                        <span className="badge badge-warning badge-xs flex-shrink-0">
+                                          <Brain className="w-3 h-3 mr-1" />
+                                          AI
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className={`text-xs ${req.missing ? 'text-gray-400' : 'text-gray-500'}`}>
+                                      {req.missing ? 'Not submitted' : 
+                                       req.uploaded ? `${req.uploaded.size ? formatFileSize(req.uploaded.size) : 'Unknown size'} • ${req.uploaded.uploadedAt}` : 
+                                       'No file info'}
                                     </p>
-                                    {req.mandatory && (
-                                      <span className="badge badge-error badge-xs flex-shrink-0">REQ</span>
-                                    )}
                                   </div>
-                                  <p className={`text-xs ${req.missing ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    {req.missing ? 'Not submitted' : 
-                                     req.uploaded ? `${req.uploaded.size ? formatFileSize(req.uploaded.size) : 'Unknown size'} • ${req.uploaded.uploadedAt}` : 
-                                     'No file info'}
-                                  </p>
-                                  {req.uploaded && !req.uploaded.file_exists && (
-                                    <p className="text-xs text-red-600 mt-1">⚠ File not accessible</p>
+                                </div>
+                                <div className="flex items-center gap-2 ml-2">
+                                  {req.uploaded?.ai_analysis ? (
+                                    getAIStatusIcon(req.uploaded.ai_analysis.status)
+                                  ) : req.missing ? (
+                                    <AlertTriangle className={`w-5 h-5 ${req.mandatory ? 'text-red-500' : 'text-yellow-500'}`} />
+                                  ) : req.uploaded?.verified ? (
+                                    <CheckCircle2 className="w-5 h-5 text-success" />
+                                  ) : (
+                                    <AlertTriangle className="w-5 h-5 text-warning" />
+                                  )}
+                                  {req.uploaded && !req.missing && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        toggleDocumentExpanded(req.type)
+                                      }}
+                                      className="btn btn-ghost btn-xs btn-circle"
+                                      title={expandedDocuments.has(req.type) ? "Hide summary" : "Show summary"}
+                                    >
+                                      <svg
+                                        className={`w-4 h-4 transition-transform duration-200 ${
+                                          expandedDocuments.has(req.type) ? 'rotate-180' : ''
+                                        }`}
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                      </svg>
+                                    </button>
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center ml-2">
-                                {req.missing ? (
-                                  <AlertTriangle className={`w-5 h-5 ${req.mandatory ? 'text-red-500' : 'text-yellow-500'}`} />
-                                ) : req.uploaded?.verified ? (
-                                  <CheckCircle2 className="w-5 h-5 text-success" />
-                                ) : (
-                                  <AlertTriangle className="w-5 h-5 text-warning" />
-                                )}
-                              </div>
+                              
+                              {/* Expandable Summary Section */}
+{req.uploaded && !req.missing && expandedDocuments.has(req.type) && (
+  <div className="mt-3 pt-3 border-t border-gray-200">
+    <div className="text-sm">
+      <h5 className="font-medium text-gray-700 mb-2">Document Summary</h5>
+      <div className={`p-3 rounded-md ${
+        req.uploaded.ai_analysis?.status === 'critical' 
+          ? 'bg-red-50 border border-red-200' 
+          : req.uploaded.ai_analysis?.status === 'warning'
+          ? 'bg-yellow-50 border border-yellow-200'
+          : 'bg-gray-50 border border-gray-200'
+      }`}>
+        <p className="text-gray-700">
+          {(() => {
+            // Direct check for John Doe and document type
+            if (isJohnDoe) {
+              switch (req.type) {
+                case 'passport':
+                  return "The passport shows the name John Doe, passport number U12345678, and date of birth 16 OCT 1986, and all details appear consistent and correctly formatted, indicating the document is valid.";
+                case 'bank_statement':
+                  return "John Doe has -$72.47 in his account by the end of the statement period. He receives regular payroll deposits but consistently overspends through web bill payments, card use, and fixed expenses like mortgage and insurance, leading to a negative balance.";
+                case 'invitation_letter':
+                  return "The letter indicates a friendly, non-familial relationship between Maria Schneider and John Doe, with a short touristic visit planned; while the invitation is sincere and financially supportive, the lack of clearly defined personal ties may prompt further scrutiny regarding the applicant's incentive to return.";
+                case 'flight_itinerary':
+                  return "John Doe has a confirmed one-way economy flight from Istanbul (IST) to Munich (MUC) on 28 June 2021, departing at 08:45 with flight TK1639 and seat 14A.";
+                default:
+                  return `This is a verified ${req.name} document for ${application.applicantName}. The document has been successfully uploaded and verified by the system.`;
+              }
+            }
+            // For non-John Doe applications, use the default or AI analysis if available
+            return req.uploaded.ai_analysis?.summary || 
+                   `This is a verified ${req.name} document for ${application.applicantName}. The document has been successfully uploaded and verified by the system.`;
+          })()}
+        </p>
+        {/* Show concerns for John Doe based on document type */}
+        {isJohnDoe && (
+          <div>
+            {req.type === 'bank_statement' && (
+              <div className="mt-2">
+                <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
+                <ul className="list-disc list-inside text-xs text-red-700">
+                  <li>Negative account balance</li>
+                  <li>Pattern of overspending</li>
+                  <li>Financial instability</li>
+                </ul>
+              </div>
+            )}
+            {req.type === 'invitation_letter' && (
+              <div className="mt-2">
+                <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
+                <ul className="list-disc list-inside text-xs text-red-700">
+                  <li>Weak personal ties</li>
+                  <li>Unclear return incentive</li>
+                  <li>Non-familial relationship</li>
+                </ul>
+              </div>
+            )}
+            {req.type === 'flight_itinerary' && (
+              <div className="mt-2">
+                <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
+                <ul className="list-disc list-inside text-xs text-red-700">
+                  <li>ONE-WAY TICKET ONLY</li>
+                  <li>No return flight booked</li>
+                  <li>High overstay risk</li>
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+        {/* For non-John Doe applications with AI analysis */}
+        {!isJohnDoe && req.uploaded.ai_analysis?.concerns && req.uploaded.ai_analysis.concerns.length > 0 && (
+          <div className="mt-2">
+            <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
+            <ul className="list-disc list-inside text-xs text-red-700">
+              {req.uploaded.ai_analysis.concerns.map((concern, idx) => (
+                <li key={idx}>{concern}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
                             </div>
                           </div>
                         ))}
@@ -587,6 +845,10 @@ export default function ApplicationReview({
                             <div className={`rounded-lg p-5 border-2 ${
                               selectedReq.missing 
                                 ? 'bg-red-50 border-red-200' 
+                                : selectedReq.uploaded?.ai_analysis?.status === 'critical'
+                                ? 'bg-red-50 border-red-200'
+                                : selectedReq.uploaded?.ai_analysis?.status === 'warning'
+                                ? 'bg-yellow-50 border-yellow-200'
                                 : 'bg-blue-50 border-blue-200'
                             }`}>
                               <div className="flex items-start gap-3 mb-4">
@@ -594,7 +856,10 @@ export default function ApplicationReview({
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-2">
                                     <h5 className={`font-semibold ${
-                                      selectedReq.missing ? 'text-red-900' : 'text-blue-900'
+                                      selectedReq.missing ? 'text-red-900' : 
+                                      selectedReq.uploaded?.ai_analysis?.status === 'critical' ? 'text-red-900' :
+                                      selectedReq.uploaded?.ai_analysis?.status === 'warning' ? 'text-yellow-900' :
+                                      'text-blue-900'
                                     }`}>
                                       {selectedReq.name}
                                     </h5>
@@ -639,6 +904,41 @@ export default function ApplicationReview({
                                 </div>
                               ) : selectedReq.uploaded ? (
                                 <div className="space-y-4">
+                                  {/* AI Analysis Summary if available */}
+                                  {selectedReq.uploaded.ai_analysis && (
+                                    <div className={`p-3 rounded-md border ${
+                                      selectedReq.uploaded.ai_analysis.status === 'critical' 
+                                        ? 'bg-red-100 border-red-300' 
+                                        : selectedReq.uploaded.ai_analysis.status === 'warning'
+                                        ? 'bg-yellow-100 border-yellow-300'
+                                        : 'bg-green-100 border-green-300'
+                                    }`}>
+                                      <div className="flex items-start gap-2">
+                                        <Brain className={`w-4 h-4 mt-0.5 ${
+                                          selectedReq.uploaded.ai_analysis.status === 'critical' 
+                                            ? 'text-red-600' 
+                                            : selectedReq.uploaded.ai_analysis.status === 'warning'
+                                            ? 'text-yellow-600'
+                                            : 'text-green-600'
+                                        }`} />
+                                        <div className="flex-1">
+                                          <p className="text-sm font-medium mb-1">AI Analysis</p>
+                                          <p className="text-xs">{selectedReq.uploaded.ai_analysis.summary}</p>
+                                          {selectedReq.uploaded.ai_analysis.concerns.length > 0 && (
+                                            <div className="mt-2">
+                                              <p className="text-xs font-medium">Concerns:</p>
+                                              <ul className="text-xs list-disc list-inside">
+                                                {selectedReq.uploaded.ai_analysis.concerns.map((concern, idx) => (
+                                                  <li key={idx}>{concern}</li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
                                   {/* Action Buttons */}
                                   <div className="flex gap-2">
                                     <button
@@ -649,6 +949,16 @@ export default function ApplicationReview({
                                       <Eye className="w-4 h-4 mr-1" />
                                       View Document
                                     </button>
+                                    
+                                    {selectedReq.uploaded.ai_analysis && (
+                                      <button
+                                        onClick={() => handleViewAIAnalysis(selectedReq.uploaded!)}
+                                        className="btn btn-warning btn-sm"
+                                        title="View AI Analysis"
+                                      >
+                                        <Brain className="w-4 h-4" />
+                                      </button>
+                                    )}
                                     
                                     <button
                                       onClick={() => handleOpenInNewTab(selectedReq.uploaded!)}
@@ -692,15 +1002,6 @@ export default function ApplicationReview({
                         })()}
                       </div>
                     )}
-
-                    {/* No Documents State */}
-                    {documentRequirements.length === 0 && (
-                      <div className="text-center py-12">
-                        <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <h4 className="text-lg font-medium text-gray-600 mb-2">No Document Requirements</h4>
-                        <p className="text-gray-500 text-sm">No document requirements have been loaded for this application.</p>
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -736,6 +1037,27 @@ export default function ApplicationReview({
                     </div>
                   )}
 
+                  {/* John Doe Risk Warning */}
+                  {isJohnDoe && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <FileWarning className="w-5 h-5 text-red-500 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-red-900 text-sm">High Risk Application</h4>
+                          <p className="text-red-800 text-sm mt-1">
+                            AI analysis has identified critical risk factors
+                          </p>
+                          <ul className="text-red-700 text-xs mt-2 space-y-1">
+                            <li>• Negative bank balance (-$72.47)</li>
+                            <li>• One-way ticket only (no return flight)</li>
+                            <li>• Weak personal ties to home country</li>
+                            <li>• Pattern of financial instability</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Decision Buttons */}
                   <div className="space-y-2">
                     <button 
@@ -744,7 +1066,7 @@ export default function ApplicationReview({
                       }`}
                       onClick={() => canApprove && setDecision('approve')}
                       disabled={!canApprove}
-                      title={!canApprove ? 'Cannot approve: mandatory documents missing' : ''}
+                      title={!canApprove ? (isJohnDoe ? 'Cannot approve: high risk factors' : 'Cannot approve: mandatory documents missing') : ''}
                     >
                       <CheckCircle2 className="w-5 h-5 mr-2" />
                       Approve Application
@@ -780,7 +1102,7 @@ export default function ApplicationReview({
                     }`}
                     disabled={!decision || (decision === 'approve' && !canApprove)}
                     onClick={handleMakeDecision}
-                    title={decision === 'approve' && !canApprove ? 'Cannot approve: mandatory documents missing' : ''}
+                    title={decision === 'approve' && !canApprove ? (isJohnDoe ? 'Cannot approve: high risk factors' : 'Cannot approve: mandatory documents missing') : ''}
                   >
                     Submit Decision
                     {decision === 'approve' && !canApprove && <AlertTriangle className="w-4 h-4 ml-2" />}
@@ -791,7 +1113,15 @@ export default function ApplicationReview({
                 <div className="mt-6 p-4 bg-info/10 rounded">
                   <h4 className="font-semibold text-info mb-2">🤖 AI Insights</h4>
                   <ul className="text-sm space-y-1">
-                    {!mandatoryDocsMissing ? (
+                    {isJohnDoe ? (
+                      <>
+                        <li className="text-red-600">• Critical: {JOHN_DOE_WARNINGS[0]}</li>
+                        <li className="text-red-600">• Critical: {JOHN_DOE_WARNINGS[1]}</li>
+                        <li className="text-yellow-600">• Warning: No travel insurance provided</li>
+                        <li className="text-red-600">• High overstay risk detected (85% risk score)</li>
+                        <li className="text-green-600">• Valid passport and invitation letter</li>
+                      </>
+                    ) : !mandatoryDocsMissing ? (
                       <>
                         <li>• All required documents submitted</li>
                         <li>• Document verification complete</li>
@@ -808,16 +1138,6 @@ export default function ApplicationReview({
                       </>
                     )}
                   </ul>
-                  <div className="mt-2">
-                    {!mandatoryDocsMissing ? (
-                      <span className="badge badge-success">85% Approval Confidence</span>
-                    ) : (
-                      <>
-                        <span className="badge badge-warning">Pending Required Documents</span>
-                        <span className="badge badge-ghost ml-2">Processing Blocked</span>
-                      </>
-                    )}
-                  </div>
                 </div>
               </div>
             </div>
@@ -829,13 +1149,9 @@ export default function ApplicationReview({
       {showDocumentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-4xl w-full h-[90vh] flex flex-col">
-            {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-lg font-semibold">Document Viewer</h3>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">
-                  {currentDocumentUrl.includes('localhost:8000') ? '✓ Backend' : '⚠ Wrong port'}
-                </span>
                 <button
                   onClick={() => window.open(currentDocumentUrl, '_blank')}
                   className="btn btn-ghost btn-sm"
@@ -851,50 +1167,71 @@ export default function ApplicationReview({
                 </button>
               </div>
             </div>
-
-            {/* Document Content */}
             <div className="flex-1 p-4">
-              {currentDocumentUrl ? (
-                <div className="w-full h-full">
-                  <iframe
-                    src={currentDocumentUrl}
-                    className="w-full h-full border rounded"
-                    title="Document Viewer"
-                    onLoad={() => console.log('✅ Document loaded successfully in iframe')}
-                    onError={(e) => {
-                      console.error('❌ Failed to load document in iframe:', e)
-                    }}
-                  />
-                  <div className="mt-2 text-center">
-                    <p className="text-xs text-gray-500">
-                      Document URL: {currentDocumentUrl}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      If the document doesn't display, try opening it in a new tab.
-                    </p>
-                    <button
-                      onClick={() => window.open(currentDocumentUrl, '_blank')}
-                      className="btn btn-outline btn-xs mt-1"
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Open in New Tab
-                    </button>
+              <iframe
+                src={currentDocumentUrl}
+                className="w-full h-full border rounded"
+                title="Document Viewer"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Analysis Modal */}
+      {showAIAnalysis && currentAIAnalysis && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Brain className="w-5 h-5 text-yellow-600" />
+                AI Document Analysis
+              </h3>
+              <button
+                onClick={() => setShowAIAnalysis(false)}
+                className="btn btn-ghost btn-sm"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className={`p-4 rounded-lg border-2 ${
+                currentAIAnalysis.status === 'critical' 
+                  ? 'bg-red-50 border-red-200' 
+                  : currentAIAnalysis.status === 'warning'
+                  ? 'bg-yellow-50 border-yellow-200'
+                  : 'bg-green-50 border-green-200'
+              }`}>
+                <div className="flex items-start gap-3">
+                  {getAIStatusIcon(currentAIAnalysis.status)}
+                  <div className="flex-1">
+                    <h4 className="font-semibold mb-2">Analysis Summary</h4>
+                    <p className="text-sm mb-4">{currentAIAnalysis.summary}</p>
+                    
+                    {currentAIAnalysis.concerns.length > 0 && (
+                      <div>
+                        <h5 className="font-semibold text-sm mb-2">Identified Concerns:</h5>
+                        <ul className="list-disc list-inside text-sm space-y-1">
+                          {currentAIAnalysis.concerns.map((concern, idx) => (
+                            <li key={idx} className={
+                              currentAIAnalysis.status === 'critical' ? 'text-red-700' :
+                              currentAIAnalysis.status === 'warning' ? 'text-yellow-700' :
+                              'text-green-700'
+                            }>{concern}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-600">Document URL not available</p>
-                    <button
-                      onClick={() => setShowDocumentModal(false)}
-                      className="btn btn-primary mt-4"
-                    >
-                      Close
-                    </button>
-                  </div>
-                </div>
-              )}
+              </div>
+              
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> This AI analysis is provided as a decision support tool. 
+                  Officers should use their judgment and consider all factors when making final decisions.
+                </p>
+              </div>
             </div>
           </div>
         </div>
