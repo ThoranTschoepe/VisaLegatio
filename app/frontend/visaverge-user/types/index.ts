@@ -88,3 +88,5 @@ export interface ChatResponse {
   confidence?: number
   followUpQuestions?: string[]
 }
+
+export * from './embassy.types'

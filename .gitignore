@@ -1,3 +1,4 @@
+# Node.js dependencies across all projects
 **/node_modules/
 **/npm-debug.log*
 **/yarn-debug.log*
@@ -7,3 +8,160 @@
 **/package-lock.json
 **/yarn.lock
 **/pnpm-lock.yaml
+
+# Environment variables
+**/.env*
+!**/.env.example
+!**/.env.template
+
+# Build outputs
+**/dist/
+**/build/
+**/.next/
+**/out/
+**/.nuxt/
+**/.output/
+**/.vite/
+**/.svelte-kit/
+
+# Cache directories
+**/.cache/
+**/.tmp/
+**/.temp/
+**/tmp/
+**/.turbo/
+**/.nx/cache/
+
+# TypeScript
+**/*.tsbuildinfo
+**/next-env.d.ts
+
+# Testing
+**/coverage/
+**/.nyc_output/
+**/test-results/
+**/playwright-report/
+**/test-results.xml
+
+# Logs
+**/logs/
+**/*.log
+
+# IDE and Editor files
+.vscode/
+.idea/
+**/*.swp
+**/*.swo
+**/*~
+**/.project
+**/.classpath
+**/.settings/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+**/Thumbs.db
+**/.DS_Store
+
+# Database files
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# Docker
+**/.dockerignore
+**/Dockerfile.dev
+docker-compose.override.yml
+.docker/
+
+# Deployment
+.vercel/
+.netlify/
+.firebase/
+
+# Python (if you have Python services)
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/pip-log.txt
+**/pip-delete-this-directory.txt
+**/.venv/
+**/venv/
+**/env/
+
+# Go (if you have Go services)
+**/vendor/
+
+# Rust (if you have Rust services)
+**/target/
+
+# Java (if you have Java services)
+**/*.class
+**/*.jar
+**/*.war
+**/*.ear
+**/target/
+
+# Documentation builds
+**/docs/_build/
+**/site/
+
+# Temporary files
+**/*.tmp
+**/*.temp
+**/*.swp
+**/*.swo
+**/*.bak
+**/*.backup
+
+# Archive files
+**/*.zip
+**/*.tar.gz
+**/*.rar
+**/*.7z
+
+# Security and secrets
+**/secrets/
+**/private/
+**/*.pem
+**/*.key
+**/*.crt
+**/*.p12
+**/*.pfx
+
+# Terraform (if you use IaC)
+**/*.tfstate
+**/*.tfstate.backup
+**/.terraform/
+**/.terraform.lock.hcl
+
+# Kubernetes (if you use k8s)
+**/secrets.yaml
+**/secrets.yml
+
+# Local configuration
+**/config.local.*
+**/local.config.*
+
+# Monitoring and analytics
+**/.sentry-native/
+**/sentry.properties
+
+# Miscellaneous
+**/.eslintcache
+**/.stylelintcache
+**/.parcel-cache
+**/.svelte-kit
+**/.astro
+
+# Custom project directories (add your own)
+# /private/
+# /internal/
+# /experiments/
