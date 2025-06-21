@@ -1,4 +1,4 @@
-# backend/routes/applications.py - Applications API routes
+# backend/routes/applications.py - Fixed version
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 from database import get_db, User, Application, Document, StatusUpdate
 from models import ApplicationCreate, ApplicationResponse, ApplicationUpdate, FormQuestionsResponse, Question
-from utils import generate_id, calculate_risk_score, calculate_approval_probability, get_form_questions
+from utils import generate_id, calculate_risk_score, calculate_approval_probability, get_form_questions as get_visa_form_questions
 
 router = APIRouter()
 
@@ -243,10 +243,11 @@ async def update_application(
     return await get_application(application_id, db)
 
 @router.get("/{visa_type}/questions", response_model=FormQuestionsResponse)
-async def get_form_questions(visa_type: str, answers: dict = {}):
+async def get_questions_for_visa_type(visa_type: str):
     """Get dynamic form questions for a visa type"""
     
-    questions = get_form_questions(visa_type, answers)
+    # Call the utility function with proper name
+    questions = get_visa_form_questions(visa_type, {})
     return FormQuestionsResponse(questions=questions)
 
 # Utility functions

@@ -1,286 +1,273 @@
-// utils/api.ts
+// app/frontend/visaverge-user/utils/api.ts - Updated API integration with Python backend
 
 import { ChatResponse, Question, VisaApplication, VisaType } from '@/types'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
-// Mock API responses for development (replace with real API calls later)
-export const api = {
+// API Client with error handling
+class APIClient {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${API_BASE}${endpoint}`
+    
+    const config: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    }
+
+    try {
+      const response = await fetch(url, config)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      return await response.json()
+    } catch (error) {
+      console.error(`API Error [${endpoint}]:`, error)
+      throw error
+    }
+  }
+
   // Chat with AVA
-  async chat(message: string): Promise<ChatResponse> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    const lowerMessage = message.toLowerCase()
-    
-    if (lowerMessage.includes('tourist') || lowerMessage.includes('vacation') || lowerMessage.includes('holiday')) {
-      return {
-        response: "Perfect! For a tourist visa, you'll typically need a passport, bank statements, travel insurance, and a travel itinerary. The process usually takes 5-10 business days. Would you like me to start your application?",
-        suggestedVisaType: 'tourist',
-        nextAction: 'start_form',
-        confidence: 0.9,
-        followUpQuestions: ["How long do you plan to stay?", "Which country are you visiting?"]
-      }
-    }
-    
-    if (lowerMessage.includes('business') || lowerMessage.includes('work') || lowerMessage.includes('conference')) {
-      return {
-        response: "Great! For a business visa, you'll need an invitation letter from the company, your employment details, and proof of business activities. This typically takes 7-15 business days. Shall we begin your application?",
-        suggestedVisaType: 'business',
-        nextAction: 'start_form',
-        confidence: 0.85,
-        followUpQuestions: ["Do you have an invitation letter?", "What type of business activities?"]
-      }
-    }
-    
-    if (lowerMessage.includes('student') || lowerMessage.includes('study') || lowerMessage.includes('university')) {
-      return {
-        response: "Excellent! For a student visa, you'll need an acceptance letter from your educational institution, proof of finances, and academic transcripts. Processing takes 15-30 business days. Ready to start?",
-        suggestedVisaType: 'student',
-        nextAction: 'start_form',
-        confidence: 0.92
-      }
-    }
-    
-    if (lowerMessage.includes('family') || lowerMessage.includes('visit') || lowerMessage.includes('relative')) {
-      return {
-        response: "I understand you want to visit family! You'll need an invitation from your family member, proof of relationship, and financial documentation. Processing typically takes 10-20 business days. Let's get started!",
-        suggestedVisaType: 'family_visit',
-        nextAction: 'start_form',
-        confidence: 0.88
-      }
-    }
-    
-    return {
-      response: "Hi! I'm AVA, your AI visa assistant. I can help you with tourist, business, student, work, or family visit visas. What type of travel are you planning? 🛂✈️",
-      nextAction: 'continue_chat',
-      confidence: 0.5
-    }
-  },
+  async chat(message: string, sessionId?: string): Promise<ChatResponse> {
+    const response = await this.request<any>('/chat/', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        message,
+        session_id: sessionId 
+      }),
+    })
 
-  // Get dynamic form questions
+    // Transform backend response to frontend format
+    return {
+      response: response.response,
+      suggestedVisaType: response.suggested_visa_type,
+      nextAction: response.next_action,
+      confidence: response.confidence,
+      followUpQuestions: response.follow_up_questions || []
+    }
+  }
+
+  // Get form questions for a visa type
   async getFormQuestions(visaType: VisaType, currentAnswers: Record<string, any> = {}): Promise<Question[]> {
-    await new Promise(resolve => setTimeout(resolve, 500))
+    const response = await this.request<{ questions: Question[] }>(`/applications/${visaType}/questions`, {
+      method: 'GET'
+    })
     
-    const baseQuestions: Record<VisaType, Question[]> = {
-      tourist: [
-        {
-          id: 'destination_country',
-          text: 'Which country are you planning to visit?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'travel_purpose',
-          text: 'What is the main purpose of your visit?',
-          type: 'select',
-          options: ['Sightseeing', 'Visiting friends/family', 'Cultural events', 'Medical treatment'],
-          required: true
-        },
-        {
-          id: 'duration',
-          text: 'How many days do you plan to stay?',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 90, message: 'Tourist stays are typically 1-90 days' }
-        },
-        {
-          id: 'accommodation',
-          text: 'Where will you be staying?',
-          type: 'select',
-          options: ['Hotel', 'Airbnb', 'With friends/family', 'Hostel', 'Other'],
-          required: true
-        }
-      ],
-      business: [
-        {
-          id: 'destination_country',
-          text: 'Which country is your business visit to?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'business_purpose',
-          text: 'What type of business activities?',
-          type: 'select',
-          options: ['Conference/Meeting', 'Training', 'Negotiations', 'Site visit', 'Trade fair'],
-          required: true
-        },
-        {
-          id: 'company_name',
-          text: 'What is your company name?',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'invitation_company',
-          text: 'Name of the inviting company/organization',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'duration',
-          text: 'Duration of business visit (days)?',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 30, message: 'Business visits are typically 1-30 days' }
-        }
-      ],
-      student: [
-        {
-          id: 'destination_country',
-          text: 'Which country will you study in?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'institution_name',
-          text: 'Name of educational institution',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'study_level',
-          text: 'Level of study',
-          type: 'select',
-          options: ['Bachelor\'s degree', 'Master\'s degree', 'PhD', 'Exchange program', 'Language course'],
-          required: true
-        },
-        {
-          id: 'study_duration',
-          text: 'Duration of studies (months)',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 60, message: 'Study duration typically 1-60 months' }
-        }
-      ],
-      work: [
-        {
-          id: 'destination_country',
-          text: 'Which country will you work in?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'job_title',
-          text: 'Job title/position',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'employer_name',
-          text: 'Employer company name',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'contract_duration',
-          text: 'Contract duration (months)',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 60, message: 'Work contracts typically 1-60 months' }
-        }
-      ],
-      family_visit: [
-        {
-          id: 'destination_country',
-          text: 'Which country are you visiting?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'relationship',
-          text: 'Relationship to person you\'re visiting',
-          type: 'select',
-          options: ['Spouse', 'Parent', 'Child', 'Sibling', 'Grandparent', 'Other family'],
-          required: true
-        },
-        {
-          id: 'host_name',
-          text: 'Name of person you\'re visiting',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'visit_duration',
-          text: 'Duration of visit (days)',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 180, message: 'Family visits typically 1-180 days' }
-        }
-      ],
-      transit: [
-        {
-          id: 'transit_country',
-          text: 'Which country are you transiting through?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'final_destination',
-          text: 'What is your final destination?',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'transit_duration',
-          text: 'How long is your layover (hours)?',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 24, message: 'Transit typically 1-24 hours' }
-        }
-      ]
-    }
-    
-    return baseQuestions[visaType] || []
-  },
+    return response.questions
+  }
 
-  // Submit application
-  async submitApplication(application: Partial<VisaApplication>): Promise<VisaApplication> {
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    const now = new Date()
-    const estimatedDecision = new Date(now.getTime() + (10 * 24 * 60 * 60 * 1000)) // 10 days from now
-    
-    return {
-      id: `app_${Date.now()}`,
-      userId: 'user_123',
-      visaType: application.visaType!,
-      status: 'submitted',
-      answers: application.answers || {},
-      documents: application.documents || [],
-      createdAt: now,
-      updatedAt: now,
-      submittedAt: now,
-      estimatedDecision,
-      approvalProbability: Math.floor(Math.random() * 30) + 70 // 70-100%
-    }
-  },
+  // Submit visa application
+  async submitApplication(application: {
+    visaType: VisaType
+    answers: Record<string, any>
+    documents: any[]
+  }): Promise<VisaApplication> {
+    const response = await this.request<any>('/applications/', {
+      method: 'POST',
+      body: JSON.stringify({
+        visa_type: application.visaType,
+        answers: application.answers,
+        documents: application.documents
+      }),
+    })
+
+    // Transform backend response to frontend format
+    return this.transformApplicationResponse(response)
+  }
 
   // Get application status
   async getApplicationStatus(applicationId: string): Promise<VisaApplication> {
-    await new Promise(resolve => setTimeout(resolve, 800))
+    const response = await this.request<any>(`/applications/${applicationId}`)
+    return this.transformApplicationResponse(response)
+  }
+
+  // Get all applications (for embassy dashboard)
+  async getApplications(filters: { status?: string; search?: string } = {}): Promise<VisaApplication[]> {
+    const params = new URLSearchParams()
+    if (filters.status) params.append('status', filters.status)
+    if (filters.search) params.append('search', filters.search)
     
-    // Mock status progression
-    const statuses: any[] = ['submitted', 'document_review', 'background_check', 'officer_review']
-    const currentStatusIndex = Math.floor(Math.random() * statuses.length)
+    const queryString = params.toString()
+    const endpoint = queryString ? `/applications/?${queryString}` : '/applications/'
     
-    return {
-      id: applicationId,
-      userId: 'user_123',
-      visaType: 'tourist',
-      status: statuses[currentStatusIndex],
-      answers: {},
-      documents: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      approvalProbability: Math.floor(Math.random() * 30) + 70
+    const response = await this.request<any[]>(endpoint)
+    return response.map(app => this.transformApplicationResponse(app))
+  }
+
+  // Update application status (embassy officer)
+  async updateApplicationStatus(
+    applicationId: string, 
+    update: { status?: string; notes?: string; officer_id?: string }
+  ): Promise<VisaApplication> {
+    const response = await this.request<any>(`/applications/${applicationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(update),
+    })
+    
+    return this.transformApplicationResponse(response)
+  }
+
+  // Officer authentication
+  async officerLogin(credentials: {
+    officer_id: string
+    password: string
+    embassy: string
+  }): Promise<any> {
+    return await this.request<any>('/officers/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    })
+  }
+
+  // Get analytics data
+  async getAnalytics(filters: { embassy_id?: string; days?: number } = {}): Promise<any> {
+    const params = new URLSearchParams()
+    if (filters.embassy_id) params.append('embassy_id', filters.embassy_id)
+    if (filters.days) params.append('days', filters.days.toString())
+    
+    const queryString = params.toString()
+    const endpoint = queryString ? `/analytics/dashboard?${queryString}` : '/analytics/dashboard'
+    
+    return await this.request<any>(endpoint)
+  }
+
+  // Upload document
+  async uploadDocument(
+    applicationId: string,
+    documentType: string,
+    file: File
+  ): Promise<any> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('application_id', applicationId)
+    formData.append('document_type', documentType)
+
+    const response = await fetch(`${API_BASE}/documents/upload`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`)
     }
+
+    return await response.json()
+  }
+
+  // Get chat history
+  async getChatHistory(sessionId: string): Promise<any[]> {
+    return await this.request<any[]>(`/chat/history/${sessionId}`)
+  }
+
+  // Health check
+  async healthCheck(): Promise<{ status: string }> {
+    return await this.request<{ status: string }>('/health')
+  }
+
+  // Transform backend application response to frontend format
+  private transformApplicationResponse(backendApp: any): VisaApplication {
+    return {
+      id: backendApp.id,
+      userId: backendApp.user_id,
+      visaType: backendApp.visa_type,
+      status: backendApp.status,
+      answers: backendApp.answers || {},
+      documents: backendApp.documents || [],
+      createdAt: new Date(backendApp.submitted_at),
+      updatedAt: new Date(backendApp.updated_at),
+      submittedAt: backendApp.submitted_at ? new Date(backendApp.submitted_at) : undefined,
+      estimatedDecision: backendApp.estimated_decision ? new Date(backendApp.estimated_decision) : undefined,
+      approvalProbability: backendApp.approval_probability,
+      
+      // Additional fields from backend
+      applicantName: backendApp.applicant_name || backendApp.answers?.applicant_name,
+      country: backendApp.country || backendApp.answers?.destination_country,
+      priority: backendApp.priority,
+      riskScore: backendApp.risk_score,
+      documentsCount: backendApp.documents_count || (backendApp.documents?.length || 0),
+      estimatedDays: backendApp.estimated_days,
+      lastActivity: backendApp.last_activity ? new Date(backendApp.last_activity) : new Date(backendApp.updated_at)
+    }
+  }
+}
+
+// Create API instance
+export const api = new APIClient()
+
+// Export additional utilities
+export const apiUtils = {
+  // Check if backend is available
+  async isBackendAvailable(): Promise<boolean> {
+    try {
+      await api.healthCheck()
+      return true
+    } catch (error) {
+      console.warn('Backend not available, falling back to mock data')
+      return false
+    }
+  },
+
+  // Generate session ID for chat
+  generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  },
+
+  // Format error messages for users
+  formatErrorMessage(error: any): string {
+    if (error.message) {
+      return error.message
+    }
+    
+    if (typeof error === 'string') {
+      return error
+    }
+    
+    return 'An unexpected error occurred. Please try again.'
+  },
+
+  // Get status color helper (for UI components)
+  getStatusColor(status: string): string {
+    switch (status) {
+      case 'approved':
+        return 'text-green-600'
+      case 'rejected':
+        return 'text-red-600'
+      case 'requires_interview':
+        return 'text-yellow-600'
+      case 'submitted':
+        return 'text-blue-600'
+      case 'document_review':
+      case 'background_check':
+      case 'officer_review':
+        return 'text-purple-600'
+      default:
+        return 'text-gray-600'
+    }
+  },
+
+  // Get priority color helper
+  getPriorityColor(priority: string): string {
+    switch (priority) {
+      case 'urgent':
+        return 'text-red-600'
+      case 'high':
+        return 'text-orange-600'
+      case 'normal':
+        return 'text-blue-600'
+      default:
+        return 'text-gray-600'
+    }
+  },
+
+  // Get risk score color helper
+  getRiskColor(score: number): string {
+    if (score < 10) return 'text-green-600'
+    if (score < 20) return 'text-yellow-600'
+    return 'text-red-600'
   }
 }

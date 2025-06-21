@@ -3,8 +3,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, User, Sparkles } from 'lucide-react'
 import { Message, VisaType } from '@/types'
-import { api } from '@/utils/api'
+import { api, apiUtils } from '@/utils/api'
 import { Button, Badge } from '@/components/UI'
+import { useAlertStore } from '@/lib/stores/alert.store'
 
 interface ChatInterfaceProps {
   onVisaTypeSelected?: (visaType: VisaType) => void
@@ -21,7 +22,10 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId] = useState(() => apiUtils.generateSessionId())
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { showError, showSuccess } = useAlertStore()
+  const [isBackendAvailable, setIsBackendAvailable] = useState(true)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -30,6 +34,20 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Check backend availability on component mount
+  useEffect(() => {
+    checkBackendHealth()
+  }, [])
+
+  const checkBackendHealth = async () => {
+    const available = await apiUtils.isBackendAvailable()
+    setIsBackendAvailable(available)
+    
+    if (!available) {
+      showError('Backend not available - using demo mode')
+    }
+  }
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return
@@ -46,27 +64,53 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
     setIsLoading(true)
 
     try {
-      const response = await api.chat(input.trim())
-      
-      const avaMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: response.response,
-        sender: 'ava',
-        timestamp: new Date(),
-        metadata: {
-          suggestedVisaType: response.suggestedVisaType,
-          nextAction: response.nextAction,
-          confidence: response.confidence
+      if (!isBackendAvailable) {
+        // Fallback to mock response
+        const mockResponse = getMockChatResponse(input.trim())
+        const avaMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: mockResponse.response,
+          sender: 'ava',
+          timestamp: new Date(),
+          metadata: {
+            suggestedVisaType: mockResponse.suggestedVisaType,
+            nextAction: mockResponse.nextAction,
+            confidence: mockResponse.confidence
+          }
         }
-      }
+        setMessages(prev => [...prev, avaMessage])
+        
+        // Trigger visa type selection if needed
+        if (mockResponse.nextAction === 'start_form' && mockResponse.suggestedVisaType && onVisaTypeSelected) {
+          setTimeout(() => {
+            onVisaTypeSelected(mockResponse.suggestedVisaType!)
+          }, 1000)
+        }
+      } else {
+        // Use real backend
+        const response = await api.chat(input.trim(), sessionId)
+        
+        const avaMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: response.response,
+          sender: 'ava',
+          timestamp: new Date(),
+          metadata: {
+            suggestedVisaType: response.suggestedVisaType,
+            nextAction: response.nextAction,
+            confidence: response.confidence
+          }
+        }
 
-      setMessages(prev => [...prev, avaMessage])
+        setMessages(prev => [...prev, avaMessage])
 
-      // If AVA suggests starting a form, trigger the callback
-      if (response.nextAction === 'start_form' && response.suggestedVisaType && onVisaTypeSelected) {
-        setTimeout(() => {
-          onVisaTypeSelected(response.suggestedVisaType!)
-        }, 1000)
+        // If AVA suggests starting a form, trigger the callback
+        if (response.nextAction === 'start_form' && response.suggestedVisaType && onVisaTypeSelected) {
+          showSuccess(`Starting ${response.suggestedVisaType} visa application!`)
+          setTimeout(() => {
+            onVisaTypeSelected(response.suggestedVisaType!)
+          }, 1000)
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -77,6 +121,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
+      showError('Failed to send message - please try again')
     } finally {
       setIsLoading(false)
     }
@@ -96,6 +141,11 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
     "Family visit visa"
   ]
 
+  const handleQuickReply = (reply: string) => {
+    setInput(reply)
+    setTimeout(() => sendMessage(), 100)
+  }
+
   return (
     <div className="flex flex-col h-full bg-base-100 rounded-lg shadow-lg overflow-hidden border border-base-300">
       {/* Header */}
@@ -107,17 +157,21 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
                 <Bot className="w-6 h-6 text-primary m-2" />
               </div>
             </div>
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-success rounded-full animate-pulse" />
+            <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse ${
+              isBackendAvailable ? 'bg-success' : 'bg-warning'
+            }`} />
           </div>
           <div>
             <h3 className="font-semibold text-lg flex items-center gap-2">
               AVA - AI Visa Assistant
               <Badge variant="ghost" className="text-xs bg-white/20 text-white border-white/30">
                 <Sparkles className="w-3 h-3 mr-1" />
-                AI
+                {isBackendAvailable ? 'AI' : 'Demo'}
               </Badge>
             </h3>
-            <p className="text-primary-content/70 text-sm">Online • Ready to help</p>
+            <p className="text-primary-content/70 text-sm">
+              {isBackendAvailable ? 'Online • Ready to help' : 'Demo mode • Limited functionality'}
+            </p>
           </div>
         </div>
       </div>
@@ -206,10 +260,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
                 key={index}
                 variant="ghost"
                 size="xs"
-                onClick={() => {
-                  setInput(reply)
-                  setTimeout(sendMessage, 100)
-                }}
+                onClick={() => handleQuickReply(reply)}
                 className="text-xs"
               >
                 {reply}
@@ -244,8 +295,38 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
         </div>
         <p className="text-xs opacity-50 mt-2 text-center">
           AVA can make mistakes. Please verify important information.
+          {!isBackendAvailable && ' • Currently in demo mode'}
         </p>
       </div>
     </div>
   )
+}
+
+// Mock chat response for fallback
+function getMockChatResponse(message: string): any {
+  const lowerMessage = message.toLowerCase()
+  
+  if (lowerMessage.includes('tourist') || lowerMessage.includes('vacation') || lowerMessage.includes('holiday')) {
+    return {
+      response: "Perfect! For a tourist visa, you'll typically need a passport, bank statements, travel insurance, and a travel itinerary. The process usually takes 5-10 business days. Would you like me to start your application?",
+      suggestedVisaType: 'tourist',
+      nextAction: 'start_form',
+      confidence: 0.9
+    }
+  }
+  
+  if (lowerMessage.includes('business') || lowerMessage.includes('work') || lowerMessage.includes('conference')) {
+    return {
+      response: "Great! For a business visa, you'll need an invitation letter from the company, your employment details, and proof of business activities. This typically takes 7-15 business days. Shall we begin your application?",
+      suggestedVisaType: 'business',
+      nextAction: 'start_form',
+      confidence: 0.85
+    }
+  }
+  
+  return {
+    response: "I'm running in demo mode. I can help you with tourist, business, student, work, or family visit visas. What type of travel are you planning?",
+    nextAction: 'continue_chat',
+    confidence: 0.5
+  }
 }

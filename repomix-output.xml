@@ -41,15 +41,40 @@ The content is organized as follows:
 
 <directory_structure>
 app/
+  backend/
+    routes/
+      __init__.py
+      analytics.py
+      applications.py
+      chat.py
+      documents.py
+      officers.py
+    database.py
+    main.py
+    models.py
+    README.md
+    requirements.txt
+    run.py
+    utils.py
   frontend/
     visaverge-user/
       app/
+        embassy/
+          layout.tsx
+          loading.tsx
+          page.tsx
         globals.css
         layout.tsx
         page.tsx
       components/
         Alert/
           AlertContainer.tsx
+        Embassy/
+          AnalyticsDashboard.tsx
+          ApplicationReview.tsx
+          EmbassyDashboard.tsx
+          EmbassyLogin.tsx
+          index.tsx
         Layout/
           DarkModeSwitcher/
             DarkModeSelect/
@@ -86,6 +111,7 @@ app/
         vercel.svg
         window.svg
       types/
+        embassy.types.ts
         index.ts
       utils/
         api.ts
@@ -107,6 +133,1928 @@ notion_page.md
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="app/backend/routes/__init__.py">
+# backend/routes/__init__.py - Route module initializer
+
+# This file makes the routes directory a Python package
+# Import all route modules here for easy access
+
+from . import applications
+from . import chat
+from . import officers
+from . import analytics
+from . import documents
+
+__all__ = ["applications", "chat", "officers", "analytics", "documents"]
+</file>
+
+<file path="app/backend/routes/analytics.py">
+# backend/routes/analytics.py - Analytics and reporting API
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import func, case
+from datetime import datetime, timedelta
+from typing import Optional
+
+from database import get_db, Application, Document, StatusUpdate
+from models import AnalyticsResponse
+
+router = APIRouter()
+
+@router.get("/dashboard", response_model=AnalyticsResponse)
+async def get_dashboard_analytics(
+    embassy_id: Optional[str] = Query(None, description="Filter by embassy"),
+    days: Optional[int] = Query(30, description="Number of days to analyze"),
+    db: Session = Depends(get_db)
+):
+    """Get analytics data for embassy dashboard"""
+    
+    # Date range
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # Base query
+    query = db.query(Application)
+    if embassy_id:
+        # In a real app, filter by embassy through officer assignments
+        pass
+    
+    # Total applications
+    total_applications = query.count()
+    
+    # Applications in date range
+    recent_apps = query.filter(Application.submitted_at >= start_date).all()
+    
+    # Basic statistics
+    total_recent = len(recent_apps)
+    approved_count = len([app for app in recent_apps if app.status == "approved"])
+    rejected_count = len([app for app in recent_apps if app.status == "rejected"])
+    pending_count = len([app for app in recent_apps if app.status not in ["approved", "rejected"]])
+    
+    # Approval rate
+    processed_count = approved_count + rejected_count
+    approval_rate = (approved_count / processed_count * 100) if processed_count > 0 else 0
+    
+    # Average processing time (mock calculation)
+    avg_processing_time = 8.5  # Mock value for demo
+    
+    # Trends data (last 6 months)
+    trends_data = []
+    for i in range(6):
+        month_start = datetime.utcnow().replace(day=1) - timedelta(days=30*i)
+        month_end = month_start + timedelta(days=30)
+        
+        month_apps = [app for app in recent_apps 
+                     if month_start <= app.submitted_at < month_end]
+        
+        trends_data.append({
+            "month": month_start.strftime("%b %Y"),
+            "applications": len(month_apps),
+            "approvals": len([app for app in month_apps if app.status == "approved"]),
+            "rejections": len([app for app in month_apps if app.status == "rejected"])
+        })
+    
+    trends_data.reverse()  # Chronological order
+    
+    # Visa type distribution
+    visa_types = {}
+    for app in recent_apps:
+        visa_types[app.visa_type] = visa_types.get(app.visa_type, 0) + 1
+    
+    visa_type_distribution = [
+        {
+            "type": visa_type.title(),
+            "count": count,
+            "percentage": round(count / total_recent * 100, 1) if total_recent > 0 else 0
+        }
+        for visa_type, count in visa_types.items()
+    ]
+    
+    # Country statistics (mock data for demo)
+    country_stats = [
+        {"country": "Germany", "applications": 425, "approval_rate": 92.5},
+        {"country": "United Kingdom", "applications": 298, "approval_rate": 88.9},
+        {"country": "France", "applications": 234, "approval_rate": 85.7},
+        {"country": "Spain", "applications": 156, "approval_rate": 83.3},
+        {"country": "Italy", "applications": 134, "approval_rate": 89.6}
+    ]
+    
+    # Processing time by visa type (mock data)
+    processing_time_by_type = [
+        {"visa_type": "Tourist", "avg_days": 6.5, "trend": "down"},
+        {"visa_type": "Business", "avg_days": 8.2, "trend": "stable"},
+        {"visa_type": "Student", "avg_days": 14.8, "trend": "up"},
+        {"visa_type": "Work", "avg_days": 21.3, "trend": "down"},
+        {"visa_type": "Family Visit", "avg_days": 9.7, "trend": "stable"}
+    ]
+    
+    return AnalyticsResponse(
+        total_applications=total_applications,
+        approval_rate=approval_rate,
+        avg_processing_time=avg_processing_time,
+        pending_applications=pending_count,
+        trends_data=trends_data,
+        visa_type_distribution=visa_type_distribution,
+        country_stats=country_stats,
+        processing_time_by_type=processing_time_by_type
+    )
+
+@router.get("/metrics/summary")
+async def get_metrics_summary(db: Session = Depends(get_db)):
+    """Get quick metrics summary for dashboard cards"""
+    
+    # Count applications by status
+    status_counts = db.query(
+        Application.status,
+        func.count(Application.id).label('count')
+    ).group_by(Application.status).all()
+    
+    status_dict = {status: count for status, count in status_counts}
+    
+    return {
+        "total_applications": sum(status_dict.values()),
+        "pending_review": sum(
+            status_dict.get(status, 0) 
+            for status in ["submitted", "document_review", "background_check", "officer_review"]
+        ),
+        "approved_today": status_dict.get("approved", 0),  # Simplified for demo
+        "rejected_today": status_dict.get("rejected", 0),
+        "avg_processing_days": 8.5  # Mock value
+    }
+</file>
+
+<file path="app/backend/routes/applications.py">
+# backend/routes/applications.py - Applications API routes
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from typing import List, Optional
+import json
+from datetime import datetime, timedelta
+
+from database import get_db, User, Application, Document, StatusUpdate
+from models import ApplicationCreate, ApplicationResponse, ApplicationUpdate, FormQuestionsResponse, Question
+from utils import generate_id, calculate_risk_score, calculate_approval_probability, get_form_questions
+
+router = APIRouter()
+
+@router.get("/", response_model=List[ApplicationResponse])
+async def get_applications(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    search: Optional[str] = Query(None, description="Search by name or ID"),
+    db: Session = Depends(get_db)
+):
+    """Get all applications with optional filtering"""
+    
+    query = db.query(Application)
+    
+    # Filter by status
+    if status and status != "all":
+        query = query.filter(Application.status == status)
+    
+    applications = query.order_by(Application.submitted_at.desc()).all()
+    
+    # Process applications for frontend
+    result = []
+    for app in applications:
+        answers = json.loads(app.answers) if app.answers else {}
+        
+        # Get document count
+        doc_count = db.query(Document).filter(Document.application_id == app.id).count()
+        
+        app_data = ApplicationResponse(
+            id=app.id,
+            user_id=app.user_id,
+            visa_type=app.visa_type,
+            status=app.status,
+            priority=app.priority,
+            risk_score=app.risk_score,
+            answers=answers,
+            submitted_at=app.submitted_at,
+            updated_at=app.updated_at,
+            estimated_decision=app.estimated_decision,
+            approval_probability=app.approval_probability,
+            assigned_officer_id=app.assigned_officer_id,
+            
+            # Computed fields
+            applicant_name=answers.get("applicant_name", f"Applicant {app.id[-4:]}"),
+            country=answers.get("destination_country", "Unknown"),
+            documents_count=doc_count,
+            estimated_days=get_estimated_days(app.status, app.visa_type),
+            last_activity=app.updated_at
+        )
+        
+        # Apply search filter
+        if search:
+            search_lower = search.lower()
+            if (search_lower not in app_data.id.lower() and 
+                search_lower not in (app_data.applicant_name or "").lower()):
+                continue
+        
+        result.append(app_data)
+    
+    return result
+
+@router.get("/{application_id}", response_model=ApplicationResponse)
+async def get_application(application_id: str, db: Session = Depends(get_db)):
+    """Get a specific application by ID"""
+    
+    app = db.query(Application).filter(Application.id == application_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Get related data
+    documents = db.query(Document).filter(Document.application_id == application_id).all()
+    status_updates = db.query(StatusUpdate).filter(StatusUpdate.application_id == application_id).all()
+    
+    answers = json.loads(app.answers) if app.answers else {}
+    
+    return ApplicationResponse(
+        id=app.id,
+        user_id=app.user_id,
+        visa_type=app.visa_type,
+        status=app.status,
+        priority=app.priority,
+        risk_score=app.risk_score,
+        answers=answers,
+        submitted_at=app.submitted_at,
+        updated_at=app.updated_at,
+        estimated_decision=app.estimated_decision,
+        approval_probability=app.approval_probability,
+        assigned_officer_id=app.assigned_officer_id,
+        
+        # Computed fields
+        applicant_name=answers.get("applicant_name", f"Applicant {app.id[-4:]}"),
+        country=answers.get("destination_country", "Unknown"),
+        documents_count=len(documents),
+        estimated_days=get_estimated_days(app.status, app.visa_type),
+        last_activity=app.updated_at,
+        
+        # Relationships
+        documents=[{
+            "id": doc.id,
+            "name": doc.name,
+            "type": doc.type,
+            "size": doc.size,
+            "verified": doc.verified,
+            "uploaded_at": doc.uploaded_at,
+            "file_path": doc.file_path
+        } for doc in documents],
+        status_updates=[{
+            "id": update.id,
+            "status": update.status,
+            "notes": update.notes,
+            "officer_id": update.officer_id,
+            "timestamp": update.timestamp
+        } for update in status_updates]
+    )
+
+@router.post("/", response_model=ApplicationResponse)
+async def create_application(application: ApplicationCreate, db: Session = Depends(get_db)):
+    """Create a new visa application"""
+    
+    # Generate IDs
+    app_id = generate_id("VSV")
+    user_id = generate_id("user")
+    
+    # Calculate risk score and approval probability
+    risk_score = calculate_risk_score(application.visa_type, application.answers)
+    approval_probability = calculate_approval_probability(risk_score, application.documents)
+    
+    # Create user (simplified for demo)
+    user = User(
+        id=user_id,
+        email=application.answers.get("email", f"user{app_id[-6:]}@example.com"),
+        name=application.answers.get("applicant_name", "Demo User"),
+        phone=application.answers.get("phone", ""),
+        nationality=application.answers.get("nationality", "")
+    )
+    db.add(user)
+    
+    # Create application
+    new_app = Application(
+        id=app_id,
+        user_id=user_id,
+        visa_type=application.visa_type,
+        status="submitted",
+        priority=get_priority_from_risk(risk_score),
+        risk_score=risk_score,
+        answers=json.dumps(application.answers),
+        estimated_decision=datetime.utcnow() + timedelta(days=get_estimated_days("submitted", application.visa_type)),
+        approval_probability=approval_probability
+    )
+    db.add(new_app)
+    
+    # Create initial status update
+    status_update = StatusUpdate(
+        id=generate_id("status"),
+        application_id=app_id,
+        status="submitted",
+        notes="Application submitted successfully",
+        timestamp=datetime.utcnow()
+    )
+    db.add(status_update)
+    
+    # Create documents
+    for doc_data in application.documents:
+        document = Document(
+            id=generate_id("doc"),
+            application_id=app_id,
+            name=doc_data.get("name", "Unknown Document"),
+            type=doc_data.get("type", "unknown"),
+            size=doc_data.get("size", 0),
+            verified=doc_data.get("verified", False)
+        )
+        db.add(document)
+    
+    db.commit()
+    db.refresh(new_app)
+    
+    return ApplicationResponse(
+        id=new_app.id,
+        user_id=new_app.user_id,
+        visa_type=new_app.visa_type,
+        status=new_app.status,
+        priority=new_app.priority,
+        risk_score=new_app.risk_score,
+        answers=json.loads(new_app.answers),
+        submitted_at=new_app.submitted_at,
+        updated_at=new_app.updated_at,
+        estimated_decision=new_app.estimated_decision,
+        approval_probability=new_app.approval_probability,
+        assigned_officer_id=new_app.assigned_officer_id,
+        
+        applicant_name=application.answers.get("applicant_name", "Demo User"),
+        country=application.answers.get("destination_country", "Unknown"),
+        documents_count=len(application.documents),
+        estimated_days=get_estimated_days("submitted", application.visa_type),
+        last_activity=new_app.updated_at
+    )
+
+@router.put("/{application_id}", response_model=ApplicationResponse)
+async def update_application(
+    application_id: str, 
+    update: ApplicationUpdate, 
+    db: Session = Depends(get_db)
+):
+    """Update application status (used by embassy officers)"""
+    
+    app = db.query(Application).filter(Application.id == application_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Update fields
+    if update.status:
+        app.status = update.status
+        app.updated_at = datetime.utcnow()
+        
+        # Create status update record
+        status_update = StatusUpdate(
+            id=generate_id("status"),
+            application_id=application_id,
+            status=update.status,
+            notes=update.notes,
+            officer_id=update.officer_id,
+            timestamp=datetime.utcnow()
+        )
+        db.add(status_update)
+    
+    if update.officer_id:
+        app.assigned_officer_id = update.officer_id
+    
+    db.commit()
+    db.refresh(app)
+    
+    # Return updated application
+    return await get_application(application_id, db)
+
+@router.get("/{visa_type}/questions", response_model=FormQuestionsResponse)
+async def get_form_questions(visa_type: str, answers: dict = {}):
+    """Get dynamic form questions for a visa type"""
+    
+    questions = get_form_questions(visa_type, answers)
+    return FormQuestionsResponse(questions=questions)
+
+# Utility functions
+def get_estimated_days(status: str, visa_type: str) -> int:
+    """Calculate estimated processing days based on status and visa type"""
+    base_days = {
+        "tourist": 7,
+        "business": 10,
+        "student": 21,
+        "work": 30,
+        "family_visit": 14,
+        "transit": 3
+    }
+    
+    status_multipliers = {
+        "submitted": 1.0,
+        "document_review": 0.8,
+        "background_check": 0.6,
+        "officer_review": 0.3,
+        "approved": 0,
+        "rejected": 0
+    }
+    
+    base = base_days.get(visa_type, 10)
+    multiplier = status_multipliers.get(status, 1.0)
+    
+    return max(1, int(base * multiplier))
+
+def get_priority_from_risk(risk_score: int) -> str:
+    """Determine priority based on risk score"""
+    if risk_score >= 80:
+        return "urgent"
+    elif risk_score >= 60:
+        return "high"
+    elif risk_score >= 30:
+        return "normal"
+    else:
+        return "low"
+</file>
+
+<file path="app/backend/routes/chat.py">
+# backend/routes/chat.py - AVA Chat API routes
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+import json
+import re
+from typing import Dict, List
+
+from database import get_db, ChatMessage as ChatMessageDB
+from models import ChatMessage, ChatResponse, VisaType
+from utils import generate_id
+
+router = APIRouter()
+
+@router.post("/", response_model=ChatResponse)
+async def chat_with_ava(message: ChatMessage, db: Session = Depends(get_db)):
+    """Chat with AVA - AI Visa Assistant"""
+    
+    # Generate session ID if not provided
+    session_id = message.session_id or generate_id("chat")
+    
+    # Save user message
+    user_msg = ChatMessageDB(
+        id=generate_id("msg"),
+        session_id=session_id,
+        message=message.message,
+        sender="user"
+    )
+    db.add(user_msg)
+    
+    # Process message with AVA
+    response = process_ava_message(message.message, session_id, db)
+    
+    # Save AVA response
+    ava_msg = ChatMessageDB(
+        id=generate_id("msg"),
+        session_id=session_id,
+        message=response.response,
+        sender="ava",
+        message_metadata=json.dumps({
+            "suggested_visa_type": response.suggested_visa_type,
+            "next_action": response.next_action,
+            "confidence": response.confidence
+        })
+    )
+    db.add(ava_msg)
+    
+    db.commit()
+    
+    return response
+
+@router.get("/history/{session_id}")
+async def get_chat_history(session_id: str, db: Session = Depends(get_db)):
+    """Get chat history for a session"""
+    
+    messages = db.query(ChatMessageDB).filter(
+        ChatMessageDB.session_id == session_id
+    ).order_by(ChatMessageDB.timestamp.asc()).all()
+    
+    return [
+        {
+            "id": msg.id,
+            "message": msg.message,
+            "sender": msg.sender,
+            "timestamp": msg.timestamp,
+            "metadata": json.loads(msg.message_metadata) if msg.message_metadata else None
+        }
+        for msg in messages
+    ]
+
+def process_ava_message(message: str, session_id: str, db: Session) -> ChatResponse:
+    """Process user message and generate AVA response"""
+    
+    message_lower = message.lower()
+    
+    # Greeting responses
+    if any(word in message_lower for word in ["hi", "hello", "hey", "start"]):
+        return ChatResponse(
+            response="Hi! I'm AVA, your AI visa assistant. I can help you find the right visa and guide you through the application process. What type of travel are you planning? 🛂✈️",
+            next_action="continue_chat",
+            confidence=1.0
+        )
+    
+    # Tourist visa detection
+    if any(word in message_lower for word in ["tourist", "vacation", "holiday", "sightsee", "leisure", "travel"]):
+        return ChatResponse(
+            response="Perfect! For a tourist visa, you'll typically need a passport, bank statements, travel insurance, and a travel itinerary. The process usually takes 5-10 business days. Would you like me to start your application?",
+            suggested_visa_type=VisaType.TOURIST,
+            next_action="start_form",
+            confidence=0.9,
+            follow_up_questions=["How long do you plan to stay?", "Which country are you visiting?"]
+        )
+    
+    # Business visa detection
+    if any(word in message_lower for word in ["business", "work", "conference", "meeting", "company", "trade"]):
+        return ChatResponse(
+            response="Great! For a business visa, you'll need an invitation letter from the company, your employment details, and proof of business activities. This typically takes 7-15 business days. Shall we begin your application?",
+            suggested_visa_type=VisaType.BUSINESS,
+            next_action="start_form",
+            confidence=0.85,
+            follow_up_questions=["Do you have an invitation letter?", "What type of business activities?"]
+        )
+    
+    # Student visa detection
+    if any(word in message_lower for word in ["student", "study", "university", "college", "education", "course"]):
+        return ChatResponse(
+            response="Excellent! For a student visa, you'll need an acceptance letter from your educational institution, proof of finances, and academic transcripts. Processing takes 15-30 business days. Ready to start?",
+            suggested_visa_type=VisaType.STUDENT,
+            next_action="start_form",
+            confidence=0.92,
+            follow_up_questions=["Do you have an acceptance letter?", "What are you planning to study?"]
+        )
+    
+    # Work visa detection
+    if any(word in message_lower for word in ["work visa", "employment", "job", "employer", "hire"]):
+        return ChatResponse(
+            response="I can help with your work visa! You'll need a job offer letter, employer sponsorship, and proof of qualifications. Processing typically takes 20-45 business days. Let's get started!",
+            suggested_visa_type=VisaType.WORK,
+            next_action="start_form",
+            confidence=0.88,
+            follow_up_questions=["Do you have a job offer?", "What type of work will you be doing?"]
+        )
+    
+    # Family visit detection
+    if any(word in message_lower for word in ["family", "visit", "relative", "spouse", "parent", "child"]):
+        return ChatResponse(
+            response="I understand you want to visit family! You'll need an invitation from your family member, proof of relationship, and financial documentation. Processing typically takes 10-20 business days. Let's get started!",
+            suggested_visa_type=VisaType.FAMILY_VISIT,
+            next_action="start_form",
+            confidence=0.88,
+            follow_up_questions=["Who are you visiting?", "What's your relationship to them?"]
+        )
+    
+    # Transit visa detection
+    if any(word in message_lower for word in ["transit", "layover", "connecting", "stopover"]):
+        return ChatResponse(
+            response="For transit visas, you'll need your onward ticket and passport. Transit visas are usually processed within 1-3 business days. Would you like to apply?",
+            suggested_visa_type=VisaType.TRANSIT,
+            next_action="start_form",
+            confidence=0.95,
+            follow_up_questions=["How long is your layover?", "What's your final destination?"]
+        )
+    
+    # Country-specific responses
+    countries = extract_countries(message_lower)
+    if countries:
+        country = countries[0].title()
+        return ChatResponse(
+            response=f"I can help you with your visa for {country}! What's the purpose of your visit? Are you traveling for tourism, business, study, or another reason?",
+            next_action="continue_chat",
+            confidence=0.8,
+            follow_up_questions=[
+                f"Tourism in {country}",
+                f"Business in {country}",
+                f"Study in {country}"
+            ]
+        )
+    
+    # Help and guidance
+    if any(word in message_lower for word in ["help", "guide", "what", "how", "need"]):
+        return ChatResponse(
+            response="I'm here to help! I can assist you with:\n\n• Finding the right visa type for your travel\n• Explaining document requirements\n• Guiding you through the application process\n• Checking your eligibility\n\nWhat would you like to know more about?",
+            next_action="continue_chat",
+            confidence=0.7,
+            follow_up_questions=[
+                "What visa types are available?",
+                "What documents do I need?",
+                "How long does processing take?"
+            ]
+        )
+    
+    # Default response
+    return ChatResponse(
+        response="I want to make sure I understand your needs correctly. Could you tell me more about your travel plans? For example:\n\n• What country are you planning to visit?\n• What's the purpose of your trip?\n• How long do you plan to stay?\n\nThis will help me recommend the right visa type for you! 🌍",
+        next_action="continue_chat",
+        confidence=0.5,
+        follow_up_questions=[
+            "I need a tourist visa",
+            "I'm traveling for business",
+            "I'm visiting family",
+            "I'm going to study"
+        ]
+    )
+
+def extract_countries(text: str) -> List[str]:
+    """Extract country names from text"""
+    countries = [
+        "germany", "france", "spain", "italy", "netherlands", "uk", "united kingdom",
+        "usa", "united states", "canada", "australia", "japan", "china", "india",
+        "brazil", "mexico", "russia", "south africa", "egypt", "turkey"
+    ]
+    
+    found_countries = []
+    for country in countries:
+        if country in text:
+            found_countries.append(country)
+    
+    return found_countries
+</file>
+
+<file path="app/backend/routes/documents.py">
+# backend/routes/documents.py - Document handling API
+
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from sqlalchemy.orm import Session
+import os
+import shutil
+from typing import List
+
+from database import get_db, Document as DocumentDB, Application
+from models import DocumentResponse, DocumentUpload
+from utils import generate_id
+
+router = APIRouter()
+
+@router.post("/upload")
+async def upload_document(
+    application_id: str,
+    document_type: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """Upload a document for an application"""
+    
+    # Verify application exists
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Create uploads directory if it doesn't exist
+    os.makedirs("uploads", exist_ok=True)
+    
+    # Generate unique filename
+    file_extension = os.path.splitext(file.filename)[1]
+    filename = f"{generate_id('doc')}{file_extension}"
+    file_path = os.path.join("uploads", filename)
+    
+    # Save file
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Create document record
+    document = DocumentDB(
+        id=generate_id("doc"),
+        application_id=application_id,
+        name=file.filename,
+        type=document_type,
+        size=file.size,
+        verified=False,  # Will be verified later
+        file_path=file_path
+    )
+    
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+    
+    return DocumentResponse(
+        id=document.id,
+        name=document.name,
+        type=document.type,
+        size=document.size,
+        verified=document.verified,
+        uploaded_at=document.uploaded_at,
+        file_path=document.file_path
+    )
+
+@router.get("/application/{application_id}", response_model=List[DocumentResponse])
+async def get_documents_by_application(application_id: str, db: Session = Depends(get_db)):
+    """Get all documents for an application"""
+    
+    documents = db.query(DocumentDB).filter(
+        DocumentDB.application_id == application_id
+    ).all()
+    
+    return [
+        DocumentResponse(
+            id=doc.id,
+            name=doc.name,
+            type=doc.type,
+            size=doc.size,
+            verified=doc.verified,
+            uploaded_at=doc.uploaded_at,
+            file_path=doc.file_path
+        )
+        for doc in documents
+    ]
+
+@router.put("/{document_id}/verify")
+async def verify_document(document_id: str, verified: bool, db: Session = Depends(get_db)):
+    """Mark a document as verified or not verified"""
+    
+    document = db.query(DocumentDB).filter(DocumentDB.id == document_id).first()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    document.verified = verified
+    db.commit()
+    
+    return {"message": f"Document {'verified' if verified else 'marked as unverified'}"}
+</file>
+
+<file path="app/backend/routes/officers.py">
+# backend/routes/officers.py - Officers authentication API
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from database import get_db, Officer
+from models import OfficerLogin, OfficerResponse
+
+router = APIRouter()
+
+@router.post("/login", response_model=OfficerResponse)
+async def officer_login(credentials: OfficerLogin, db: Session = Depends(get_db)):
+    """Authenticate embassy officer"""
+    
+    officer = db.query(Officer).filter(
+        Officer.id == credentials.officer_id,
+        Officer.password_hash == credentials.password  # In real app, use proper password hashing
+    ).first()
+    
+    if not officer:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    
+    return OfficerResponse(
+        id=officer.id,
+        name=officer.name,
+        email=officer.email,
+        role=officer.role,
+        embassy_id=officer.embassy_id,
+        created_at=officer.created_at
+    )
+
+@router.get("/profile/{officer_id}", response_model=OfficerResponse)
+async def get_officer_profile(officer_id: str, db: Session = Depends(get_db)):
+    """Get officer profile information"""
+    
+    officer = db.query(Officer).filter(Officer.id == officer_id).first()
+    if not officer:
+        raise HTTPException(status_code=404, detail="Officer not found")
+    
+    return OfficerResponse(
+        id=officer.id,
+        name=officer.name,
+        email=officer.email,
+        role=officer.role,
+        embassy_id=officer.embassy_id,
+        created_at=officer.created_at
+    )
+</file>
+
+<file path="app/backend/database.py">
+# backend/database.py - Database configuration and models
+
+from sqlalchemy import create_engine, Column, String, Integer, Float, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session, relationship
+from datetime import datetime
+import os
+
+# Database configuration
+DATABASE_URL = "sqlite:///./visaverge.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# Database Models
+class User(Base):
+    __tablename__ = "users"
+    
+    id = Column(String, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    name = Column(String)
+    phone = Column(String)
+    nationality = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    applications = relationship("Application", back_populates="user")
+
+class Application(Base):
+    __tablename__ = "applications"
+    
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"))
+    visa_type = Column(String, nullable=False)
+    status = Column(String, default="submitted")  # submitted, document_review, background_check, officer_review, approved, rejected
+    priority = Column(String, default="normal")   # low, normal, high, urgent
+    risk_score = Column(Integer, default=0)
+    answers = Column(Text)  # JSON blob
+    submitted_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    estimated_decision = Column(DateTime)
+    approval_probability = Column(Integer)
+    assigned_officer_id = Column(String, ForeignKey("officers.id"))
+    
+    # Relationships
+    user = relationship("User", back_populates="applications")
+    documents = relationship("Document", back_populates="application")
+    status_updates = relationship("StatusUpdate", back_populates="application")
+    assigned_officer = relationship("Officer", back_populates="assigned_applications")
+
+class Document(Base):
+    __tablename__ = "documents"
+    
+    id = Column(String, primary_key=True, index=True)
+    application_id = Column(String, ForeignKey("applications.id"))
+    name = Column(String, nullable=False)
+    type = Column(String, nullable=False)  # passport, photo, bank_statement, etc.
+    size = Column(Integer)
+    verified = Column(Boolean, default=False)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+    file_path = Column(String)
+    
+    # Relationships
+    application = relationship("Application", back_populates="documents")
+
+class Officer(Base):
+    __tablename__ = "officers"
+    
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    email = Column(String, unique=True)
+    role = Column(String, nullable=False)  # Senior Consular Officer, Consular Officer, etc.
+    embassy_id = Column(String, nullable=False)
+    password_hash = Column(String, nullable=False)  # In real app, use proper hashing
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    assigned_applications = relationship("Application", back_populates="assigned_officer")
+    status_updates = relationship("StatusUpdate", back_populates="officer")
+
+class StatusUpdate(Base):
+    __tablename__ = "status_updates"
+    
+    id = Column(String, primary_key=True, index=True)
+    application_id = Column(String, ForeignKey("applications.id"))
+    status = Column(String, nullable=False)
+    notes = Column(Text)
+    officer_id = Column(String, ForeignKey("officers.id"))
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    application = relationship("Application", back_populates="status_updates")
+    officer = relationship("Officer", back_populates="status_updates")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    
+    id = Column(String, primary_key=True, index=True)
+    session_id = Column(String, index=True)
+    message = Column(Text, nullable=False)
+    sender = Column(String, nullable=False)  # 'user' or 'ava'
+    message_metadata = Column(Text)  # JSON blob for confidence, suggestions, etc.
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+class Metric(Base):
+    __tablename__ = "metrics"
+    
+    id = Column(String, primary_key=True, index=True)
+    metric_type = Column(String, nullable=False)  # applications_count, approval_rate, etc.
+    metric_value = Column(Float, nullable=False)
+    period = Column(String, nullable=False)  # daily, weekly, monthly
+    date = Column(DateTime, nullable=False)
+    embassy_id = Column(String)
+
+# Database functions
+def create_tables():
+    """Create all database tables"""
+    Base.metadata.create_all(bind=engine)
+
+def get_db():
+    """Dependency to get database session"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_db_session() -> Session:
+    """Get database session for direct use"""
+    return SessionLocal()
+</file>
+
+<file path="app/backend/main.py">
+# backend/main.py - FastAPI main application
+
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+import uvicorn
+from contextlib import asynccontextmanager
+
+from database import engine, create_tables, get_db
+from models import *
+from routes import applications, chat, officers, analytics, documents
+from utils import seed_demo_data
+
+# Startup/shutdown events
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    print("🚀 Starting VisaVerge Backend...")
+    create_tables()
+    seed_demo_data()
+    print("✅ Database initialized and seeded!")
+    yield
+    # Shutdown
+    print("👋 Shutting down VisaVerge Backend...")
+
+# Create FastAPI app
+app = FastAPI(
+    title="VisaVerge API",
+    description="AI-Powered Visa Application System - Embassy Innovation Hackathon",
+    version="1.0.0",
+    docs_url="/api/docs",  # Swagger UI
+    redoc_url="/api/redoc", # ReDoc
+    lifespan=lifespan
+)
+
+# CORS middleware for frontend integration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Next.js frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Static files for document uploads
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+# Include API routes
+app.include_router(applications.router, prefix="/api/applications", tags=["Applications"])
+app.include_router(chat.router, prefix="/api/chat", tags=["AI Chat"])
+app.include_router(officers.router, prefix="/api/officers", tags=["Officers"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
+
+# Health check endpoint
+@app.get("/api/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "service": "VisaVerge Backend",
+        "version": "1.0.0",
+        "embassy": "AI-Powered Visa Processing"
+    }
+
+# Root endpoint
+@app.get("/")
+async def root():
+    return {
+        "message": "🏛️ Welcome to VisaVerge API",
+        "docs": "/api/docs",
+        "health": "/api/health",
+        "frontend": "http://localhost:3000"
+    }
+
+# Development server
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,  # Auto-reload for development
+        log_level="info"
+    )
+</file>
+
+<file path="app/backend/models.py">
+# backend/models.py - Pydantic models for API validation and serialization
+
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List, Dict, Any
+from datetime import datetime
+from enum import Enum
+
+# Enums
+class VisaType(str, Enum):
+    TOURIST = "tourist"
+    BUSINESS = "business"
+    STUDENT = "student"
+    WORK = "work"
+    FAMILY_VISIT = "family_visit"
+    TRANSIT = "transit"
+
+class ApplicationStatus(str, Enum):
+    SUBMITTED = "submitted"
+    DOCUMENT_REVIEW = "document_review"
+    BACKGROUND_CHECK = "background_check"
+    OFFICER_REVIEW = "officer_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+class Priority(str, Enum):
+    LOW = "low"
+    NORMAL = "normal"
+    HIGH = "high"
+    URGENT = "urgent"
+
+class DocumentType(str, Enum):
+    PASSPORT = "passport"
+    PHOTO = "photo"
+    BANK_STATEMENT = "bank_statement"
+    INVITATION_LETTER = "invitation_letter"
+    TRAVEL_INSURANCE = "travel_insurance"
+    EMPLOYMENT_LETTER = "employment_letter"
+    FLIGHT_ITINERARY = "flight_itinerary"
+
+# Request Models
+class ApplicationCreate(BaseModel):
+    visa_type: VisaType
+    answers: Dict[str, Any]
+    documents: Optional[List[Dict[str, Any]]] = []
+
+class ApplicationUpdate(BaseModel):
+    status: Optional[ApplicationStatus] = None
+    notes: Optional[str] = None
+    officer_id: Optional[str] = None
+
+class ChatMessage(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+class OfficerLogin(BaseModel):
+    officer_id: str
+    password: str
+    embassy: str
+
+class DocumentUpload(BaseModel):
+    application_id: str
+    name: str
+    type: DocumentType
+    size: Optional[int] = None
+
+# Response Models
+class UserResponse(BaseModel):
+    id: str
+    email: Optional[str]
+    name: Optional[str]
+    nationality: Optional[str]
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class DocumentResponse(BaseModel):
+    id: str
+    name: str
+    type: str
+    size: Optional[int]
+    verified: bool
+    uploaded_at: datetime
+    file_path: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+class StatusUpdateResponse(BaseModel):
+    id: str
+    status: str
+    notes: Optional[str]
+    officer_id: Optional[str]
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class ApplicationResponse(BaseModel):
+    id: str
+    user_id: str
+    visa_type: str
+    status: str
+    priority: str
+    risk_score: int
+    answers: Dict[str, Any]
+    submitted_at: datetime
+    updated_at: datetime
+    estimated_decision: Optional[datetime]
+    approval_probability: Optional[int]
+    assigned_officer_id: Optional[str]
+    
+    # Computed fields for frontend
+    applicant_name: Optional[str] = None
+    country: Optional[str] = None
+    documents_count: Optional[int] = None
+    estimated_days: Optional[int] = None
+    last_activity: Optional[datetime] = None
+    
+    # Relationships
+    documents: Optional[List[DocumentResponse]] = []
+    status_updates: Optional[List[StatusUpdateResponse]] = []
+
+    class Config:
+        from_attributes = True
+
+class OfficerResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: str
+    embassy_id: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ChatResponse(BaseModel):
+    response: str
+    suggested_visa_type: Optional[VisaType] = None
+    next_action: str = "continue_chat"  # continue_chat, start_form, upload_documents, submit_application
+    confidence: Optional[float] = None
+    follow_up_questions: Optional[List[str]] = []
+
+class AnalyticsResponse(BaseModel):
+    total_applications: int
+    approval_rate: float
+    avg_processing_time: float
+    pending_applications: int
+    trends_data: List[Dict[str, Any]]
+    visa_type_distribution: List[Dict[str, Any]]
+    country_stats: List[Dict[str, Any]]
+    processing_time_by_type: List[Dict[str, Any]]
+
+# Question models for dynamic forms
+class QuestionValidation(BaseModel):
+    min: Optional[int] = None
+    max: Optional[int] = None
+    pattern: Optional[str] = None
+    message: Optional[str] = None
+
+class QuestionDependency(BaseModel):
+    question_id: str
+    value: Any
+
+class Question(BaseModel):
+    id: str
+    text: str
+    type: str  # text, select, number, date, file
+    options: Optional[List[str]] = None
+    required: bool = True
+    validation: Optional[QuestionValidation] = None
+    depends_on: Optional[QuestionDependency] = None
+
+class FormQuestionsResponse(BaseModel):
+    questions: List[Question]
+</file>
+
+<file path="app/backend/README.md">
+# VisaVerge Backend API
+
+## Quick Start for Hackathon
+
+### 1. Setup
+```bash
+# Navigate to backend folder
+cd backend
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create uploads directory
+mkdir uploads
+
+# Run the server
+python main.py
+```
+
+### 2. The API will be available at:
+- **API Server**: http://localhost:8000
+- **Interactive Docs**: http://localhost:8000/api/docs
+- **Health Check**: http://localhost:8000/api/health
+
+### 3. Demo Credentials
+**Embassy Officers:**
+- `maria.schmidt` / `demo123` (Senior Officer)
+- `john.davis` / `demo123` (Standard Officer)  
+- `admin` / `admin` (Administrator)
+
+### 4. Frontend Integration
+Update your frontend API calls to point to:
+```javascript
+const API_BASE = 'http://localhost:8000/api'
+```
+
+### 5. Key Endpoints
+- `GET /api/applications` - Get all applications
+- `POST /api/applications` - Create new application
+- `PUT /api/applications/{id}` - Update application status
+- `POST /api/chat` - Chat with AVA
+- `POST /api/officers/login` - Officer authentication
+- `GET /api/analytics` - Dashboard analytics
+
+### 6. Database
+- SQLite database (`visaverge.db`) created automatically
+- Demo data seeded on first run
+- No additional setup required!
+
+## Architecture
+- **FastAPI** - Modern Python web framework
+- **SQLAlchemy** - Database ORM
+- **SQLite** - Zero-config database
+- **Pydantic** - Data validation and serialization
+</file>
+
+<file path="app/backend/requirements.txt">
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+</file>
+
+<file path="app/backend/run.py">
+import uvicorn
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", 8000)),
+        reload=os.getenv("DEBUG", "False").lower() == "true",
+        log_level="info"
+    )
+</file>
+
+<file path="app/backend/utils.py">
+# backend/utils.py - Utility functions and demo data seeding
+
+import random
+import string
+import json
+from datetime import datetime, timedelta
+from typing import Dict, Any, List
+from sqlalchemy.orm import Session
+
+from database import get_db_session, User, Application, Document, Officer, StatusUpdate
+from models import Question, QuestionValidation
+
+def generate_id(prefix: str = "") -> str:
+    """Generate a unique ID with optional prefix"""
+    timestamp = str(int(datetime.now().timestamp() * 1000))[-8:]
+    random_part = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+    
+    if prefix:
+        return f"{prefix}-{timestamp}-{random_part}"
+    return f"{timestamp}-{random_part}"
+
+def calculate_risk_score(visa_type: str, answers: Dict[str, Any]) -> int:
+    """Calculate risk score based on visa type and answers"""
+    
+    # Base scores by visa type
+    base_scores = {
+        "tourist": 5,
+        "business": 10,
+        "student": 15,
+        "work": 20,
+        "family_visit": 8,
+        "transit": 3
+    }
+    
+    score = base_scores.get(visa_type, 10)
+    
+    # Duration factor
+    duration = int(answers.get("duration", 0))
+    if duration > 90:
+        score += 15
+    elif duration > 30:
+        score += 10
+    elif duration > 7:
+        score += 5
+    
+    # Country factor (simplified)
+    high_risk_countries = ["country_x", "country_y"]  # Demo placeholder
+    if answers.get("destination_country", "").lower() in high_risk_countries:
+        score += 20
+    
+    # Employment status
+    if answers.get("employment_status") == "unemployed":
+        score += 10
+    
+    # Previous visa violations (mock check)
+    if answers.get("previous_violations", False):
+        score += 25
+    
+    # Add some randomness for demo variety
+    score += random.randint(0, 10)
+    
+    return min(max(score, 0), 100)
+
+def calculate_approval_probability(risk_score: int, documents: List[Dict] = None) -> int:
+    """Calculate approval probability based on risk score and documents"""
+    
+    if documents is None:
+        documents = []
+    
+    # Base probability (inverse of risk)
+    probability = 100 - risk_score
+    
+    # Document completeness factor
+    if documents:
+        verified_docs = sum(1 for doc in documents if doc.get("verified", False))
+        total_docs = len(documents)
+        doc_completeness = (verified_docs / total_docs) * 100 if total_docs > 0 else 0
+        
+        # Average with document completeness
+        probability = (probability + doc_completeness) / 2
+    
+    # Keep in realistic range
+    return max(min(int(probability), 95), 60)
+
+def get_form_questions(visa_type: str, current_answers: Dict[str, Any] = None) -> List[Question]:
+    """Get dynamic form questions based on visa type and current answers"""
+    
+    if current_answers is None:
+        current_answers = {}
+    
+    # Base questions for all visa types
+    base_questions = [
+        Question(
+            id="applicant_name",
+            text="What is your full name?",
+            type="text",
+            required=True
+        ),
+        Question(
+            id="destination_country",
+            text="Which country are you applying to visit?",
+            type="select",
+            options=["Germany", "France", "Spain", "Italy", "Netherlands", "United Kingdom", "Other"],
+            required=True
+        ),
+        Question(
+            id="nationality",
+            text="What is your nationality?",
+            type="text",
+            required=True
+        ),
+        Question(
+            id="passport_number",
+            text="Passport number",
+            type="text",
+            required=True,
+            validation=QuestionValidation(
+                pattern="^[A-Z0-9]{6,9}$",
+                message="Please enter a valid passport number"
+            )
+        ),
+        Question(
+            id="email",
+            text="Email address",
+            type="text",
+            required=True,
+            validation=QuestionValidation(
+                pattern="^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$",
+                message="Please enter a valid email address"
+            )
+        ),
+        Question(
+            id="phone",
+            text="Phone number",
+            type="text",
+            required=True
+        )
+    ]
+    
+    # Visa type specific questions
+    visa_specific_questions = {
+        "tourist": [
+            Question(
+                id="travel_purpose",
+                text="What is the main purpose of your visit?",
+                type="select",
+                options=["Sightseeing", "Visiting friends/family", "Cultural events", "Medical treatment"],
+                required=True
+            ),
+            Question(
+                id="duration",
+                text="How many days do you plan to stay?",
+                type="number",
+                required=True,
+                validation=QuestionValidation(
+                    min=1,
+                    max=90,
+                    message="Tourist stays are typically 1-90 days"
+                )
+            ),
+            Question(
+                id="accommodation",
+                text="Where will you be staying?",
+                type="select",
+                options=["Hotel", "Airbnb", "With friends/family", "Hostel", "Other"],
+                required=True
+            ),
+            Question(
+                id="return_ticket",
+                text="Do you have a return ticket?",
+                type="select",
+                options=["Yes", "No"],
+                required=True
+            )
+        ],
+        
+        "business": [
+            Question(
+                id="business_purpose",
+                text="What type of business activities?",
+                type="select",
+                options=["Conference/Meeting", "Training", "Negotiations", "Site visit", "Trade fair"],
+                required=True
+            ),
+            Question(
+                id="company_name",
+                text="What is your company name?",
+                type="text",
+                required=True
+            ),
+            Question(
+                id="invitation_company",
+                text="Name of the inviting company/organization",
+                type="text",
+                required=True
+            ),
+            Question(
+                id="duration",
+                text="Duration of business visit (days)?",
+                type="number",
+                required=True,
+                validation=QuestionValidation(
+                    min=1,
+                    max=30,
+                    message="Business visits are typically 1-30 days"
+                )
+            ),
+            Question(
+                id="employment_letter",
+                text="Do you have an employment letter from your company?",
+                type="select",
+                options=["Yes", "No"],
+                required=True
+            )
+        ],
+        
+        "student": [
+            Question(
+                id="institution_name",
+                text="Name of educational institution",
+                type="text",
+                required=True
+            ),
+            Question(
+                id="study_level",
+                text="Level of study",
+                type="select",
+                options=["Bachelor's degree", "Master's degree", "PhD", "Exchange program", "Language course"],
+                required=True
+            ),
+            Question(
+                id="study_duration",
+                text="Duration of studies (months)",
+                type="number",
+                required=True,
+                validation=QuestionValidation(
+                    min=1,
+                    max=60,
+                    message="Study duration typically 1-60 months"
+                )
+            ),
+            Question(
+                id="acceptance_letter",
+                text="Do you have an acceptance letter?",
+                type="select",
+                options=["Yes", "No"],
+                required=True
+            ),
+            Question(
+                id="financial_support",
+                text="How will you finance your studies?",
+                type="select",
+                options=["Personal funds", "Scholarship", "Family support", "Student loan", "Other"],
+                required=True
+            )
+        ],
+        
+        "work": [
+            Question(
+                id="job_title",
+                text="Job title/position",
+                type="text",
+                required=True
+            ),
+            Question(
+                id="employer_name",
+                text="Employer company name",
+                type="text",
+                required=True
+            ),
+            Question(
+                id="contract_duration",
+                text="Contract duration (months)",
+                type="number",
+                required=True,
+                validation=QuestionValidation(
+                    min=1,
+                    max=60,
+                    message="Work contracts typically 1-60 months"
+                )
+            ),
+            Question(
+                id="work_permit",
+                text="Do you have a work permit?",
+                type="select",
+                options=["Yes", "No", "Applied"],
+                required=True
+            ),
+            Question(
+                id="salary",
+                text="Annual salary (in EUR)",
+                type="number",
+                required=True,
+                validation=QuestionValidation(
+                    min=20000,
+                    message="Please enter annual salary"
+                )
+            )
+        ],
+        
+        "family_visit": [
+            Question(
+                id="relationship",
+                text="Relationship to person you're visiting",
+                type="select",
+                options=["Spouse", "Parent", "Child", "Sibling", "Grandparent", "Other family"],
+                required=True
+            ),
+            Question(
+                id="host_name",
+                text="Name of person you're visiting",
+                type="text",
+                required=True
+            ),
+            Question(
+                id="visit_duration",
+                text="Duration of visit (days)",
+                type="number",
+                required=True,
+                validation=QuestionValidation(
+                    min=1,
+                    max=180,
+                    message="Family visits typically 1-180 days"
+                )
+            ),
+            Question(
+                id="invitation_letter",
+                text="Do you have an invitation letter?",
+                type="select",
+                options=["Yes", "No"],
+                required=True
+            ),
+            Question(
+                id="host_status",
+                text="Immigration status of your host",
+                type="select",
+                options=["Citizen", "Permanent resident", "Temporary resident", "Student", "Other"],
+                required=True
+            )
+        ],
+        
+        "transit": [
+            Question(
+                id="final_destination",
+                text="What is your final destination?",
+                type="text",
+                required=True
+            ),
+            Question(
+                id="transit_duration",
+                text="How long is your layover (hours)?",
+                type="number",
+                required=True,
+                validation=QuestionValidation(
+                    min=1,
+                    max=24,
+                    message="Transit typically 1-24 hours"
+                )
+            ),
+            Question(
+                id="onward_ticket",
+                text="Do you have an onward ticket?",
+                type="select",
+                options=["Yes", "No"],
+                required=True
+            )
+        ]
+    }
+    
+    # Combine base questions with visa-specific questions
+    questions = base_questions + visa_specific_questions.get(visa_type, [])
+    
+    return questions
+
+def seed_demo_data():
+    """Seed database with demo data for hackathon presentation"""
+    
+    db = get_db_session()
+    
+    try:
+        # Check if data already exists
+        if db.query(Officer).count() > 0:
+            print("Demo data already exists, skipping seeding...")
+            return
+        
+        # Create demo officers
+        officers = [
+            Officer(
+                id="maria.schmidt",
+                name="Officer Maria Schmidt",
+                email="maria@embassy.gov",
+                role="Senior Consular Officer",
+                embassy_id="us_berlin",
+                password_hash="demo123"  # In real app, use proper hashing
+            ),
+            Officer(
+                id="john.davis",
+                name="Officer John Davis",
+                email="john@embassy.gov",
+                role="Consular Officer",
+                embassy_id="us_berlin",
+                password_hash="demo123"
+            ),
+            Officer(
+                id="admin",
+                name="Administrator",
+                email="admin@embassy.gov",
+                role="System Administrator",
+                embassy_id="us_berlin",
+                password_hash="admin"
+            )
+        ]
+        
+        for officer in officers:
+            db.add(officer)
+        
+        # Create demo users and applications
+        demo_applications = [
+            {
+                "applicant_name": "Sarah Johnson",
+                "visa_type": "business",
+                "status": "officer_review",
+                "country": "United States",
+                "answers": {
+                    "applicant_name": "Sarah Johnson",
+                    "destination_country": "Germany",
+                    "business_purpose": "Conference/Meeting",
+                    "company_name": "Tech Solutions Inc.",
+                    "invitation_company": "Berlin Tech Conference",
+                    "duration": "7",
+                    "email": "sarah.johnson@techsolutions.com",
+                    "phone": "+1-555-0123"
+                }
+            },
+            {
+                "applicant_name": "Miguel Rodriguez",
+                "visa_type": "tourist",
+                "status": "document_review",
+                "country": "Spain",
+                "answers": {
+                    "applicant_name": "Miguel Rodriguez",
+                    "destination_country": "Germany",
+                    "travel_purpose": "Sightseeing",
+                    "duration": "14",
+                    "accommodation": "Hotel",
+                    "email": "miguel.rodriguez@email.com",
+                    "phone": "+34-666-123456"
+                }
+            },
+            {
+                "applicant_name": "Anna Chen",
+                "visa_type": "student",
+                "status": "background_check",
+                "country": "China",
+                "answers": {
+                    "applicant_name": "Anna Chen",
+                    "destination_country": "Germany",
+                    "institution_name": "Technical University of Munich",
+                    "study_level": "Master's degree",
+                    "study_duration": "24",
+                    "email": "anna.chen@student.tum.de",
+                    "phone": "+86-138-0013-8000"
+                }
+            },
+            {
+                "applicant_name": "James Wilson",
+                "visa_type": "work",
+                "status": "submitted",
+                "country": "United Kingdom",
+                "answers": {
+                    "applicant_name": "James Wilson",
+                    "destination_country": "Germany",
+                    "job_title": "Software Engineer",
+                    "employer_name": "German Tech Corp",
+                    "contract_duration": "36",
+                    "email": "james.wilson@germantech.de",
+                    "phone": "+44-20-7946-0958"
+                }
+            }
+        ]
+        
+        for i, app_data in enumerate(demo_applications):
+            # Create user
+            user_id = generate_id("user")
+            user = User(
+                id=user_id,
+                email=app_data["answers"]["email"],
+                name=app_data["applicant_name"],
+                phone=app_data["answers"]["phone"],
+                nationality=app_data["country"]
+            )
+            db.add(user)
+            
+            # Create application
+            app_id = generate_id("VSV")
+            risk_score = calculate_risk_score(app_data["visa_type"], app_data["answers"])
+            
+            application = Application(
+                id=app_id,
+                user_id=user_id,
+                visa_type=app_data["visa_type"],
+                status=app_data["status"],
+                priority=["high", "normal", "normal", "urgent"][i],
+                risk_score=risk_score,
+                answers=json.dumps(app_data["answers"]),
+                submitted_at=datetime.utcnow() - timedelta(days=random.randint(1, 5)),
+                approval_probability=calculate_approval_probability(risk_score),
+                assigned_officer_id="maria.schmidt" if i < 2 else "john.davis"
+            )
+            db.add(application)
+            
+            # Create demo documents
+            doc_types = ["passport", "photo", "bank_statement", "invitation_letter"]
+            for j, doc_type in enumerate(doc_types[:3 + i]):  # Varying number of documents
+                document = Document(
+                    id=generate_id("doc"),
+                    application_id=app_id,
+                    name=f"{doc_type.replace('_', ' ').title()}",
+                    type=doc_type,
+                    size=random.randint(100000, 2000000),  # 100KB - 2MB
+                    verified=random.choice([True, True, False]),  # Mostly verified
+                    uploaded_at=datetime.utcnow() - timedelta(hours=random.randint(1, 48))
+                )
+                db.add(document)
+        
+        db.commit()
+        print("✅ Demo data seeded successfully!")
+        
+    except Exception as e:
+        print(f"❌ Error seeding demo data: {e}")
+        db.rollback()
+    finally:
+        db.close()
+</file>
+
+<file path="app/frontend/visaverge-user/app/embassy/layout.tsx">
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Embassy Portal - VisaVerge',
+  description: 'Secure portal for embassy officers to manage visa applications',
+  robots: 'noindex, nofollow', // Don't index embassy pages
+}
+
+export default function EmbassyLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="embassy-portal">
+      {children}
+    </div>
+  )
+}
+</file>
+
+<file path="app/frontend/visaverge-user/app/embassy/loading.tsx">
+import { Shield } from 'lucide-react'
+
+export default function EmbassyLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-blue-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="p-3 bg-primary rounded-full animate-pulse">
+            <Shield className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-800">VisaVerge</h1>
+        </div>
+        
+        <div className="relative">
+          <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-spin mx-auto" />
+          <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-t-blue-500 rounded-full animate-spin mx-auto" />
+        </div>
+        
+        <h2 className="text-xl font-semibold text-gray-700 mt-6 mb-2">Embassy Portal</h2>
+        <p className="text-gray-600">Initializing secure connection...</p>
+        
+        <div className="mt-8 space-y-2">
+          <div className="w-64 h-2 bg-gray-200 rounded-full mx-auto overflow-hidden">
+            <div className="w-full h-full bg-primary rounded-full animate-pulse" />
+          </div>
+          <p className="text-sm text-gray-500">Verifying security protocols</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="app/frontend/visaverge-user/app/embassy/page.tsx">
+'use client'
+
+import { useState, useEffect } from 'react'
+import { EmbassyLogin, EmbassyDashboard } from '@/components/Embassy'
+import { Officer } from '@/types/embassy.types'
+
+export default function EmbassyPage() {
+  const [currentOfficer, setCurrentOfficer] = useState<Officer | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Check for existing session
+    const storedOfficer = localStorage.getItem('embassy_officer')
+    if (storedOfficer) {
+      try {
+        setCurrentOfficer(JSON.parse(storedOfficer))
+      } catch (error) {
+        console.error('Error parsing stored officer data:', error)
+        localStorage.removeItem('embassy_officer')
+      }
+    }
+    setIsLoading(false)
+  }, [])
+
+  const handleLogin = (officer: Officer) => {
+    setCurrentOfficer(officer)
+    localStorage.setItem('embassy_officer', JSON.stringify(officer))
+  }
+
+  const handleLogout = () => {
+    setCurrentOfficer(null)
+    localStorage.removeItem('embassy_officer')
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-base-200 flex items-center justify-center">
+        <div className="text-center">
+          <div className="loading loading-spinner loading-lg text-primary"></div>
+          <p className="mt-4 text-gray-600">Loading Embassy Portal...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!currentOfficer) {
+    return <EmbassyLogin onLogin={handleLogin} />
+  }
+
+  return <EmbassyDashboard officer={currentOfficer} onLogout={handleLogout} />
+}
+</file>
 
 <file path="app/frontend/visaverge-user/app/globals.css">
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
@@ -861,6 +2809,1208 @@ const AlertContainer: React.FC = () => {
 export default AlertContainer
 </file>
 
+<file path="app/frontend/visaverge-user/components/Embassy/AnalyticsDashboard.tsx">
+'use client'
+
+import { 
+  Users, 
+  CheckCircle2, 
+  Clock, 
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Download
+} from 'lucide-react'
+import { Officer } from '@/types/embassy.types'
+
+interface AnalyticsDashboardProps {
+  onBack: () => void
+  officer: Officer
+}
+
+export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboardProps) {
+  const mockData = {
+    totalApplications: 1247,
+    approvalRate: 87.3,
+    avgProcessingTime: 8.5,
+    pendingApplications: 89,
+    trendsData: [
+      { month: 'Jan 2024', applications: 156, approvals: 138, rejections: 18 },
+      { month: 'Feb 2024', applications: 189, approvals: 165, rejections: 24 },
+      { month: 'Mar 2024', applications: 203, approvals: 178, rejections: 25 },
+      { month: 'Apr 2024', applications: 221, approvals: 195, rejections: 26 },
+      { month: 'May 2024', applications: 198, approvals: 171, rejections: 27 },
+      { month: 'Jun 2024', applications: 280, approvals: 248, rejections: 32 }
+    ],
+    visaTypeDistribution: [
+      { type: 'Tourist', count: 524, percentage: 42.0 },
+      { type: 'Business', count: 312, percentage: 25.0 },
+      { type: 'Student', count: 186, percentage: 14.9 },
+      { type: 'Work', count: 124, percentage: 9.9 },
+      { type: 'Family Visit', count: 101, percentage: 8.1 }
+    ]
+  }
+
+  return (
+    <div className="min-h-screen bg-base-200">
+      {/* Header */}
+      <div className="navbar bg-base-100 shadow-lg">
+        <div className="flex-1">
+          <button className="btn btn-ghost" onClick={onBack}>
+            ← Back to Dashboard
+          </button>
+          <div className="divider divider-horizontal"></div>
+          <h1 className="text-xl font-bold">Analytics & Reports</h1>
+        </div>
+        <div className="flex-none">
+          <button className="btn btn-outline btn-sm">
+            <Download className="w-4 h-4 mr-2" />
+            Export Report
+          </button>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-6">
+        {/* Key Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <div className="flex items-center gap-3">
+                <Users className="w-8 h-8 text-primary" />
+                <div>
+                  <p className="text-2xl font-bold">{mockData.totalApplications.toLocaleString()}</p>
+                  <p className="text-sm text-gray-600">Total Applications</p>
+                </div>
+              </div>
+              <div className="text-sm text-green-600 flex items-center gap-1 mt-2">
+                <TrendingUp className="w-4 h-4" />
+                +12% from last period
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-8 h-8 text-success" />
+                <div>
+                  <p className="text-2xl font-bold">{mockData.approvalRate}%</p>
+                  <p className="text-sm text-gray-600">Approval Rate</p>
+                </div>
+              </div>
+              <div className="text-sm text-green-600 flex items-center gap-1 mt-2">
+                <TrendingUp className="w-4 h-4" />
+                +2.3% from last period
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <div className="flex items-center gap-3">
+                <Clock className="w-8 h-8 text-info" />
+                <div>
+                  <p className="text-2xl font-bold">{mockData.avgProcessingTime}d</p>
+                  <p className="text-sm text-gray-600">Avg Processing</p>
+                </div>
+              </div>
+              <div className="text-sm text-green-600 flex items-center gap-1 mt-2">
+                <TrendingDown className="w-4 h-4" />
+                -1.2 days improvement
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-8 h-8 text-warning" />
+                <div>
+                  <p className="text-2xl font-bold">{mockData.pendingApplications}</p>
+                  <p className="text-sm text-gray-600">Pending Review</p>
+                </div>
+              </div>
+              <div className="text-sm text-yellow-600 flex items-center gap-1 mt-2">
+                <Clock className="w-4 h-4" />
+                6 urgent priority
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts and Tables */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <h3 className="card-title">Application Trends</h3>
+              <div className="mt-4">
+                <div className="space-y-4">
+                  {mockData.trendsData.map((month, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">{month.month}</span>
+                        <span>{month.applications} total</span>
+                      </div>
+                      <div className="flex h-4 bg-gray-200 rounded overflow-hidden">
+                        <div 
+                          className="bg-success" 
+                          style={{ width: `${(month.approvals / month.applications) * 100}%` }}
+                        />
+                        <div 
+                          className="bg-error" 
+                          style={{ width: `${(month.rejections / month.applications) * 100}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600">
+                        <span>✅ {month.approvals} approved</span>
+                        <span>❌ {month.rejections} rejected</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <h3 className="card-title">Visa Type Distribution</h3>
+              <div className="space-y-3 mt-4">
+                {mockData.visaTypeDistribution.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full bg-primary opacity-${100 - index * 20}`} />
+                      <span className="font-medium">{item.type}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold">{item.count}</span>
+                      <span className="text-sm text-gray-600 ml-1">({item.percentage}%)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Performance Tables */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <h3 className="card-title">Processing Performance</h3>
+              <div className="space-y-4 mt-4">
+                <div className="flex justify-between items-center">
+                  <span>Tourist Visas</span>
+                  <span className="badge badge-success">6.5 days avg</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Business Visas</span>
+                  <span className="badge badge-warning">8.2 days avg</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Student Visas</span>
+                  <span className="badge badge-info">14.8 days avg</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Work Visas</span>
+                  <span className="badge badge-error">21.3 days avg</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <h3 className="card-title">Officer Performance</h3>
+              <div className="space-y-4 mt-4">
+                <div className="flex justify-between items-center">
+                  <span>Maria Schmidt</span>
+                  <div className="flex items-center gap-2">
+                    <span className="badge badge-success">98% accuracy</span>
+                    <span className="badge badge-outline">156 processed</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>John Davis</span>
+                  <div className="flex items-center gap-2">
+                    <span className="badge badge-success">96% accuracy</span>
+                    <span className="badge badge-outline">142 processed</span>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>Sarah Wilson</span>
+                  <div className="flex items-center gap-2">
+                    <span className="badge badge-warning">94% accuracy</span>
+                    <span className="badge badge-outline">128 processed</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Monthly Insights */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <h4 className="font-semibold">Peak Application Period</h4>
+              <p className="text-2xl font-bold text-primary">June 2024</p>
+              <p className="text-sm text-gray-600">280 applications received</p>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <h4 className="font-semibold">Highest Approval Rate</h4>
+              <p className="text-2xl font-bold text-success">88.6%</p>
+              <p className="text-sm text-gray-600">June 2024</p>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <h4 className="font-semibold">Growth Rate</h4>
+              <p className="text-2xl font-bold text-info">+79%</p>
+              <p className="text-sm text-gray-600">Compared to last 6 months</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="app/frontend/visaverge-user/components/Embassy/ApplicationReview.tsx">
+'use client'
+
+import { useState } from 'react'
+import { CheckCircle2, AlertTriangle, FileText } from 'lucide-react'
+import { EmbassyApplication, Officer, EmbassyDocument } from '@/types/embassy.types'
+
+interface ApplicationReviewProps {
+  application: EmbassyApplication
+  onBack: () => void
+  onUpdateStatus: (id: string, status: EmbassyApplication['status']) => void
+  officer: Officer
+}
+
+export default function ApplicationReview({ 
+  application, 
+  onBack, 
+  onUpdateStatus, 
+  officer 
+}: ApplicationReviewProps) {
+  const [decision, setDecision] = useState<'approve' | 'reject' | null>(null)
+  const [notes, setNotes] = useState('')
+  const [selectedDocument, setSelectedDocument] = useState(0)
+
+  const mockDocuments: EmbassyDocument[] = [
+    { id: '1', name: 'Passport', type: 'passport', verified: true, uploadedAt: '2024-01-15' },
+    { id: '2', name: 'Photo', type: 'photo', verified: true, uploadedAt: '2024-01-15' },
+    { id: '3', name: 'Bank Statement', type: 'bank_statement', verified: true, uploadedAt: '2024-01-15' },
+    { id: '4', name: 'Invitation Letter', type: 'invitation_letter', verified: false, uploadedAt: '2024-01-15' }
+  ]
+
+  const mockAnswers = {
+    'destination_country': 'Germany',
+    'business_purpose': 'Conference/Meeting',
+    'company_name': 'Tech Solutions Inc.',
+    'invitation_company': 'Berlin Tech Conference',
+    'duration': '7'
+  }
+
+  const handleMakeDecision = () => {
+    if (decision) {
+      const newStatus = decision === 'approve' ? 'approved' : 'rejected'
+      onUpdateStatus(application.id, newStatus)
+      onBack()
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-base-200">
+      {/* Header */}
+      <div className="navbar bg-base-100 shadow-lg">
+        <div className="flex-1">
+          <button className="btn btn-ghost" onClick={onBack}>
+            ← Back to Dashboard
+          </button>
+          <div className="divider divider-horizontal"></div>
+          <h1 className="text-xl font-bold">Application Review</h1>
+        </div>
+        <div className="flex-none">
+          <span className="text-sm text-gray-600">Reviewing as: {officer.name}</span>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Application Details */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Applicant Info */}
+            <div className="card bg-base-100 shadow">
+              <div className="card-body">
+                <h3 className="card-title">Applicant Information</h3>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-sm text-gray-600">Name</p>
+                    <p className="font-semibold">{application.applicantName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Application ID</p>
+                    <p className="font-mono text-sm">{application.id}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Visa Type</p>
+                    <span className="badge badge-primary">{application.visaType}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Country of Origin</p>
+                    <p className="font-semibold">{application.country}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Risk Assessment</p>
+                    <p className={`font-bold ${application.riskScore < 10 ? 'text-green-600' : application.riskScore < 20 ? 'text-yellow-600' : 'text-red-600'}`}>
+                      {application.riskScore}% Risk Score
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Application Answers */}
+            <div className="card bg-base-100 shadow">
+              <div className="card-body">
+                <h3 className="card-title">Application Answers</h3>
+                <div className="space-y-3">
+                  {Object.entries(mockAnswers).map(([key, value]) => (
+                    <div key={key}>
+                      <p className="text-sm text-gray-600">{key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                      <p className="font-semibold">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Middle Column - Documents */}
+          <div className="lg:col-span-1">
+            <div className="card bg-base-100 shadow h-full">
+              <div className="card-body">
+                <h3 className="card-title">Documents ({mockDocuments.length})</h3>
+                
+                {/* Document List */}
+                <div className="space-y-2">
+                  {mockDocuments.map((doc, index) => (
+                    <div 
+                      key={index}
+                      className={`p-3 rounded border cursor-pointer ${selectedDocument === index ? 'border-primary bg-primary/10' : 'border-gray-200'}`}
+                      onClick={() => setSelectedDocument(index)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-semibold">{doc.name}</p>
+                          <p className="text-sm text-gray-600">Uploaded: {doc.uploadedAt}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {doc.verified ? (
+                            <CheckCircle2 className="w-5 h-5 text-success" />
+                          ) : (
+                            <AlertTriangle className="w-5 h-5 text-warning" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Document Viewer */}
+                <div className="mt-4 p-4 border rounded bg-gray-100">
+                  <h4 className="font-semibold mb-2">{mockDocuments[selectedDocument].name}</h4>
+                  <div className="bg-white p-6 rounded border-2 border-dashed text-center">
+                    <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-600">Document Preview</p>
+                    <p className="text-sm text-gray-500">
+                      {mockDocuments[selectedDocument].verified ? 'Verified ✓' : 'Verification Pending'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Decision */}
+          <div className="lg:col-span-1">
+            <div className="card bg-base-100 shadow">
+              <div className="card-body">
+                <h3 className="card-title">Make Decision</h3>
+                
+                <div className="space-y-4">
+                  {/* Decision Buttons */}
+                  <div className="space-y-2">
+                    <button 
+                      className={`btn w-full ${decision === 'approve' ? 'btn-success' : 'btn-outline btn-success'}`}
+                      onClick={() => setDecision('approve')}
+                    >
+                      <CheckCircle2 className="w-5 h-5 mr-2" />
+                      Approve Application
+                    </button>
+                    
+                    <button 
+                      className={`btn w-full ${decision === 'reject' ? 'btn-error' : 'btn-outline btn-error'}`}
+                      onClick={() => setDecision('reject')}
+                    >
+                      <AlertTriangle className="w-5 h-5 mr-2" />
+                      Reject Application
+                    </button>
+                  </div>
+
+                  {/* Notes */}
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text">Decision Notes</span>
+                    </label>
+                    <textarea 
+                      className="textarea textarea-bordered h-24" 
+                      placeholder="Add notes about your decision..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    ></textarea>
+                  </div>
+
+                  {/* Submit Decision */}
+                  <button 
+                    className="btn btn-primary w-full"
+                    disabled={!decision}
+                    onClick={handleMakeDecision}
+                  >
+                    Submit Decision
+                  </button>
+                </div>
+
+                {/* AI Insights */}
+                <div className="mt-6 p-4 bg-info/10 rounded">
+                  <h4 className="font-semibold text-info mb-2">🤖 AI Insights</h4>
+                  <ul className="text-sm space-y-1">
+                    <li>• Strong financial documentation</li>
+                    <li>• Clear business purpose stated</li>
+                    <li>• No previous visa violations</li>
+                    <li>• All required documents present</li>
+                  </ul>
+                  <div className="mt-2">
+                    <span className="badge badge-success">85% Approval Confidence</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="app/frontend/visaverge-user/components/Embassy/EmbassyDashboard.tsx">
+'use client'
+
+import { useState, useEffect } from 'react'
+import { 
+  Users, 
+  CheckCircle2, 
+  Clock, 
+  AlertTriangle, 
+  Filter, 
+  Search,
+  FileText,
+  TrendingUp,
+  Eye,
+  MoreVertical,
+  BarChart3
+} from 'lucide-react'
+import { Officer, EmbassyApplication } from '@/types/embassy.types'
+import { api, apiUtils } from '@/utils/api'
+import ApplicationReview from './ApplicationReview'
+import AnalyticsDashboard from './AnalyticsDashboard'
+
+interface EmbassyDashboardProps {
+  officer: Officer
+  onLogout: () => void
+}
+
+const mockApplications: EmbassyApplication[] = [
+  {
+    id: 'VSV-240101-A1B2',
+    applicantName: 'Sarah Johnson',
+    visaType: 'Business',
+    status: 'officer_review',
+    submittedAt: new Date('2024-01-15'),
+    priority: 'high',
+    country: 'United States',
+    documentsCount: 4,
+    riskScore: 15,
+    estimatedDays: 2,
+    lastActivity: new Date()
+  },
+  {
+    id: 'VSV-240102-C3D4',
+    applicantName: 'Miguel Rodriguez',
+    visaType: 'Tourist',
+    status: 'document_review',
+    submittedAt: new Date('2024-01-16'),
+    priority: 'normal',
+    country: 'Spain',
+    documentsCount: 5,
+    riskScore: 8,
+    estimatedDays: 5,
+    lastActivity: new Date(Date.now() - 2 * 60 * 60 * 1000)
+  },
+  {
+    id: 'VSV-240103-E5F6',
+    applicantName: 'Anna Chen',
+    visaType: 'Student',
+    status: 'background_check',
+    submittedAt: new Date('2024-01-14'),
+    priority: 'normal',
+    country: 'China',
+    documentsCount: 6,
+    riskScore: 12,
+    estimatedDays: 7,
+    lastActivity: new Date(Date.now() - 4 * 60 * 60 * 1000)
+  },
+  {
+    id: 'VSV-240104-G7H8',
+    applicantName: 'James Wilson',
+    visaType: 'Work',
+    status: 'submitted',
+    submittedAt: new Date('2024-01-17'),
+    priority: 'urgent',
+    country: 'United Kingdom',
+    documentsCount: 3,
+    riskScore: 25,
+    estimatedDays: 1,
+    lastActivity: new Date(Date.now() - 30 * 60 * 1000)
+  }
+]
+
+export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboardProps) {
+  const [applications, setApplications] = useState<EmbassyApplication[]>([])
+  const [selectedApplication, setSelectedApplication] = useState<EmbassyApplication | null>(null)
+  const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [currentView, setCurrentView] = useState<'dashboard' | 'review' | 'analytics'>('dashboard')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // Load applications from backend
+  useEffect(() => {
+    loadApplications()
+  }, [filterStatus, searchTerm])
+
+  const loadApplications = async () => {
+    try {
+      setIsLoading(true)
+      const filters: any = {}
+      if (filterStatus !== 'all') filters.status = filterStatus
+      if (searchTerm) filters.search = searchTerm
+
+      const response = await api.getApplications(filters)
+      
+      // Transform response to match frontend types
+      const transformedApps: EmbassyApplication[] = response.map((app: any) => ({
+        id: app.id,
+        applicantName: app.applicantName || app.answers?.applicant_name || 'Unknown',
+        visaType: app.visaType,
+        status: app.status,
+        submittedAt: new Date(app.submittedAt || app.createdAt),
+        priority: app.priority || 'normal',
+        country: app.country || app.answers?.destination_country || 'Unknown',
+        documentsCount: app.documentsCount || 0,
+        riskScore: app.riskScore || 0,
+        estimatedDays: app.estimatedDays || 0,
+        lastActivity: new Date(app.lastActivity || app.updatedAt)
+      }))
+
+      setApplications(transformedApps)
+      setError('')
+    } catch (err: any) {
+      console.error('Error loading applications:', err)
+      setError('Failed to load applications')
+      
+      // Fallback to mock data if backend fails
+      setApplications(mockApplications)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Filter and search applications
+  const filteredApplications = applications.filter(app => {
+    const matchesFilter = filterStatus === 'all' || app.status === filterStatus
+    const matchesSearch = app.applicantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         app.id.toLowerCase().includes(searchTerm.toLowerCase())
+    return matchesFilter && matchesSearch
+  })
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'approved': return 'badge-success'
+      case 'rejected': return 'badge-error'
+      case 'officer_review': return 'badge-warning'
+      case 'background_check': return 'badge-info'
+      case 'document_review': return 'badge-primary'
+      default: return 'badge-ghost'
+    }
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'text-red-600'
+      case 'high': return 'text-orange-600'
+      case 'normal': return 'text-blue-600'
+      default: return 'text-gray-600'
+    }
+  }
+
+  const getRiskColor = (score: number) => {
+    if (score < 10) return 'text-green-600'
+    if (score < 20) return 'text-yellow-600'
+    return 'text-red-600'
+  }
+
+  const handleReviewApplication = (application: EmbassyApplication) => {
+    setSelectedApplication(application)
+    setCurrentView('review')
+  }
+
+  const handleUpdateStatus = async (applicationId: string, newStatus: EmbassyApplication['status']) => {
+    try {
+      await api.updateApplicationStatus(applicationId, {
+        status: newStatus,
+        officer_id: officer.id,
+        notes: `Status updated to ${newStatus} by ${officer.name}`
+      })
+
+      // Update local state
+      setApplications(prev => 
+        prev.map(app => 
+          app.id === applicationId 
+            ? { ...app, status: newStatus, lastActivity: new Date() }
+            : app
+        )
+      )
+    } catch (error) {
+      console.error('Error updating application status:', error)
+      // Fallback to local update for demo
+      setApplications(prev => 
+        prev.map(app => 
+          app.id === applicationId 
+            ? { ...app, status: newStatus, lastActivity: new Date() }
+            : app
+        )
+      )
+    }
+  }
+
+  const stats = {
+    total: applications.length,
+    pending: applications.filter(app => !['approved', 'rejected'].includes(app.status)).length,
+    approved: applications.filter(app => app.status === 'approved').length,
+    avgProcessingTime: 8
+  }
+
+  if (currentView === 'review' && selectedApplication) {
+    return (
+      <ApplicationReview 
+        application={selectedApplication}
+        onBack={() => setCurrentView('dashboard')}
+        onUpdateStatus={handleUpdateStatus}
+        officer={officer}
+      />
+    )
+  }
+
+  if (currentView === 'analytics') {
+    return (
+      <AnalyticsDashboard 
+        onBack={() => setCurrentView('dashboard')}
+        officer={officer}
+      />
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-base-200">
+      {/* Header */}
+      <div className="navbar bg-base-100 shadow-lg">
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold text-primary">
+            🏛️ Embassy Portal
+          </h1>
+        </div>
+        <div className="flex-none gap-2">
+          <button 
+            className="btn btn-outline btn-sm"
+            onClick={() => setCurrentView('analytics')}
+          >
+            <BarChart3 className="w-4 h-4 mr-2" />
+            Analytics
+          </button>
+          <div className="dropdown dropdown-end">
+            <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar">
+              <div className="w-10 rounded-full bg-primary text-white flex items-center justify-center">
+                {officer.name.charAt(0)}
+              </div>
+            </div>
+            <ul tabIndex={0} className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+              <li><a>Profile</a></li>
+              <li><a>Settings</a></li>
+              <li><a onClick={onLogout}>Logout</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-6">
+        {/* Welcome Section */}
+        <div className="mb-6">
+          <h2 className="text-3xl font-bold mb-2">Welcome back, {officer.name.split(' ')[1]}</h2>
+          <p className="text-gray-600">Manage visa applications and track processing status</p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <div className="flex items-center gap-3">
+                <FileText className="w-8 h-8 text-primary" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-sm text-gray-600">Total Applications</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <div className="flex items-center gap-3">
+                <Clock className="w-8 h-8 text-warning" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.pending}</p>
+                  <p className="text-sm text-gray-600">Pending Review</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-8 h-8 text-success" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.approved}</p>
+                  <p className="text-sm text-gray-600">Approved Today</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-8 h-8 text-info" />
+                <div>
+                  <p className="text-2xl font-bold">{stats.avgProcessingTime}d</p>
+                  <p className="text-sm text-gray-600">Avg Processing</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="card bg-base-100 shadow mb-6">
+          <div className="card-body">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="form-control">
+                  <div className="input-group">
+                    <input 
+                      type="text" 
+                      placeholder="Search by name or application ID..." 
+                      className="input input-bordered flex-1"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <button className="btn btn-square">
+                      <Search className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <select 
+                  className="select select-bordered"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                >
+                  <option value="all">All Status</option>
+                  <option value="submitted">Submitted</option>
+                  <option value="document_review">Document Review</option>
+                  <option value="background_check">Background Check</option>
+                  <option value="officer_review">Officer Review</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                </select>
+                
+                <button className="btn btn-outline">
+                  <Filter className="w-5 h-5" />
+                  More Filters
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Applications Table */}
+        <div className="card bg-base-100 shadow">
+          <div className="card-body">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold">Application Queue</h3>
+              <span className="badge badge-outline">{filteredApplications.length} applications</span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="table table-zebra w-full">
+                <thead>
+                  <tr>
+                    <th>Application ID</th>
+                    <th>Applicant</th>
+                    <th>Visa Type</th>
+                    <th>Status</th>
+                    <th>Priority</th>
+                    <th>Risk Score</th>
+                    <th>Submitted</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredApplications.map((app) => (
+                    <tr key={app.id} className="hover">
+                      <td>
+                        <div className="font-mono text-sm">{app.id}</div>
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-3">
+                          <div className="avatar">
+                            <div className="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center text-sm">
+                              {app.applicantName.split(' ').map(n => n[0]).join('')}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="font-semibold">{app.applicantName}</div>
+                            <div className="text-sm text-gray-600">{app.country}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="badge badge-outline">{app.visaType}</span>
+                      </td>
+                      <td>
+                        <span className={`badge ${getStatusColor(app.status)}`}>
+                          {app.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`font-semibold ${getPriorityColor(app.priority)}`}>
+                          {app.priority.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`font-bold ${getRiskColor(app.riskScore)}`}>
+                          {app.riskScore}%
+                        </span>
+                      </td>
+                      <td>
+                        <div className="text-sm">
+                          {app.submittedAt.toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td>
+                        <button 
+                          className="btn btn-sm btn-primary"
+                          onClick={() => handleReviewApplication(app)}
+                        >
+                          <Eye className="w-4 h-4" />
+                          Review
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="app/frontend/visaverge-user/components/Embassy/EmbassyLogin.tsx">
+'use client'
+
+import { useState } from 'react'
+import { 
+  Shield, 
+  Eye, 
+  EyeOff, 
+  Lock,
+  User,
+  Building
+} from 'lucide-react'
+import { LoginCredentials, Officer, MOCK_EMBASSIES, MOCK_OFFICERS } from '@/types/embassy.types'
+import { api, apiUtils } from '@/utils/api'
+
+interface EmbassyLoginProps {
+  onLogin: (officer: Officer) => void
+}
+
+export default function EmbassyLogin({ onLogin }: EmbassyLoginProps) {
+  const [credentials, setCredentials] = useState<LoginCredentials>({
+    officerId: '',
+    password: '',
+    embassy: ''
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async () => {
+    setIsLoading(true)
+    setError('')
+
+    try {
+      // Use real backend authentication
+      const response = await api.officerLogin({
+        officer_id: credentials.officerId,
+        password: credentials.password,
+        embassy: credentials.embassy
+      })
+
+      // Successful login
+      onLogin({
+        id: response.id,
+        name: response.name,
+        role: response.role,
+        embassy: credentials.embassy
+      })
+    } catch (error: any) {
+      console.error('Login error:', error)
+      setError(apiUtils.formatErrorMessage(error))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDemoLogin = (officerId: string) => {
+    setCredentials({
+      officerId,
+      password: MOCK_OFFICERS[officerId as keyof typeof MOCK_OFFICERS].password,
+      embassy: 'us_berlin'
+    })
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-blue-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="p-3 bg-primary rounded-full">
+              <Shield className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-800">VisaVerge</h1>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Embassy Portal</h2>
+          <p className="text-gray-600">Secure access for consular officers</p>
+        </div>
+
+        {/* Login Card */}
+        <div className="card bg-base-100 shadow-xl">
+          <div className="card-body">
+            <div className="space-y-4">
+              {/* Embassy Selection */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text flex items-center gap-2">
+                    <Building className="w-4 h-4" />
+                    Embassy Location
+                  </span>
+                </label>
+                <select 
+                  className="select select-bordered w-full"
+                  value={credentials.embassy}
+                  onChange={(e) => setCredentials(prev => ({ ...prev, embassy: e.target.value }))}
+                  required
+                >
+                  <option value="">Select your embassy</option>
+                  {MOCK_EMBASSIES.map(embassy => (
+                    <option key={embassy.id} value={embassy.id}>
+                      {embassy.name} - {embassy.location}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Officer ID */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    Officer ID
+                  </span>
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="Enter your officer ID"
+                  className="input input-bordered w-full" 
+                  value={credentials.officerId}
+                  onChange={(e) => setCredentials(prev => ({ ...prev, officerId: e.target.value }))}
+                  required
+                />
+              </div>
+
+              {/* Password */}
+              <div className="form-control">
+                <label className="label">
+                  <span className="label-text flex items-center gap-2">
+                    <Lock className="w-4 h-4" />
+                    Password
+                  </span>
+                </label>
+                <div className="relative">
+                  <input 
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Enter your password"
+                    className="input input-bordered w-full pr-12" 
+                    value={credentials.password}
+                    onChange={(e) => setCredentials(prev => ({ ...prev, password: e.target.value }))}
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5 text-gray-400" /> : <Eye className="w-5 h-5 text-gray-400" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="alert alert-error">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Login Button */}
+              <button 
+                onClick={handleSubmit}
+                className="btn btn-primary w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm"></span>
+                    Authenticating...
+                  </>
+                ) : (
+                  <>
+                    <Shield className="w-5 h-5 mr-2" />
+                    Secure Login
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Demo Credentials */}
+            <div className="divider">Demo Access</div>
+            
+            <div className="space-y-2">
+              <button 
+                className="btn btn-ghost btn-sm w-full justify-start"
+                onClick={() => handleDemoLogin('maria.schmidt')}
+              >
+                <User className="w-4 h-4 mr-2" />
+                Officer Maria Schmidt (Senior)
+              </button>
+              <button 
+                className="btn btn-ghost btn-sm w-full justify-start"
+                onClick={() => handleDemoLogin('john.davis')}
+              >
+                <User className="w-4 h-4 mr-2" />
+                Officer John Davis (Standard)
+              </button>
+              <button 
+                className="btn btn-ghost btn-sm w-full justify-start"
+                onClick={() => handleDemoLogin('admin')}
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Administrator Access
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Security Notice */}
+        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+            <div>
+              <h4 className="font-semibold text-blue-900 text-sm">Security Notice</h4>
+              <p className="text-blue-800 text-xs mt-1">
+                This is a secure government system. All activities are logged and monitored.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+</file>
+
+<file path="app/frontend/visaverge-user/components/Embassy/index.tsx">
+// Export all embassy components for easy importing
+
+export { default as EmbassyLogin } from './EmbassyLogin'
+export { default as EmbassyDashboard } from './EmbassyDashboard'
+export { default as ApplicationReview } from './ApplicationReview'
+export { default as AnalyticsDashboard } from './AnalyticsDashboard'
+
+// Re-export types for convenience
+export type {
+  Officer,
+  Embassy,
+  LoginCredentials,
+  EmbassyApplication,
+  EmbassyDocument,
+  ApplicationReviewData,
+  StatusUpdate,
+  AnalyticsData
+} from '@/types/embassy.types'
+</file>
+
 <file path="app/frontend/visaverge-user/components/Layout/DarkModeSwitcher/DarkModeSelect/DarkModeSelect.tsx">
 import React from "react"
 
@@ -1464,8 +4614,9 @@ export { Stats, Stat }
 import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, User, Sparkles } from 'lucide-react'
 import { Message, VisaType } from '@/types'
-import { api } from '@/utils/api'
+import { api, apiUtils } from '@/utils/api'
 import { Button, Badge } from '@/components/UI'
+import { useAlertStore } from '@/lib/stores/alert.store'
 
 interface ChatInterfaceProps {
   onVisaTypeSelected?: (visaType: VisaType) => void
@@ -1482,7 +4633,10 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
   ])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId] = useState(() => apiUtils.generateSessionId())
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { showError, showSuccess } = useAlertStore()
+  const [isBackendAvailable, setIsBackendAvailable] = useState(true)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -1491,6 +4645,20 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Check backend availability on component mount
+  useEffect(() => {
+    checkBackendHealth()
+  }, [])
+
+  const checkBackendHealth = async () => {
+    const available = await apiUtils.isBackendAvailable()
+    setIsBackendAvailable(available)
+    
+    if (!available) {
+      showError('Backend not available - using demo mode')
+    }
+  }
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return
@@ -1507,27 +4675,53 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
     setIsLoading(true)
 
     try {
-      const response = await api.chat(input.trim())
-      
-      const avaMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        text: response.response,
-        sender: 'ava',
-        timestamp: new Date(),
-        metadata: {
-          suggestedVisaType: response.suggestedVisaType,
-          nextAction: response.nextAction,
-          confidence: response.confidence
+      if (!isBackendAvailable) {
+        // Fallback to mock response
+        const mockResponse = getMockChatResponse(input.trim())
+        const avaMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: mockResponse.response,
+          sender: 'ava',
+          timestamp: new Date(),
+          metadata: {
+            suggestedVisaType: mockResponse.suggestedVisaType,
+            nextAction: mockResponse.nextAction,
+            confidence: mockResponse.confidence
+          }
         }
-      }
+        setMessages(prev => [...prev, avaMessage])
+        
+        // Trigger visa type selection if needed
+        if (mockResponse.nextAction === 'start_form' && mockResponse.suggestedVisaType && onVisaTypeSelected) {
+          setTimeout(() => {
+            onVisaTypeSelected(mockResponse.suggestedVisaType!)
+          }, 1000)
+        }
+      } else {
+        // Use real backend
+        const response = await api.chat(input.trim(), sessionId)
+        
+        const avaMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: response.response,
+          sender: 'ava',
+          timestamp: new Date(),
+          metadata: {
+            suggestedVisaType: response.suggestedVisaType,
+            nextAction: response.nextAction,
+            confidence: response.confidence
+          }
+        }
 
-      setMessages(prev => [...prev, avaMessage])
+        setMessages(prev => [...prev, avaMessage])
 
-      // If AVA suggests starting a form, trigger the callback
-      if (response.nextAction === 'start_form' && response.suggestedVisaType && onVisaTypeSelected) {
-        setTimeout(() => {
-          onVisaTypeSelected(response.suggestedVisaType!)
-        }, 1000)
+        // If AVA suggests starting a form, trigger the callback
+        if (response.nextAction === 'start_form' && response.suggestedVisaType && onVisaTypeSelected) {
+          showSuccess(`Starting ${response.suggestedVisaType} visa application!`)
+          setTimeout(() => {
+            onVisaTypeSelected(response.suggestedVisaType!)
+          }, 1000)
+        }
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -1538,6 +4732,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
         timestamp: new Date()
       }
       setMessages(prev => [...prev, errorMessage])
+      showError('Failed to send message - please try again')
     } finally {
       setIsLoading(false)
     }
@@ -1557,6 +4752,11 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
     "Family visit visa"
   ]
 
+  const handleQuickReply = (reply: string) => {
+    setInput(reply)
+    setTimeout(() => sendMessage(), 100)
+  }
+
   return (
     <div className="flex flex-col h-full bg-base-100 rounded-lg shadow-lg overflow-hidden border border-base-300">
       {/* Header */}
@@ -1568,17 +4768,21 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
                 <Bot className="w-6 h-6 text-primary m-2" />
               </div>
             </div>
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-success rounded-full animate-pulse" />
+            <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse ${
+              isBackendAvailable ? 'bg-success' : 'bg-warning'
+            }`} />
           </div>
           <div>
             <h3 className="font-semibold text-lg flex items-center gap-2">
               AVA - AI Visa Assistant
               <Badge variant="ghost" className="text-xs bg-white/20 text-white border-white/30">
                 <Sparkles className="w-3 h-3 mr-1" />
-                AI
+                {isBackendAvailable ? 'AI' : 'Demo'}
               </Badge>
             </h3>
-            <p className="text-primary-content/70 text-sm">Online • Ready to help</p>
+            <p className="text-primary-content/70 text-sm">
+              {isBackendAvailable ? 'Online • Ready to help' : 'Demo mode • Limited functionality'}
+            </p>
           </div>
         </div>
       </div>
@@ -1667,10 +4871,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
                 key={index}
                 variant="ghost"
                 size="xs"
-                onClick={() => {
-                  setInput(reply)
-                  setTimeout(sendMessage, 100)
-                }}
+                onClick={() => handleQuickReply(reply)}
                 className="text-xs"
               >
                 {reply}
@@ -1705,10 +4906,40 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
         </div>
         <p className="text-xs opacity-50 mt-2 text-center">
           AVA can make mistakes. Please verify important information.
+          {!isBackendAvailable && ' • Currently in demo mode'}
         </p>
       </div>
     </div>
   )
+}
+
+// Mock chat response for fallback
+function getMockChatResponse(message: string): any {
+  const lowerMessage = message.toLowerCase()
+  
+  if (lowerMessage.includes('tourist') || lowerMessage.includes('vacation') || lowerMessage.includes('holiday')) {
+    return {
+      response: "Perfect! For a tourist visa, you'll typically need a passport, bank statements, travel insurance, and a travel itinerary. The process usually takes 5-10 business days. Would you like me to start your application?",
+      suggestedVisaType: 'tourist',
+      nextAction: 'start_form',
+      confidence: 0.9
+    }
+  }
+  
+  if (lowerMessage.includes('business') || lowerMessage.includes('work') || lowerMessage.includes('conference')) {
+    return {
+      response: "Great! For a business visa, you'll need an invitation letter from the company, your employment details, and proof of business activities. This typically takes 7-15 business days. Shall we begin your application?",
+      suggestedVisaType: 'business',
+      nextAction: 'start_form',
+      confidence: 0.85
+    }
+  }
+  
+  return {
+    response: "I'm running in demo mode. I can help you with tourist, business, student, work, or family visit visas. What type of travel are you planning?",
+    nextAction: 'continue_chat',
+    confidence: 0.5
+  }
 }
 </file>
 
@@ -3644,384 +6875,383 @@ export const useAlertStore = create<AlertStore>((set, get) => ({
 <svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
 </file>
 
-<file path="app/frontend/visaverge-user/types/index.ts">
-// types/index.ts
+<file path="app/frontend/visaverge-user/types/embassy.types.ts">
+// Embassy-specific types
 
-export interface Message {
-  id: string
-  text: string
-  sender: 'user' | 'ava'
-  timestamp: Date
-  metadata?: {
-    suggestedVisaType?: string
-    nextAction?: string
-    confidence?: number
-  }
-}
-
-export interface Question {
-  id: string
-  text: string
-  type: 'text' | 'select' | 'number' | 'date' | 'file'
-  options?: string[]
-  required?: boolean
-  validation?: {
-    min?: number
-    max?: number
-    pattern?: string
-    message?: string
-  }
-  dependsOn?: {
-    questionId: string
-    value: any
-  }
-}
-
-export interface VisaApplication {
-  id: string
-  userId: string
-  visaType: string
-  status: ApplicationStatus
-  answers: Record<string, any>
-  documents: Document[]
-  createdAt: Date
-  updatedAt: Date
-  submittedAt?: Date
-  estimatedDecision?: Date
-  approvalProbability?: number
-}
-
-export interface Document {
+export interface Officer {
   id: string
   name: string
-  type: DocumentType
-  size: number
-  uploadedAt: Date
+  role: string
+  embassy: string
+}
+
+export interface Embassy {
+  id: string
+  name: string
+  country: string
+  location: string
+}
+
+export interface LoginCredentials {
+  officerId: string
+  password: string
+  embassy: string
+}
+
+export interface EmbassyApplication {
+  id: string
+  applicantName: string
+  visaType: string
+  status: 'submitted' | 'document_review' | 'background_check' | 'officer_review' | 'approved' | 'rejected'
+  submittedAt: Date
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+  country: string
+  documentsCount: number
+  riskScore: number
+  estimatedDays: number
+  lastActivity: Date
+}
+
+export interface EmbassyDocument {
+  id: string
+  name: string
+  type: string
   verified: boolean
+  uploadedAt: string
+  size?: number
   url?: string
 }
 
-export type ApplicationStatus = 
-  | 'draft'
-  | 'submitted' 
-  | 'document_review'
-  | 'background_check'
-  | 'officer_review'
-  | 'approved'
-  | 'rejected'
-  | 'requires_interview'
-
-export type DocumentType = 
-  | 'passport'
-  | 'photo'
-  | 'bank_statement'
-  | 'invitation_letter'
-  | 'travel_insurance'
-  | 'employment_letter'
-  | 'flight_itinerary'
-
-export type VisaType = 
-  | 'tourist'
-  | 'business' 
-  | 'student'
-  | 'work'
-  | 'family_visit'
-  | 'transit'
-
-export interface ChatResponse {
-  response: string
-  suggestedVisaType?: VisaType
-  nextAction: 'continue_chat' | 'start_form' | 'upload_documents' | 'submit_application'
-  confidence?: number
-  followUpQuestions?: string[]
+export interface ApplicationReviewData {
+  application: EmbassyApplication
+  documents: EmbassyDocument[]
+  answers: Record<string, any>
+  history: StatusUpdate[]
 }
+
+export interface StatusUpdate {
+  id: string
+  status: string
+  timestamp: Date
+  officerId: string
+  notes?: string
+}
+
+export interface AnalyticsData {
+  totalApplications: number
+  approvalRate: number
+  avgProcessingTime: number
+  pendingApplications: number
+  trendsData: {
+    month: string
+    applications: number
+    approvals: number
+    rejections: number
+  }[]
+  visaTypeDistribution: {
+    type: string
+    count: number
+    percentage: number
+  }[]
+  countryStats: {
+    country: string
+    applications: number
+    approvalRate: number
+  }[]
+  processingTimeByType: {
+    visaType: string
+    avgDays: number
+    trend: 'up' | 'down' | 'stable'
+  }[]
+}
+
+// Mock data constants
+export const MOCK_EMBASSIES: Embassy[] = [
+  { id: 'us_berlin', name: 'U.S. Embassy Berlin', country: 'Germany', location: 'Berlin, Germany' },
+  { id: 'us_london', name: 'U.S. Embassy London', country: 'United Kingdom', location: 'London, UK' },
+  { id: 'us_paris', name: 'U.S. Embassy Paris', country: 'France', location: 'Paris, France' },
+  { id: 'us_tokyo', name: 'U.S. Embassy Tokyo', country: 'Japan', location: 'Tokyo, Japan' }
+]
+
+export const MOCK_OFFICERS = {
+  'maria.schmidt': { password: 'demo123', name: 'Officer Maria Schmidt', role: 'Senior Consular Officer' },
+  'john.davis': { password: 'demo123', name: 'Officer John Davis', role: 'Consular Officer' },
+  'admin': { password: 'admin', name: 'Administrator', role: 'System Administrator' }
+} as const
 </file>
 
 <file path="app/frontend/visaverge-user/utils/api.ts">
-// utils/api.ts
+// app/frontend/visaverge-user/utils/api.ts - Updated API integration with Python backend
 
 import { ChatResponse, Question, VisaApplication, VisaType } from '@/types'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
-// Mock API responses for development (replace with real API calls later)
-export const api = {
+// API Client with error handling
+class APIClient {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = `${API_BASE}${endpoint}`
+    
+    const config: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    }
+
+    try {
+      const response = await fetch(url, config)
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`)
+      }
+      
+      return await response.json()
+    } catch (error) {
+      console.error(`API Error [${endpoint}]:`, error)
+      throw error
+    }
+  }
+
   // Chat with AVA
-  async chat(message: string): Promise<ChatResponse> {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    const lowerMessage = message.toLowerCase()
-    
-    if (lowerMessage.includes('tourist') || lowerMessage.includes('vacation') || lowerMessage.includes('holiday')) {
-      return {
-        response: "Perfect! For a tourist visa, you'll typically need a passport, bank statements, travel insurance, and a travel itinerary. The process usually takes 5-10 business days. Would you like me to start your application?",
-        suggestedVisaType: 'tourist',
-        nextAction: 'start_form',
-        confidence: 0.9,
-        followUpQuestions: ["How long do you plan to stay?", "Which country are you visiting?"]
-      }
-    }
-    
-    if (lowerMessage.includes('business') || lowerMessage.includes('work') || lowerMessage.includes('conference')) {
-      return {
-        response: "Great! For a business visa, you'll need an invitation letter from the company, your employment details, and proof of business activities. This typically takes 7-15 business days. Shall we begin your application?",
-        suggestedVisaType: 'business',
-        nextAction: 'start_form',
-        confidence: 0.85,
-        followUpQuestions: ["Do you have an invitation letter?", "What type of business activities?"]
-      }
-    }
-    
-    if (lowerMessage.includes('student') || lowerMessage.includes('study') || lowerMessage.includes('university')) {
-      return {
-        response: "Excellent! For a student visa, you'll need an acceptance letter from your educational institution, proof of finances, and academic transcripts. Processing takes 15-30 business days. Ready to start?",
-        suggestedVisaType: 'student',
-        nextAction: 'start_form',
-        confidence: 0.92
-      }
-    }
-    
-    if (lowerMessage.includes('family') || lowerMessage.includes('visit') || lowerMessage.includes('relative')) {
-      return {
-        response: "I understand you want to visit family! You'll need an invitation from your family member, proof of relationship, and financial documentation. Processing typically takes 10-20 business days. Let's get started!",
-        suggestedVisaType: 'family_visit',
-        nextAction: 'start_form',
-        confidence: 0.88
-      }
-    }
-    
-    return {
-      response: "Hi! I'm AVA, your AI visa assistant. I can help you with tourist, business, student, work, or family visit visas. What type of travel are you planning? 🛂✈️",
-      nextAction: 'continue_chat',
-      confidence: 0.5
-    }
-  },
+  async chat(message: string, sessionId?: string): Promise<ChatResponse> {
+    const response = await this.request<any>('/chat/', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        message,
+        session_id: sessionId 
+      }),
+    })
 
-  // Get dynamic form questions
+    // Transform backend response to frontend format
+    return {
+      response: response.response,
+      suggestedVisaType: response.suggested_visa_type,
+      nextAction: response.next_action,
+      confidence: response.confidence,
+      followUpQuestions: response.follow_up_questions || []
+    }
+  }
+
+  // Get form questions for a visa type
   async getFormQuestions(visaType: VisaType, currentAnswers: Record<string, any> = {}): Promise<Question[]> {
-    await new Promise(resolve => setTimeout(resolve, 500))
+    const response = await this.request<{ questions: Question[] }>(`/applications/${visaType}/questions`, {
+      method: 'GET'
+    })
     
-    const baseQuestions: Record<VisaType, Question[]> = {
-      tourist: [
-        {
-          id: 'destination_country',
-          text: 'Which country are you planning to visit?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'travel_purpose',
-          text: 'What is the main purpose of your visit?',
-          type: 'select',
-          options: ['Sightseeing', 'Visiting friends/family', 'Cultural events', 'Medical treatment'],
-          required: true
-        },
-        {
-          id: 'duration',
-          text: 'How many days do you plan to stay?',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 90, message: 'Tourist stays are typically 1-90 days' }
-        },
-        {
-          id: 'accommodation',
-          text: 'Where will you be staying?',
-          type: 'select',
-          options: ['Hotel', 'Airbnb', 'With friends/family', 'Hostel', 'Other'],
-          required: true
-        }
-      ],
-      business: [
-        {
-          id: 'destination_country',
-          text: 'Which country is your business visit to?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'business_purpose',
-          text: 'What type of business activities?',
-          type: 'select',
-          options: ['Conference/Meeting', 'Training', 'Negotiations', 'Site visit', 'Trade fair'],
-          required: true
-        },
-        {
-          id: 'company_name',
-          text: 'What is your company name?',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'invitation_company',
-          text: 'Name of the inviting company/organization',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'duration',
-          text: 'Duration of business visit (days)?',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 30, message: 'Business visits are typically 1-30 days' }
-        }
-      ],
-      student: [
-        {
-          id: 'destination_country',
-          text: 'Which country will you study in?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'institution_name',
-          text: 'Name of educational institution',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'study_level',
-          text: 'Level of study',
-          type: 'select',
-          options: ['Bachelor\'s degree', 'Master\'s degree', 'PhD', 'Exchange program', 'Language course'],
-          required: true
-        },
-        {
-          id: 'study_duration',
-          text: 'Duration of studies (months)',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 60, message: 'Study duration typically 1-60 months' }
-        }
-      ],
-      work: [
-        {
-          id: 'destination_country',
-          text: 'Which country will you work in?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'job_title',
-          text: 'Job title/position',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'employer_name',
-          text: 'Employer company name',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'contract_duration',
-          text: 'Contract duration (months)',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 60, message: 'Work contracts typically 1-60 months' }
-        }
-      ],
-      family_visit: [
-        {
-          id: 'destination_country',
-          text: 'Which country are you visiting?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'relationship',
-          text: 'Relationship to person you\'re visiting',
-          type: 'select',
-          options: ['Spouse', 'Parent', 'Child', 'Sibling', 'Grandparent', 'Other family'],
-          required: true
-        },
-        {
-          id: 'host_name',
-          text: 'Name of person you\'re visiting',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'visit_duration',
-          text: 'Duration of visit (days)',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 180, message: 'Family visits typically 1-180 days' }
-        }
-      ],
-      transit: [
-        {
-          id: 'transit_country',
-          text: 'Which country are you transiting through?',
-          type: 'select',
-          options: ['Germany', 'France', 'Spain', 'Italy', 'Netherlands', 'Other'],
-          required: true
-        },
-        {
-          id: 'final_destination',
-          text: 'What is your final destination?',
-          type: 'text',
-          required: true
-        },
-        {
-          id: 'transit_duration',
-          text: 'How long is your layover (hours)?',
-          type: 'number',
-          required: true,
-          validation: { min: 1, max: 24, message: 'Transit typically 1-24 hours' }
-        }
-      ]
-    }
-    
-    return baseQuestions[visaType] || []
-  },
+    return response.questions
+  }
 
-  // Submit application
-  async submitApplication(application: Partial<VisaApplication>): Promise<VisaApplication> {
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    
-    const now = new Date()
-    const estimatedDecision = new Date(now.getTime() + (10 * 24 * 60 * 60 * 1000)) // 10 days from now
-    
-    return {
-      id: `app_${Date.now()}`,
-      userId: 'user_123',
-      visaType: application.visaType!,
-      status: 'submitted',
-      answers: application.answers || {},
-      documents: application.documents || [],
-      createdAt: now,
-      updatedAt: now,
-      submittedAt: now,
-      estimatedDecision,
-      approvalProbability: Math.floor(Math.random() * 30) + 70 // 70-100%
-    }
-  },
+  // Submit visa application
+  async submitApplication(application: {
+    visaType: VisaType
+    answers: Record<string, any>
+    documents: any[]
+  }): Promise<VisaApplication> {
+    const response = await this.request<any>('/applications/', {
+      method: 'POST',
+      body: JSON.stringify({
+        visa_type: application.visaType,
+        answers: application.answers,
+        documents: application.documents
+      }),
+    })
+
+    // Transform backend response to frontend format
+    return this.transformApplicationResponse(response)
+  }
 
   // Get application status
   async getApplicationStatus(applicationId: string): Promise<VisaApplication> {
-    await new Promise(resolve => setTimeout(resolve, 800))
+    const response = await this.request<any>(`/applications/${applicationId}`)
+    return this.transformApplicationResponse(response)
+  }
+
+  // Get all applications (for embassy dashboard)
+  async getApplications(filters: { status?: string; search?: string } = {}): Promise<VisaApplication[]> {
+    const params = new URLSearchParams()
+    if (filters.status) params.append('status', filters.status)
+    if (filters.search) params.append('search', filters.search)
     
-    // Mock status progression
-    const statuses: any[] = ['submitted', 'document_review', 'background_check', 'officer_review']
-    const currentStatusIndex = Math.floor(Math.random() * statuses.length)
+    const queryString = params.toString()
+    const endpoint = queryString ? `/applications/?${queryString}` : '/applications/'
     
-    return {
-      id: applicationId,
-      userId: 'user_123',
-      visaType: 'tourist',
-      status: statuses[currentStatusIndex],
-      answers: {},
-      documents: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      approvalProbability: Math.floor(Math.random() * 30) + 70
+    const response = await this.request<any[]>(endpoint)
+    return response.map(app => this.transformApplicationResponse(app))
+  }
+
+  // Update application status (embassy officer)
+  async updateApplicationStatus(
+    applicationId: string, 
+    update: { status?: string; notes?: string; officer_id?: string }
+  ): Promise<VisaApplication> {
+    const response = await this.request<any>(`/applications/${applicationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(update),
+    })
+    
+    return this.transformApplicationResponse(response)
+  }
+
+  // Officer authentication
+  async officerLogin(credentials: {
+    officer_id: string
+    password: string
+    embassy: string
+  }): Promise<any> {
+    return await this.request<any>('/officers/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    })
+  }
+
+  // Get analytics data
+  async getAnalytics(filters: { embassy_id?: string; days?: number } = {}): Promise<any> {
+    const params = new URLSearchParams()
+    if (filters.embassy_id) params.append('embassy_id', filters.embassy_id)
+    if (filters.days) params.append('days', filters.days.toString())
+    
+    const queryString = params.toString()
+    const endpoint = queryString ? `/analytics/dashboard?${queryString}` : '/analytics/dashboard'
+    
+    return await this.request<any>(endpoint)
+  }
+
+  // Upload document
+  async uploadDocument(
+    applicationId: string,
+    documentType: string,
+    file: File
+  ): Promise<any> {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('application_id', applicationId)
+    formData.append('document_type', documentType)
+
+    const response = await fetch(`${API_BASE}/documents/upload`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`)
     }
+
+    return await response.json()
+  }
+
+  // Get chat history
+  async getChatHistory(sessionId: string): Promise<any[]> {
+    return await this.request<any[]>(`/chat/history/${sessionId}`)
+  }
+
+  // Health check
+  async healthCheck(): Promise<{ status: string }> {
+    return await this.request<{ status: string }>('/health')
+  }
+
+  // Transform backend application response to frontend format
+  private transformApplicationResponse(backendApp: any): VisaApplication {
+    return {
+      id: backendApp.id,
+      userId: backendApp.user_id,
+      visaType: backendApp.visa_type,
+      status: backendApp.status,
+      answers: backendApp.answers || {},
+      documents: backendApp.documents || [],
+      createdAt: new Date(backendApp.submitted_at),
+      updatedAt: new Date(backendApp.updated_at),
+      submittedAt: backendApp.submitted_at ? new Date(backendApp.submitted_at) : undefined,
+      estimatedDecision: backendApp.estimated_decision ? new Date(backendApp.estimated_decision) : undefined,
+      approvalProbability: backendApp.approval_probability,
+      
+      // Additional fields from backend
+      applicantName: backendApp.applicant_name || backendApp.answers?.applicant_name,
+      country: backendApp.country || backendApp.answers?.destination_country,
+      priority: backendApp.priority,
+      riskScore: backendApp.risk_score,
+      documentsCount: backendApp.documents_count || (backendApp.documents?.length || 0),
+      estimatedDays: backendApp.estimated_days,
+      lastActivity: backendApp.last_activity ? new Date(backendApp.last_activity) : new Date(backendApp.updated_at)
+    }
+  }
+}
+
+// Create API instance
+export const api = new APIClient()
+
+// Export additional utilities
+export const apiUtils = {
+  // Check if backend is available
+  async isBackendAvailable(): Promise<boolean> {
+    try {
+      await api.healthCheck()
+      return true
+    } catch (error) {
+      console.warn('Backend not available, falling back to mock data')
+      return false
+    }
+  },
+
+  // Generate session ID for chat
+  generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  },
+
+  // Format error messages for users
+  formatErrorMessage(error: any): string {
+    if (error.message) {
+      return error.message
+    }
+    
+    if (typeof error === 'string') {
+      return error
+    }
+    
+    return 'An unexpected error occurred. Please try again.'
+  },
+
+  // Get status color helper (for UI components)
+  getStatusColor(status: string): string {
+    switch (status) {
+      case 'approved':
+        return 'text-green-600'
+      case 'rejected':
+        return 'text-red-600'
+      case 'requires_interview':
+        return 'text-yellow-600'
+      case 'submitted':
+        return 'text-blue-600'
+      case 'document_review':
+      case 'background_check':
+      case 'officer_review':
+        return 'text-purple-600'
+      default:
+        return 'text-gray-600'
+    }
+  },
+
+  // Get priority color helper
+  getPriorityColor(priority: string): string {
+    switch (priority) {
+      case 'urgent':
+        return 'text-red-600'
+      case 'high':
+        return 'text-orange-600'
+      case 'normal':
+        return 'text-blue-600'
+      default:
+        return 'text-gray-600'
+    }
+  },
+
+  // Get risk score color helper
+  getRiskColor(score: number): string {
+    if (score < 10) return 'text-green-600'
+    if (score < 20) return 'text-yellow-600'
+    return 'text-red-600'
   }
 }
 </file>
@@ -4658,176 +7888,6 @@ module.exports = {
 }
 </file>
 
-<file path=".gitignore">
-# Node.js dependencies across all projects
-**/node_modules/
-**/npm-debug.log*
-**/yarn-debug.log*
-**/yarn-error.log*
-**/pnpm-debug.log*
-**/.pnpm-debug.log*
-**/package-lock.json
-**/yarn.lock
-**/pnpm-lock.yaml
-
-# Environment variables
-**/.env*
-!**/.env.example
-!**/.env.template
-
-# Build outputs
-**/dist/
-**/build/
-**/.next/
-**/out/
-**/.nuxt/
-**/.output/
-**/.vite/
-**/.svelte-kit/
-
-# Cache directories
-**/.cache/
-**/.tmp/
-**/.temp/
-**/tmp/
-**/.turbo/
-**/.nx/cache/
-
-# TypeScript
-**/*.tsbuildinfo
-**/next-env.d.ts
-
-# Testing
-**/coverage/
-**/.nyc_output/
-**/test-results/
-**/playwright-report/
-**/test-results.xml
-
-# Logs
-**/logs/
-**/*.log
-
-# IDE and Editor files
-.vscode/
-.idea/
-**/*.swp
-**/*.swo
-**/*~
-**/.project
-**/.classpath
-**/.settings/
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-**/Thumbs.db
-**/.DS_Store
-
-# Database files
-**/*.db
-**/*.sqlite
-**/*.sqlite3
-
-# Docker
-**/.dockerignore
-**/Dockerfile.dev
-docker-compose.override.yml
-.docker/
-
-# Deployment
-.vercel/
-.netlify/
-.firebase/
-
-# Python (if you have Python services)
-**/__pycache__/
-**/*.pyc
-**/*.pyo
-**/*.pyd
-**/.Python
-**/pip-log.txt
-**/pip-delete-this-directory.txt
-**/.venv/
-**/venv/
-**/env/
-
-# Go (if you have Go services)
-**/vendor/
-
-# Rust (if you have Rust services)
-**/target/
-
-# Java (if you have Java services)
-**/*.class
-**/*.jar
-**/*.war
-**/*.ear
-**/target/
-
-# Documentation builds
-**/docs/_build/
-**/site/
-
-# Temporary files
-**/*.tmp
-**/*.temp
-**/*.swp
-**/*.swo
-**/*.bak
-**/*.backup
-
-# Archive files
-**/*.zip
-**/*.tar.gz
-**/*.rar
-**/*.7z
-
-# Security and secrets
-**/secrets/
-**/private/
-**/*.pem
-**/*.key
-**/*.crt
-**/*.p12
-**/*.pfx
-
-# Terraform (if you use IaC)
-**/*.tfstate
-**/*.tfstate.backup
-**/.terraform/
-**/.terraform.lock.hcl
-
-# Kubernetes (if you use k8s)
-**/secrets.yaml
-**/secrets.yml
-
-# Local configuration
-**/config.local.*
-**/local.config.*
-
-# Monitoring and analytics
-**/.sentry-native/
-**/sentry.properties
-
-# Miscellaneous
-**/.eslintcache
-**/.stylelintcache
-**/.parcel-cache
-**/.svelte-kit
-**/.astro
-
-# Custom project directories (add your own)
-# /private/
-# /internal/
-# /experiments/
-</file>
-
 <file path="features_2.md">
 # 🏗️ **VisaVerge: Complete Feature Breakdown**
 
@@ -5303,6 +8363,274 @@ The website of the German Missions in the United States provides information and
 The website of the German Embassy in China provides information and digital services for German and Chinese citizens, including visa and consular services, news, cultural events, and updates on Germany-China relations (link)
 The website of the German Embassy in Paris provides information and digital consular services for German and French citizens, including visa applications, legal matters, cultural events, and updates on Germany-France relations (link)
 The website of the German Embassy in Nairobi offers information and digital consular services for German and Kenyan citizens, including visa applications, cultural exchange, bilateral cooperation updates, and support for economic, educational, and development initiatives between Germany and Kenya (link)
+</file>
+
+<file path="app/frontend/visaverge-user/types/index.ts">
+// types/index.ts
+
+export interface Message {
+  id: string
+  text: string
+  sender: 'user' | 'ava'
+  timestamp: Date
+  metadata?: {
+    suggestedVisaType?: string
+    nextAction?: string
+    confidence?: number
+  }
+}
+
+export interface Question {
+  id: string
+  text: string
+  type: 'text' | 'select' | 'number' | 'date' | 'file'
+  options?: string[]
+  required?: boolean
+  validation?: {
+    min?: number
+    max?: number
+    pattern?: string
+    message?: string
+  }
+  dependsOn?: {
+    questionId: string
+    value: any
+  }
+}
+
+export interface VisaApplication {
+  id: string
+  userId: string
+  visaType: string
+  status: ApplicationStatus
+  answers: Record<string, any>
+  documents: Document[]
+  createdAt: Date
+  updatedAt: Date
+  submittedAt?: Date
+  estimatedDecision?: Date
+  approvalProbability?: number
+}
+
+export interface Document {
+  id: string
+  name: string
+  type: DocumentType
+  size: number
+  uploadedAt: Date
+  verified: boolean
+  url?: string
+}
+
+export type ApplicationStatus = 
+  | 'draft'
+  | 'submitted' 
+  | 'document_review'
+  | 'background_check'
+  | 'officer_review'
+  | 'approved'
+  | 'rejected'
+  | 'requires_interview'
+
+export type DocumentType = 
+  | 'passport'
+  | 'photo'
+  | 'bank_statement'
+  | 'invitation_letter'
+  | 'travel_insurance'
+  | 'employment_letter'
+  | 'flight_itinerary'
+
+export type VisaType = 
+  | 'tourist'
+  | 'business' 
+  | 'student'
+  | 'work'
+  | 'family_visit'
+  | 'transit'
+
+export interface ChatResponse {
+  response: string
+  suggestedVisaType?: VisaType
+  nextAction: 'continue_chat' | 'start_form' | 'upload_documents' | 'submit_application'
+  confidence?: number
+  followUpQuestions?: string[]
+}
+
+export * from './embassy.types'
+</file>
+
+<file path=".gitignore">
+./app/uploads/*
+
+
+# Node.js dependencies across all projects
+**/node_modules/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+**/.pnpm-debug.log*
+**/package-lock.json
+**/yarn.lock
+**/pnpm-lock.yaml
+
+# Environment variables
+**/.env*
+!**/.env.example
+!**/.env.template
+
+# Build outputs
+**/dist/
+**/build/
+**/.next/
+**/out/
+**/.nuxt/
+**/.output/
+**/.vite/
+**/.svelte-kit/
+
+# Cache directories
+**/.cache/
+**/.tmp/
+**/.temp/
+**/tmp/
+**/.turbo/
+**/.nx/cache/
+
+# TypeScript
+**/*.tsbuildinfo
+**/next-env.d.ts
+
+# Testing
+**/coverage/
+**/.nyc_output/
+**/test-results/
+**/playwright-report/
+**/test-results.xml
+
+# Logs
+**/logs/
+**/*.log
+
+# IDE and Editor files
+.vscode/
+.idea/
+**/*.swp
+**/*.swo
+**/*~
+**/.project
+**/.classpath
+**/.settings/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+**/Thumbs.db
+**/.DS_Store
+
+# Database files
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# Docker
+**/.dockerignore
+**/Dockerfile.dev
+docker-compose.override.yml
+.docker/
+
+# Deployment
+.vercel/
+.netlify/
+.firebase/
+
+# Python (if you have Python services)
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/pip-log.txt
+**/pip-delete-this-directory.txt
+**/.venv/
+**/venv/
+**/env/
+
+# Go (if you have Go services)
+**/vendor/
+
+# Rust (if you have Rust services)
+**/target/
+
+# Java (if you have Java services)
+**/*.class
+**/*.jar
+**/*.war
+**/*.ear
+**/target/
+
+# Documentation builds
+**/docs/_build/
+**/site/
+
+# Temporary files
+**/*.tmp
+**/*.temp
+**/*.swp
+**/*.swo
+**/*.bak
+**/*.backup
+
+# Archive files
+**/*.zip
+**/*.tar.gz
+**/*.rar
+**/*.7z
+
+# Security and secrets
+**/secrets/
+**/private/
+**/*.pem
+**/*.key
+**/*.crt
+**/*.p12
+**/*.pfx
+
+# Terraform (if you use IaC)
+**/*.tfstate
+**/*.tfstate.backup
+**/.terraform/
+**/.terraform.lock.hcl
+
+# Kubernetes (if you use k8s)
+**/secrets.yaml
+**/secrets.yml
+
+# Local configuration
+**/config.local.*
+**/local.config.*
+
+# Monitoring and analytics
+**/.sentry-native/
+**/sentry.properties
+
+# Miscellaneous
+**/.eslintcache
+**/.stylelintcache
+**/.parcel-cache
+**/.svelte-kit
+**/.astro
+
+# Custom project directories (add your own)
+# /private/
+# /internal/
+# /experiments/
 </file>
 
 </files>

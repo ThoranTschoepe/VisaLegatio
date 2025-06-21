@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { 
   Users, 
   CheckCircle2, 
@@ -15,6 +15,7 @@ import {
   BarChart3
 } from 'lucide-react'
 import { Officer, EmbassyApplication } from '@/types/embassy.types'
+import { api, apiUtils } from '@/utils/api'
 import ApplicationReview from './ApplicationReview'
 import AnalyticsDashboard from './AnalyticsDashboard'
 
@@ -79,11 +80,55 @@ const mockApplications: EmbassyApplication[] = [
 ]
 
 export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboardProps) {
-  const [applications, setApplications] = useState<EmbassyApplication[]>(mockApplications)
+  const [applications, setApplications] = useState<EmbassyApplication[]>([])
   const [selectedApplication, setSelectedApplication] = useState<EmbassyApplication | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [currentView, setCurrentView] = useState<'dashboard' | 'review' | 'analytics'>('dashboard')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  // Load applications from backend
+  useEffect(() => {
+    loadApplications()
+  }, [filterStatus, searchTerm])
+
+  const loadApplications = async () => {
+    try {
+      setIsLoading(true)
+      const filters: any = {}
+      if (filterStatus !== 'all') filters.status = filterStatus
+      if (searchTerm) filters.search = searchTerm
+
+      const response = await api.getApplications(filters)
+      
+      // Transform response to match frontend types
+      const transformedApps: EmbassyApplication[] = response.map((app: any) => ({
+        id: app.id,
+        applicantName: app.applicantName || app.answers?.applicant_name || 'Unknown',
+        visaType: app.visaType,
+        status: app.status,
+        submittedAt: new Date(app.submittedAt || app.createdAt),
+        priority: app.priority || 'normal',
+        country: app.country || app.answers?.destination_country || 'Unknown',
+        documentsCount: app.documentsCount || 0,
+        riskScore: app.riskScore || 0,
+        estimatedDays: app.estimatedDays || 0,
+        lastActivity: new Date(app.lastActivity || app.updatedAt)
+      }))
+
+      setApplications(transformedApps)
+      setError('')
+    } catch (err: any) {
+      console.error('Error loading applications:', err)
+      setError('Failed to load applications')
+      
+      // Fallback to mock data if backend fails
+      setApplications(mockApplications)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   // Filter and search applications
   const filteredApplications = applications.filter(app => {
@@ -124,14 +169,33 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
     setCurrentView('review')
   }
 
-  const handleUpdateStatus = (applicationId: string, newStatus: EmbassyApplication['status']) => {
-    setApplications(prev => 
-      prev.map(app => 
-        app.id === applicationId 
-          ? { ...app, status: newStatus, lastActivity: new Date() }
-          : app
+  const handleUpdateStatus = async (applicationId: string, newStatus: EmbassyApplication['status']) => {
+    try {
+      await api.updateApplicationStatus(applicationId, {
+        status: newStatus,
+        officer_id: officer.id,
+        notes: `Status updated to ${newStatus} by ${officer.name}`
+      })
+
+      // Update local state
+      setApplications(prev => 
+        prev.map(app => 
+          app.id === applicationId 
+            ? { ...app, status: newStatus, lastActivity: new Date() }
+            : app
+        )
       )
-    )
+    } catch (error) {
+      console.error('Error updating application status:', error)
+      // Fallback to local update for demo
+      setApplications(prev => 
+        prev.map(app => 
+          app.id === applicationId 
+            ? { ...app, status: newStatus, lastActivity: new Date() }
+            : app
+        )
+      )
+    }
   }
 
   const stats = {

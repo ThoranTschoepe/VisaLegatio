@@ -10,6 +10,7 @@ import {
   Building
 } from 'lucide-react'
 import { LoginCredentials, Officer, MOCK_EMBASSIES, MOCK_OFFICERS } from '@/types/embassy.types'
+import { api, apiUtils } from '@/utils/api'
 
 interface EmbassyLoginProps {
   onLogin: (officer: Officer) => void
@@ -29,25 +30,27 @@ export default function EmbassyLogin({ onLogin }: EmbassyLoginProps) {
     setIsLoading(true)
     setError('')
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
-    // Mock authentication
-    const officer = MOCK_OFFICERS[credentials.officerId as keyof typeof MOCK_OFFICERS]
-    
-    if (officer && officer.password === credentials.password && credentials.embassy) {
-      // Successful login
-      onLogin({
-        id: credentials.officerId,
-        name: officer.name,
-        role: officer.role,
+    try {
+      // Use real backend authentication
+      const response = await api.officerLogin({
+        officer_id: credentials.officerId,
+        password: credentials.password,
         embassy: credentials.embassy
       })
-    } else {
-      setError('Invalid officer ID, password, or embassy selection')
+
+      // Successful login
+      onLogin({
+        id: response.id,
+        name: response.name,
+        role: response.role,
+        embassy: credentials.embassy
+      })
+    } catch (error: any) {
+      console.error('Login error:', error)
+      setError(apiUtils.formatErrorMessage(error))
+    } finally {
+      setIsLoading(false)
     }
-    
-    setIsLoading(false)
   }
 
   const handleDemoLogin = (officerId: string) => {
