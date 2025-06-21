@@ -1,4 +1,4 @@
-// app/frontend/visaverge-user/utils/api.ts - Updated API integration with new flow
+// app/frontend/visaverge-user/utils/api.ts - Real document upload implementation
 
 import { ChatResponse, Question, VisaApplication, VisaType } from '@/types'
 
@@ -32,6 +32,72 @@ class APIClient {
     }
   }
 
+  // Upload documents to existing application - REAL IMPLEMENTATION
+  async uploadDocumentsToApplication(
+    applicationId: string,
+    documents: Array<{ file: File; type: string }>
+  ): Promise<any[]> {
+    const uploadPromises = documents.map(async ({ file, type }) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('application_id', applicationId)
+      formData.append('document_type', type)
+
+      // Use fetch directly for file upload (no JSON content-type)
+      const response = await fetch(`${API_BASE}/documents/upload`, {
+        method: 'POST',
+        body: formData,
+        // Don't set Content-Type header - let browser set it with boundary for multipart
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.detail || `Upload failed for ${file.name}: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      console.log(`✅ Successfully uploaded ${file.name}:`, result)
+      return result
+    })
+
+    try {
+      const results = await Promise.all(uploadPromises)
+      
+      // After successful uploads, update application status if needed
+      try {
+        await this.notifyDocumentUpload(applicationId, results)
+      } catch (error) {
+        console.warn('Failed to notify backend of document upload:', error)
+        // Don't fail the upload if notification fails
+      }
+      
+      return results
+    } catch (error) {
+      console.error('Document upload failed:', error)
+      throw error
+    }
+  }
+
+  // Notify backend about document upload to update application status
+  private async notifyDocumentUpload(applicationId: string, uploadResults: any[]): Promise<void> {
+    await this.request(`/applications/${applicationId}/documents`, {
+      method: 'POST',
+      body: JSON.stringify(uploadResults.map(result => ({
+        id: result.id,
+        name: result.name,
+        type: result.type,
+        verified: result.verified
+     })))
+    })
+  }
+
+  // Delete a document
+  async deleteDocument(applicationId: string, documentType: string): Promise<void> {
+    await this.request(`/documents/${applicationId}/${documentType}`, {
+      method: 'DELETE'
+    })
+  }
+
   // Chat with AVA
   async chat(message: string, sessionId?: string): Promise<ChatResponse> {
     const response = await this.request<any>('/chat/', {
@@ -42,7 +108,6 @@ class APIClient {
       }),
     })
 
-    // Transform backend response to frontend format
     return {
       response: response.response,
       suggestedVisaType: response.suggested_visa_type,
@@ -61,7 +126,7 @@ class APIClient {
     return response.questions
   }
 
-  // Submit visa application (NEW: without requiring documents)
+  // Submit visa application
   async submitApplication(application: {
     visaType: VisaType
     answers: Record<string, any>
@@ -73,42 +138,41 @@ class APIClient {
       body: JSON.stringify({
         visa_type: application.visaType,
         answers: application.answers,
-        documents: application.documents || [], // Empty array if no documents
-        password: application.password // Store password for later access
+        documents: application.documents || [],
+        password: application.password
       }),
     })
 
-    // Transform backend response to frontend format
     return this.transformApplicationResponse(response)
   }
 
-  // Upload documents to existing application (NEW)
-  async uploadDocumentsToApplication(
-    applicationId: string,
-    documents: Array<{ file: File; type: string }>
-  ): Promise<any[]> {
-    const uploadPromises = documents.map(async ({ file, type }) => {
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('application_id', applicationId)
-      formData.append('document_type', type)
-
-      const response = await fetch(`${API_BASE}/documents/upload`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) {
-        throw new Error(`Upload failed for ${file.name}: ${response.statusText}`)
-      }
-
-      return await response.json()
-    })
-
-    return await Promise.all(uploadPromises)
+  // Get document requirements for a visa type
+  async getDocumentRequirements(visaType: VisaType): Promise<{
+    visa_type: string
+    mandatory_documents: string[]
+    optional_documents: string[]
+    total_mandatory: number
+    total_optional: number
+  }> {
+    const response = await this.request<any>(`/documents/${visaType}/requirements`)
+    return response
   }
 
-  // Get application status with password validation (NEW)
+  // Get documents for an application
+  async getApplicationDocuments(applicationId: string): Promise<Array<{
+    id: string
+    name: string
+    type: string
+    size: number
+    verified: boolean
+    uploaded_at: string
+    file_path?: string
+  }>> {
+    const response = await this.request<any[]>(`/documents/application/${applicationId}`)
+    return response
+  }
+
+  // Get application status with password validation
   async getApplicationWithPassword(applicationId: string, password: string): Promise<VisaApplication> {
     const response = await this.request<any>(`/applications/${applicationId}/verify`, {
       method: 'POST',
@@ -117,7 +181,7 @@ class APIClient {
     return this.transformApplicationResponse(response)
   }
 
-  // Get application status (existing)
+  // Get application status
   async getApplicationStatus(applicationId: string): Promise<VisaApplication> {
     const response = await this.request<any>(`/applications/${applicationId}`)
     return this.transformApplicationResponse(response)
@@ -173,29 +237,6 @@ class APIClient {
     return await this.request<any>(endpoint)
   }
 
-  // Upload single document (legacy support)
-  async uploadDocument(
-    applicationId: string,
-    documentType: string,
-    file: File
-  ): Promise<any> {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('application_id', applicationId)
-    formData.append('document_type', documentType)
-
-    const response = await fetch(`${API_BASE}/documents/upload`, {
-      method: 'POST',
-      body: formData,
-    })
-
-    if (!response.ok) {
-      throw new Error(`Upload failed: ${response.statusText}`)
-    }
-
-    return await response.json()
-  }
-
   // Get chat history
   async getChatHistory(sessionId: string): Promise<any[]> {
     return await this.request<any[]>(`/chat/history/${sessionId}`)
@@ -204,39 +245,6 @@ class APIClient {
   // Health check
   async healthCheck(): Promise<{ status: string }> {
     return await this.request<{ status: string }>('/health')
-  }
-
-  // Generate QR code data (NEW)
-  generateQRCodeData(applicationId: string): string {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://visaverge.com'
-    return `${baseUrl}/status?id=${applicationId}`
-  }
-
-  // Validate application access (NEW)
-  validateApplicationAccess(applicationId: string, password: string): boolean {
-    // In a real app, this would make an API call
-    // For demo, we check localStorage
-    if (typeof window !== 'undefined') {
-      const storedPassword = localStorage.getItem(`app_${applicationId}_password`)
-      return storedPassword === password
-    }
-    return false
-  }
-
-  // Store application credentials (NEW)
-  storeApplicationCredentials(applicationId: string, password: string): void {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`app_${applicationId}_password`, password)
-      localStorage.setItem(`app_${applicationId}_created`, new Date().toISOString())
-    }
-  }
-
-  // Clear application credentials (NEW)
-  clearApplicationCredentials(applicationId: string): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(`app_${applicationId}_password`)
-      localStorage.removeItem(`app_${applicationId}_created`)
-    }
   }
 
   // Transform backend application response to frontend format
@@ -277,7 +285,7 @@ export const apiUtils = {
       await api.healthCheck()
       return true
     } catch (error) {
-      console.warn('Backend not available, falling back to mock data')
+      console.warn('Backend not available:', error)
       return false
     }
   },
@@ -287,14 +295,14 @@ export const apiUtils = {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   },
 
-  // Generate application ID (NEW)
+  // Generate application ID
   generateApplicationId(): string {
     const timestamp = Date.now().toString().slice(-6)
     const random = Math.random().toString(36).substring(2, 6).toUpperCase()
     return `VSV-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${random}`
   },
 
-  // Generate secure password (NEW)
+  // Generate secure password
   generateSecurePassword(): string {
     const adjectives = ['Swift', 'Bright', 'Clear', 'Quick', 'Smart', 'Safe', 'Fast', 'Bold', 'Strong', 'Secure']
     const nouns = ['Lion', 'Eagle', 'Tiger', 'Star', 'Moon', 'Sun', 'Wave', 'Wind', 'Rock', 'Tree']
@@ -319,103 +327,60 @@ export const apiUtils = {
     return 'An unexpected error occurred. Please try again.'
   },
 
-  // Get status color helper (for UI components)
-  getStatusColor(status: string): string {
-    switch (status) {
-      case 'approved':
-        return 'text-green-600'
-      case 'rejected':
-        return 'text-red-600'
-      case 'requires_interview':
-        return 'text-yellow-600'
-      case 'submitted':
-        return 'text-blue-600'
-      case 'document_review':
-      case 'background_check':
-      case 'officer_review':
-        return 'text-purple-600'
-      default:
-        return 'text-gray-600'
-    }
-  },
-
-  // Get priority color helper
-  getPriorityColor(priority: string): string {
-    switch (priority) {
-      case 'urgent':
-        return 'text-red-600'
-      case 'high':
-        return 'text-orange-600'
-      case 'normal':
-        return 'text-blue-600'
-      default:
-        return 'text-gray-600'
-    }
-  },
-
-  // Get risk score color helper
-  getRiskColor(score: number): string {
-    if (score < 10) return 'text-green-600'
-    if (score < 20) return 'text-yellow-600'
-    return 'text-red-600'
-  },
-
-  // Create QR code URL (NEW)
+  // Create QR code URL
   createQRCodeUrl(data: string, size: number = 200): string {
     return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(data)}`
   },
 
-  // Estimate processing time (NEW)
-  estimateProcessingTime(visaType: VisaType, hasDocuments: boolean = false): number {
-    const baseDays = {
-      tourist: 7,
-      business: 10,
-      student: 21,
-      work: 30,
-      family_visit: 14,
-      transit: 3
+  // Store document progress in localStorage (for demo persistence)
+  storeDocumentProgress(applicationId: string, documents: any[]): void {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`docs_${applicationId}`, JSON.stringify(documents))
     }
-    
-    let days = baseDays[visaType] || 10
-    
-    // Reduce time if documents are provided
-    if (hasDocuments) {
-      days = Math.max(days - 2, 1)
-    }
-    
-    return days
   },
 
-  // Calculate approval probability (NEW)
-  calculateApprovalProbability(
-    visaType: VisaType, 
-    answers: Record<string, any>, 
-    documentCount: number = 0
-  ): number {
-    let probability = 70 // Base probability
-    
-    // Visa type factor
-    const typeBonus = {
-      tourist: 5,
-      business: 0,
-      student: -5,
-      work: -10,
-      family_visit: 5,
-      transit: 10
+  // Get document progress from localStorage (for demo persistence)
+  getDocumentProgress(applicationId: string): any[] {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(`docs_${applicationId}`)
+      return stored ? JSON.parse(stored) : []
     }
+    return []
+  },
+
+  // Clear document progress
+  clearDocumentProgress(applicationId: string): void {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(`docs_${applicationId}`)
+    }
+  },
+
+  // Validate file before upload
+  validateFile(file: File): { valid: boolean; error?: string } {
+    // Check file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024
+    if (file.size > maxSize) {
+      return { valid: false, error: `File too large. Maximum size is ${maxSize / (1024 * 1024)}MB` }
+    }
+
+    // Check file type
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png']
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png']
     
-    probability += typeBonus[visaType] || 0
+    const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
     
-    // Document bonus
-    probability += documentCount * 3
-    
-    // Answer quality (simplified)
-    if (answers.employment_status === 'employed') probability += 5
-    if (answers.previous_violations === false) probability += 10
-    
-    // Random factor for demo
-    probability += Math.random() * 10 - 5
-    
-    return Math.max(Math.min(Math.round(probability), 95), 60)
+    if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExtension)) {
+      return { 
+        valid: false, 
+        error: `File type not supported. Allowed types: PDF, JPG, JPEG, PNG` 
+      }
+    }
+
+    // Check minimum file size (1KB)
+    if (file.size < 1024) {
+      return { valid: false, error: 'File too small. Minimum size is 1KB' }
+    }
+
+    return { valid: true }
   }
 }

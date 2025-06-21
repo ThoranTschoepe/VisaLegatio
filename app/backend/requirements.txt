@@ -6,3 +6,5 @@ python-multipart
 python-jose[cryptography]
 passlib[bcrypt]
 python-dotenv
+reportlab
+Pillow

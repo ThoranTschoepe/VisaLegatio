@@ -1,8 +1,11 @@
+// app/frontend/visaverge-user/components/DocumentUpload.tsx - Real upload implementation
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
-import { Upload, FileText, CheckCircle2, AlertCircle, X, Camera, Trash2, ArrowRight, Clock, AlertTriangle, Shield } from 'lucide-react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { Upload, FileText, CheckCircle2, AlertCircle, X, Camera, Trash2, ArrowRight, Clock, AlertTriangle, Shield, Loader2 } from 'lucide-react'
 import { Document, DocumentType, VisaType } from '@/types'
+import { api, apiUtils } from '@/utils/api'
+import { useAlertStore } from '@/lib/stores/alert.store'
 
 interface DocumentUploadProps {
   visaType: VisaType
@@ -12,35 +15,7 @@ interface DocumentUploadProps {
   onSkip?: () => void
 }
 
-// Updated document requirements with mandatory/optional classification
-const DOCUMENT_REQUIREMENTS: Record<VisaType, { mandatory: DocumentType[], optional: DocumentType[] }> = {
-  tourist: {
-    mandatory: ['passport', 'photo', 'bank_statement'],
-    optional: ['travel_insurance', 'flight_itinerary']
-  },
-  business: {
-    mandatory: ['passport', 'photo', 'invitation_letter'],
-    optional: ['employment_letter', 'bank_statement']
-  },
-  student: {
-    mandatory: ['passport', 'photo', 'invitation_letter', 'bank_statement'],
-    optional: ['employment_letter']
-  },
-  work: {
-    mandatory: ['passport', 'photo', 'employment_letter', 'invitation_letter'],
-    optional: ['bank_statement']
-  },
-  family_visit: {
-    mandatory: ['passport', 'photo', 'invitation_letter'],
-    optional: ['bank_statement', 'employment_letter']
-  },
-  transit: {
-    mandatory: ['passport', 'photo', 'flight_itinerary'],
-    optional: []
-  }
-}
-
-const DOCUMENT_NAMES: Record<DocumentType, string> = {
+const DOCUMENT_NAMES: Record<string, string> = {
   passport: 'Passport (Photo Page)',
   photo: 'Passport Photo',
   bank_statement: 'Bank Statement',
@@ -50,7 +25,7 @@ const DOCUMENT_NAMES: Record<DocumentType, string> = {
   flight_itinerary: 'Flight Itinerary'
 }
 
-const DOCUMENT_DESCRIPTIONS: Record<DocumentType, string> = {
+const DOCUMENT_DESCRIPTIONS: Record<string, string> = {
   passport: 'Clear photo of your passport information page',
   photo: 'Recent passport-sized photo (white background)',
   bank_statement: 'Last 3 months bank statements showing sufficient funds',
@@ -70,82 +45,185 @@ export default function DocumentUpload({
   const [documents, setDocuments] = useState<Document[]>([])
   const [uploadingDocs, setUploadingDocs] = useState<Set<string>>(new Set())
   const [draggedOver, setDraggedOver] = useState<string | null>(null)
+  const [requirements, setRequirements] = useState<{
+    mandatory: string[]
+    optional: string[]
+  }>({ mandatory: [], optional: [] })
+  const [isLoading, setIsLoading] = useState(true)
+  const [backendAvailable, setBackendAvailable] = useState(true)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const { showSuccess, showError, showWarning } = useAlertStore()
 
-  const requirements = DOCUMENT_REQUIREMENTS[visaType] || { mandatory: [], optional: [] }
-  const allDocTypes = [...requirements.mandatory, ...requirements.optional]
+  // Load document requirements and existing documents
+  useEffect(() => {
+    loadDocumentData()
+  }, [visaType, applicationId])
 
-  // Simulate document verification
-  const verifyDocument = async (file: File, docType: DocumentType): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000))
-    return Math.random() > 0.1
+  const loadDocumentData = async () => {
+    try {
+      setIsLoading(true)
+      
+      // Check if backend is available
+      const available = await apiUtils.isBackendAvailable()
+      setBackendAvailable(available)
+      
+      if (!available) {
+        showError('Backend not available. Please ensure the server is running.')
+        setIsLoading(false)
+        return
+      }
+      
+      // Load document requirements for this visa type
+      const docRequirements = await api.getDocumentRequirements(visaType)
+      setRequirements({
+        mandatory: docRequirements.mandatory_documents,
+        optional: docRequirements.optional_documents
+      })
+      
+      // Load existing documents for this application
+      const existingDocs = await api.getApplicationDocuments(applicationId)
+      
+      // Transform to frontend format
+      const transformedDocs: Document[] = existingDocs.map(doc => ({
+        id: doc.id,
+        name: doc.name,
+        type: doc.type as DocumentType,
+        size: doc.size,
+        uploadedAt: new Date(doc.uploaded_at),
+        verified: doc.verified,
+        url: `http://localhost:8000/api/documents/view/${applicationId}/${doc.name}`
+      }))
+      
+      setDocuments(transformedDocs)
+      onDocumentsChange?.(transformedDocs)
+      
+    } catch (error) {
+      console.error('Error loading document data:', error)
+      showError(`Failed to load document requirements: ${apiUtils.formatErrorMessage(error)}`)
+      setBackendAvailable(false)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  const handleFileUpload = useCallback(async (file: File, docType: DocumentType) => {
-    const docId = `${docType}_${Date.now()}`
-    
-    setUploadingDocs(prev => new Set([...prev, docId]))
+  const handleFileUpload = useCallback(async (file: File, docType: string) => {
+    if (!backendAvailable) {
+      showError('Backend not available. Cannot upload documents.')
+      return
+    }
+
+    // Validate file before upload
+    const validation = apiUtils.validateFile(file)
+    if (!validation.valid) {
+      showError(validation.error!)
+      return
+    }
+
+    const uploadId = `${docType}_${Date.now()}`
+    setUploadingDocs(prev => new Set([...prev, uploadId]))
 
     try {
-      const verified = await verifyDocument(file, docType)
+      console.log(`🚀 Starting upload: ${file.name} (${file.size} bytes) as ${docType}`)
+      
+      // Upload to backend using real API
+      const uploadResults = await api.uploadDocumentsToApplication(applicationId, [
+        { file, type: docType }
+      ])
+      
+      const uploadedDoc = uploadResults[0]
       
       const newDocument: Document = {
-        id: docId,
-        name: file.name,
-        type: docType,
-        size: file.size,
-        uploadedAt: new Date(),
-        verified,
-        url: URL.createObjectURL(file)
+        id: uploadedDoc.id,
+        name: uploadedDoc.name,
+        type: docType as DocumentType,
+        size: uploadedDoc.size,
+        uploadedAt: new Date(uploadedDoc.uploaded_at),
+        verified: uploadedDoc.verified,
+        url: `http://localhost:8000/api/documents/view/${applicationId}/${uploadedDoc.name}`
       }
 
       setDocuments(prev => {
+        // Remove any existing document of the same type
         const filtered = prev.filter(doc => doc.type !== docType)
         const updated = [...filtered, newDocument]
+        
         onDocumentsChange?.(updated)
         return updated
       })
+      
+      showSuccess(`${file.name} uploaded and ${uploadedDoc.verified ? 'verified' : 'pending verification'}!`)
+      
     } catch (error) {
       console.error('Error uploading document:', error)
+      const errorMessage = apiUtils.formatErrorMessage(error)
+      showError(`Failed to upload ${file.name}: ${errorMessage}`)
+      
+      // If it's a server error, check backend availability
+      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('500')) {
+        const available = await apiUtils.isBackendAvailable()
+        setBackendAvailable(available)
+        if (!available) {
+          showError('Lost connection to server. Please check if the backend is running.')
+        }
+      }
     } finally {
       setUploadingDocs(prev => {
         const newSet = new Set(prev)
-        newSet.delete(docId)
+        newSet.delete(uploadId)
         return newSet
       })
     }
-  }, [onDocumentsChange])
+  }, [applicationId, onDocumentsChange, showSuccess, showError, backendAvailable])
 
-  const handleDrop = useCallback((e: React.DragEvent, docType: DocumentType) => {
+  const handleDrop = useCallback((e: React.DragEvent, docType: string) => {
     e.preventDefault()
     setDraggedOver(null)
+    
+    if (!backendAvailable) {
+      showWarning('Backend not available. Cannot upload documents.')
+      return
+    }
     
     const files = Array.from(e.dataTransfer.files)
     if (files.length > 0) {
       handleFileUpload(files[0], docType)
     }
-  }, [handleFileUpload])
+  }, [handleFileUpload, backendAvailable, showWarning])
 
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>, docType: DocumentType) => {
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
     const files = e.target.files
     if (files && files.length > 0) {
       handleFileUpload(files[0], docType)
     }
   }
 
-  const removeDocument = (docType: DocumentType) => {
-    setDocuments(prev => {
-      const updated = prev.filter(doc => doc.type !== docType)
-      onDocumentsChange?.(updated)
-      return updated
-    })
+  const removeDocument = async (docType: string) => {
+    if (!backendAvailable) {
+      showWarning('Backend not available. Cannot delete documents.')
+      return
+    }
+
+    try {
+      await api.deleteDocument(applicationId, docType)
+      
+      setDocuments(prev => {
+        const updated = prev.filter(doc => doc.type !== docType)
+        onDocumentsChange?.(updated)
+        return updated
+      })
+      
+      showSuccess('Document removed successfully')
+    } catch (error) {
+      console.error('Error removing document:', error)
+      showError(`Failed to remove document: ${apiUtils.formatErrorMessage(error)}`)
+    }
   }
 
-  const getDocumentForType = (docType: DocumentType) => {
+  const getDocumentForType = (docType: string) => {
     return documents.find(doc => doc.type === docType)
   }
 
-  const isUploading = (docType: DocumentType) => {
+  const isUploading = (docType: string) => {
     return Array.from(uploadingDocs).some(id => id.startsWith(docType))
   }
 
@@ -167,9 +245,60 @@ export default function DocumentUpload({
   ).length
   
   const mandatoryComplete = mandatoryUploaded === mandatoryTotal
-  const processingBlocked = !mandatoryComplete
+  const processingBlocked = !mandatoryComplete || !backendAvailable
 
-  const DocumentUploadCard = ({ docType, isMandatory }: { docType: DocumentType, isMandatory: boolean }) => {
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
+          <p className="text-gray-600">Loading document requirements...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Backend unavailable state
+  if (!backendAvailable) {
+    return (
+      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
+        <div className="text-center">
+          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Backend Unavailable</h2>
+          <p className="text-gray-600 mb-6">
+            The document upload service is currently unavailable. Please ensure the backend server is running.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={loadDocumentData}
+              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            >
+              <Loader2 className="w-4 h-4 inline mr-2" />
+              Retry Connection
+            </button>
+            <button
+              onClick={onSkip}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors ml-3"
+            >
+              Skip For Now
+            </button>
+          </div>
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-left">
+            <h4 className="font-semibold text-blue-900 mb-2">For Developers:</h4>
+            <ul className="text-blue-800 text-sm space-y-1">
+              <li>• Make sure the backend server is running on http://localhost:8000</li>
+              <li>• Check that the /api/health endpoint is accessible</li>
+              <li>• Verify CORS settings allow frontend connections</li>
+              <li>• Check console for detailed error messages</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const DocumentUploadCard = ({ docType, isMandatory }: { docType: string, isMandatory: boolean }) => {
     const document = getDocumentForType(docType)
     const uploading = isUploading(docType)
     
@@ -181,7 +310,7 @@ export default function DocumentUpload({
             : document?.verified
             ? 'border-green-500 bg-green-50'
             : document && !document.verified
-            ? 'border-red-500 bg-red-50'
+            ? 'border-yellow-500 bg-yellow-50'
             : isMandatory
             ? 'border-red-300 bg-red-50 hover:border-red-400'
             : 'border-gray-300 hover:border-blue-400'
@@ -204,7 +333,7 @@ export default function DocumentUpload({
         {/* Header with mandatory/optional indicator */}
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-medium text-gray-800">
-            {DOCUMENT_NAMES[docType]}
+            {DOCUMENT_NAMES[docType] || docType}
           </h3>
           <span className={`badge badge-sm ${
             isMandatory ? 'badge-error' : 'badge-warning'
@@ -216,7 +345,7 @@ export default function DocumentUpload({
         <div className="text-center">
           {uploading ? (
             <div className="space-y-3">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+              <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto" />
               <p className="text-blue-600 font-medium">Uploading & Verifying...</p>
               <p className="text-sm text-gray-600">Please wait while we process your document</p>
             </div>
@@ -226,7 +355,7 @@ export default function DocumentUpload({
                 {document.verified ? (
                   <CheckCircle2 className="w-12 h-12 text-green-500" />
                 ) : (
-                  <AlertCircle className="w-12 h-12 text-red-500" />
+                  <Clock className="w-12 h-12 text-yellow-500" />
                 )}
               </div>
               
@@ -234,9 +363,9 @@ export default function DocumentUpload({
                 <p className="font-medium text-gray-800">{document.name}</p>
                 <p className="text-sm text-gray-600">{formatFileSize(document.size)}</p>
                 <p className={`text-sm font-medium ${
-                  document.verified ? 'text-green-600' : 'text-red-600'
+                  document.verified ? 'text-green-600' : 'text-yellow-600'
                 }`}>
-                  {document.verified ? 'Verified ✓' : 'Verification Failed ✗'}
+                  {document.verified ? 'Verified ✓' : 'Pending Verification ⏳'}
                 </p>
               </div>
 
@@ -244,15 +373,25 @@ export default function DocumentUpload({
                 <button
                   onClick={() => fileInputRefs.current[docType]?.click()}
                   className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                  disabled={!backendAvailable}
                 >
                   Replace
                 </button>
                 <button
                   onClick={() => removeDocument(docType)}
                   className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+                  disabled={!backendAvailable}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
+                {document.url && (
+                  <button
+                    onClick={() => window.open(document.url, '_blank')}
+                    className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+                  >
+                    View
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -260,14 +399,15 @@ export default function DocumentUpload({
               <Upload className="w-12 h-12 text-gray-400 mx-auto" />
               <div>
                 <p className="text-sm text-gray-600 mb-3">
-                  {DOCUMENT_DESCRIPTIONS[docType]}
+                  {DOCUMENT_DESCRIPTIONS[docType] || `Upload your ${docType.replace('_', ' ')}`}
                 </p>
               </div>
               
               <div className="space-y-2">
                 <button
                   onClick={() => fileInputRefs.current[docType]?.click()}
-                  className={`w-full px-4 py-2 rounded-lg transition-colors ${
+                  disabled={!backendAvailable}
+                  className={`w-full px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                     isMandatory 
                       ? 'bg-red-500 text-white hover:bg-red-600' 
                       : 'bg-blue-500 text-white hover:bg-blue-600'
@@ -279,7 +419,8 @@ export default function DocumentUpload({
                 
                 <button
                   onClick={() => fileInputRefs.current[docType]?.click()}
-                  className="w-full px-4 py-2 border border-gray-400 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  disabled={!backendAvailable}
+                  className="w-full px-4 py-2 border border-gray-400 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Camera className="w-4 h-4 inline mr-2" />
                   Take Photo
@@ -334,7 +475,7 @@ export default function DocumentUpload({
 
       <div className="p-6">
         {/* Processing Status Alert */}
-        {processingBlocked ? (
+        {processingBlocked && backendAvailable && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="w-6 h-6 text-red-500 mt-0.5" />
@@ -350,7 +491,9 @@ export default function DocumentUpload({
               </div>
             </div>
           </div>
-        ) : (
+        )}
+
+        {mandatoryComplete && backendAvailable && (
           <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <CheckCircle2 className="w-6 h-6 text-green-500 mt-0.5" />
@@ -381,7 +524,7 @@ export default function DocumentUpload({
               <div className="w-full bg-red-200 rounded-full h-2">
                 <div 
                   className="bg-red-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${(mandatoryUploaded / mandatoryTotal) * 100}%` }}
+                  style={{ width: `${mandatoryTotal > 0 ? (mandatoryUploaded / mandatoryTotal) * 100 : 0}%` }}
                 />
               </div>
               <p className="text-xs text-gray-600">
@@ -444,7 +587,7 @@ export default function DocumentUpload({
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-6">
-          {mandatoryComplete && (
+          {mandatoryComplete && backendAvailable && (
             <button
               onClick={onComplete}
               className="px-8 py-3 bg-green-500 text-white text-lg font-medium rounded-lg hover:bg-green-600 transition-colors"
@@ -465,85 +608,6 @@ export default function DocumentUpload({
             <ArrowRight className="w-5 h-5 inline mr-2" />
             {processingBlocked ? 'Skip For Now (Processing Blocked)' : 'Continue to Status'}
           </button>
-        </div>
-
-        {/* Information Boxes */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Processing Information */}
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <h4 className="font-medium text-red-900 mb-2">🚨 Processing Requirements</h4>
-            <ul className="text-sm text-red-800 space-y-1">
-              <li>• <strong>Required documents are mandatory</strong> for processing</li>
-              <li>• Application will remain on hold until uploaded</li>
-              <li>• Processing time starts after all required docs verified</li>
-              <li>• Optional documents may improve approval odds</li>
-              <li>• You can upload documents anytime using your QR code</li>
-            </ul>
-          </div>
-
-          {/* Upload Benefits */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 mb-2">📄 Document Benefits</h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              <li>• <strong>Required:</strong> Enables processing to continue</li>
-              <li>• <strong>Optional:</strong> May reduce processing time</li>
-              <li>• Provides evidence supporting your application</li>
-              <li>• Shows preparedness and attention to detail</li>
-              <li>• Can be uploaded later if not available now</li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Status summary */}
-        <div className="mt-6 bg-gray-50 rounded-lg p-4">
-          <h4 className="font-medium text-gray-800 mb-3">Document Upload Status</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {allDocTypes.map(docType => {
-              const document = getDocumentForType(docType)
-              const uploading = isUploading(docType)
-              const isMandatory = requirements.mandatory.includes(docType)
-              
-              return (
-                <div key={docType} className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-700 flex items-center gap-2">
-                    {DOCUMENT_NAMES[docType]}
-                    <span className={`badge badge-xs ${isMandatory ? 'badge-error' : 'badge-warning'}`}>
-                      {isMandatory ? 'REQ' : 'OPT'}
-                    </span>
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {uploading ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-xs text-blue-600">Processing...</span>
-                      </>
-                    ) : document?.verified ? (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                        <span className="text-xs text-green-600">Verified</span>
-                      </>
-                    ) : document ? (
-                      <>
-                        <AlertCircle className="w-4 h-4 text-red-500" />
-                        <span className="text-xs text-red-600">Failed</span>
-                      </>
-                    ) : (
-                      <>
-                        <div className={`w-4 h-4 border-2 rounded-full ${
-                          isMandatory ? 'border-red-300' : 'border-gray-300'
-                        }`}></div>
-                        <span className={`text-xs ${
-                          isMandatory ? 'text-red-600' : 'text-gray-500'
-                        }`}>
-                          {isMandatory ? 'Required' : 'Optional'}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
         </div>
       </div>
     </div>

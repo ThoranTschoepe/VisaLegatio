@@ -431,7 +431,7 @@ async def get_document_requirements(visa_type: str):
 @router.post("/{application_id}/documents")
 async def add_documents_to_application(
     application_id: str,
-    documents: List[dict],
+    documents: List[dict],  # Expects array directly now
     db: Session = Depends(get_db)
 ):
     """Add documents to an existing application and update status if requirements met"""
@@ -440,25 +440,16 @@ async def add_documents_to_application(
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
     
-    # Add documents
-    for doc_data in documents:
-        document = Document(
-            id=generate_id("doc"),
-            application_id=application_id,
-            name=doc_data.get("name", "Unknown Document"),
-            type=doc_data.get("type", "unknown"),
-            size=doc_data.get("size", 0),
-            verified=doc_data.get("verified", False)
-        )
-        db.add(document)
+    print(f"📝 Notifying backend of {len(documents)} document uploads for {application_id}")
     
     # Check if document requirements are now met
     doc_status = check_document_requirements(application_id, app.visa_type, db)
     
     # Update application status if requirements are now met
     old_status = app.status
-    if doc_status["requirements_met"] and app.status == "document_collection":
+    if doc_status["requirements_met"] and app.status in ["submitted", "document_collection"]:
         app.status = "document_review"
+        app.updated_at = datetime.utcnow()
         
         # Create status update for progression
         status_update = StatusUpdate(
@@ -469,13 +460,14 @@ async def add_documents_to_application(
             timestamp=datetime.utcnow()
         )
         db.add(status_update)
+        print(f"🔄 Status updated from {old_status} to document_review")
     
-    # Create status update for document addition
+    # Create status update for document notification
     status_update = StatusUpdate(
         id=generate_id("status"),
         application_id=application_id,
         status=app.status,
-        notes=f"Added {len(documents)} supporting documents",
+        notes=f"Document upload notification received for {len(documents)} documents",
         timestamp=datetime.utcnow()
     )
     db.add(status_update)
@@ -486,9 +478,10 @@ async def add_documents_to_application(
     db.commit()
     
     return {
-        "message": f"Added {len(documents)} documents to application {application_id}",
+        "message": f"Processed notification for {len(documents)} documents in application {application_id}",
         "requirements_met": doc_status["requirements_met"],
         "status_changed": old_status != app.status,
+        "old_status": old_status,
         "new_status": app.status,
         "document_status": doc_status
     }
