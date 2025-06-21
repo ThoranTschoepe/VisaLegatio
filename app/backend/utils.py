@@ -477,30 +477,30 @@ def create_demo_flight_itinerary() -> bytes:
 def create_organized_documents_for_application(db: Session, app_id: str, visa_type: str, applicant_name: str, completion_level: str) -> List[Document]:
     """Create demo documents for an application in organized folder structure"""
     
-    # Document requirements by visa type
+    # Document requirements by visa type - UPDATED
     requirements = {
         "business": {
-            "mandatory": ["passport", "photo", "invitation_letter"],
+            "mandatory": ["passport", "invitation_letter"],
             "optional": ["employment_letter", "bank_statement"]
         },
         "tourist": {
-            "mandatory": ["passport", "photo", "bank_statement"],
-            "optional": ["travel_insurance", "flight_itinerary"]
+            "mandatory": ["passport", "bank_statement"],
+            "optional": ["travel_insurance", "flight_itinerary", "invitation_letter"]
         },
         "student": {
-            "mandatory": ["passport", "photo", "invitation_letter", "bank_statement"],
+            "mandatory": ["passport", "invitation_letter", "bank_statement"],
             "optional": ["employment_letter"]
         },
         "work": {
-            "mandatory": ["passport", "photo", "employment_letter", "invitation_letter"],
+            "mandatory": ["passport", "employment_letter", "invitation_letter"],
             "optional": ["bank_statement"]
         },
         "family_visit": {
-            "mandatory": ["passport", "photo", "invitation_letter"],
+            "mandatory": ["passport", "invitation_letter"],
             "optional": ["bank_statement", "employment_letter"]
         },
         "transit": {
-            "mandatory": ["passport", "photo", "flight_itinerary"],
+            "mandatory": ["passport", "flight_itinerary"],
             "optional": []
         }
     }
@@ -515,7 +515,7 @@ def create_organized_documents_for_application(db: Session, app_id: str, visa_ty
         docs_to_create = req["mandatory"] + req["optional"][:1]
     elif completion_level == "partial":
         # Some mandatory documents
-        docs_to_create = req["mandatory"][:2]
+        docs_to_create = req["mandatory"][:1]  # Just passport for partial
     elif completion_level == "minimal":
         # Just one document
         docs_to_create = req["mandatory"][:1]
@@ -532,11 +532,9 @@ def create_organized_documents_for_application(db: Session, app_id: str, visa_ty
         try:
             # Generate document content based on type
             if doc_type == "passport":
+                # Create passport PDF that includes photo page
                 content = create_demo_passport_pdf(applicant_name, f"PA{random.randint(100000, 999999)}", "Demo Country")
                 filename = f"passport.pdf"
-            elif doc_type == "photo":
-                content = create_demo_photo(applicant_name)
-                filename = f"photo.jpg"
             elif doc_type == "bank_statement":
                 content = create_demo_bank_statement(applicant_name)
                 filename = f"bank_statement.pdf"

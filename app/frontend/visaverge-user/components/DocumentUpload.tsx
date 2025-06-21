@@ -16,8 +16,7 @@ interface DocumentUploadProps {
 }
 
 const DOCUMENT_NAMES: Record<string, string> = {
-  passport: 'Passport (Photo Page)',
-  photo: 'Passport Photo',
+  passport: 'Passport (with Photo Page)',
   bank_statement: 'Bank Statement',
   invitation_letter: 'Invitation Letter',
   travel_insurance: 'Travel Insurance',
@@ -26,8 +25,7 @@ const DOCUMENT_NAMES: Record<string, string> = {
 }
 
 const DOCUMENT_DESCRIPTIONS: Record<string, string> = {
-  passport: 'Clear photo of your passport information page',
-  photo: 'Recent passport-sized photo (white background)',
+  passport: 'Clear scan of your passport including the photo page',
   bank_statement: 'Last 3 months bank statements showing sufficient funds',
   invitation_letter: 'Official invitation letter from host organization',
   travel_insurance: 'Valid travel insurance covering your entire stay',

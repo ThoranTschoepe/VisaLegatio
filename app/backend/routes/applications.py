@@ -16,27 +16,27 @@ router = APIRouter()
 # Document requirements by visa type
 DOCUMENT_REQUIREMENTS = {
     "tourist": {
-        "mandatory": ["passport", "photo", "bank_statement"],
-        "optional": ["travel_insurance", "flight_itinerary"]
+        "mandatory": ["passport", "bank_statement"],
+        "optional": ["travel_insurance", "flight_itinerary", "invitation_letter"]
     },
     "business": {
-        "mandatory": ["passport", "photo", "invitation_letter"],
+        "mandatory": ["passport", "invitation_letter"],
         "optional": ["employment_letter", "bank_statement"]
     },
     "student": {
-        "mandatory": ["passport", "photo", "invitation_letter", "bank_statement"],
+        "mandatory": ["passport", "invitation_letter", "bank_statement"],
         "optional": ["employment_letter"]
     },
     "work": {
-        "mandatory": ["passport", "photo", "employment_letter", "invitation_letter"],
+        "mandatory": ["passport", "employment_letter", "invitation_letter"],
         "optional": ["bank_statement"]
     },
     "family_visit": {
-        "mandatory": ["passport", "photo", "invitation_letter"],
+        "mandatory": ["passport", "invitation_letter"],
         "optional": ["bank_statement", "employment_letter"]
     },
     "transit": {
-        "mandatory": ["passport", "photo", "flight_itinerary"],
+        "mandatory": ["passport", "flight_itinerary"],
         "optional": []
     }
 }

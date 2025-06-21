@@ -16,27 +16,27 @@ router = APIRouter()
 # Document requirements by visa type
 DOCUMENT_REQUIREMENTS = {
     "tourist": {
-        "mandatory": ["passport", "photo", "bank_statement"],
-        "optional": ["travel_insurance", "flight_itinerary"]
+        "mandatory": ["passport", "bank_statement"],
+        "optional": ["travel_insurance", "flight_itinerary", "invitation_letter"]
     },
     "business": {
-        "mandatory": ["passport", "photo", "invitation_letter"],
+        "mandatory": ["passport", "invitation_letter"],
         "optional": ["employment_letter", "bank_statement"]
     },
     "student": {
-        "mandatory": ["passport", "photo", "invitation_letter", "bank_statement"],
+        "mandatory": ["passport", "invitation_letter", "bank_statement"],
         "optional": ["employment_letter"]
     },
     "work": {
-        "mandatory": ["passport", "photo", "employment_letter", "invitation_letter"],
+        "mandatory": ["passport", "employment_letter", "invitation_letter"],
         "optional": ["bank_statement"]
     },
     "family_visit": {
-        "mandatory": ["passport", "photo", "invitation_letter"],
+        "mandatory": ["passport", "invitation_letter"],
         "optional": ["bank_statement", "employment_letter"]
     },
     "transit": {
-        "mandatory": ["passport", "photo", "flight_itinerary"],
+        "mandatory": ["passport", "flight_itinerary"],
         "optional": []
     }
 }
@@ -185,10 +185,8 @@ def verify_document_content(content: bytes, doc_type: str, file_ext: str) -> boo
             return False
     
     # Additional verification based on document type
-    if doc_type == 'passport' and file_ext != '.pdf':
-        # Passport should ideally be PDF, but allow images
-        pass
-    elif doc_type == 'photo' and file_ext not in ['.jpg', '.jpeg', '.png']:
+    if doc_type == 'passport' and file_ext not in ['.pdf', '.jpg', '.jpeg', '.png']:
+        # Passport should ideally be PDF or image
         return False
     
     # File size checks
@@ -364,8 +362,6 @@ async def list_physical_files(application_id: str):
             
             if "passport" in filename_lower:
                 doc_type = "passport"
-            elif "photo" in filename_lower:
-                doc_type = "photo"
             elif "bank" in filename_lower:
                 doc_type = "bank_statement"
             elif "invitation" in filename_lower:
