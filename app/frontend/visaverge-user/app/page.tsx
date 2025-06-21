@@ -232,7 +232,7 @@ export default function HomePage() {
               className="btn btn-ghost normal-case text-xl font-bold"
             >
               <Globe className="w-6 h-6 mr-2" />
-              VisaVerge
+              VisaLegatio
             </button>
           </div>
           <div className="flex-none">
@@ -260,7 +260,7 @@ export default function HomePage() {
               className="btn btn-ghost normal-case text-xl font-bold"
             >
               <Globe className="w-6 h-6 mr-2" />
-              VisaVerge
+              VisaLegatio
             </button>
           </div>
           <div className="flex-none">
@@ -308,7 +308,7 @@ export default function HomePage() {
           <div className="flex-1">
             <span className="text-xl font-bold">
               <Globe className="w-6 h-6 mr-2 inline" />
-              VisaVerge
+              VisaLegatio
             </span>
           </div>
           <div className="flex-none">
@@ -335,7 +335,7 @@ export default function HomePage() {
           <div className="flex-1">
             <span className="text-xl font-bold">
               <Globe className="w-6 h-6 mr-2 inline" />
-              VisaVerge
+              VisaLegatio
             </span>
           </div>
           <div className="flex-none">
@@ -362,7 +362,7 @@ export default function HomePage() {
           <div className="flex-1">
             <span className="text-xl font-bold">
               <Globe className="w-6 h-6 mr-2 inline" />
-              VisaVerge
+              VisaLegatio
             </span>
           </div>
           <div className="flex-none">
@@ -397,7 +397,7 @@ export default function HomePage() {
           <div className="flex-1">
             <span className="text-xl font-bold">
               <Globe className="w-6 h-6 mr-2 inline" />
-              VisaVerge
+              VisaLegatio
             </span>
           </div>
           <div className="flex-none">
@@ -432,7 +432,7 @@ export default function HomePage() {
         <div className="flex-1">
           <span className="text-2xl font-bold">
             <Globe className="w-8 h-8 mr-2 inline text-primary" />
-            VisaVerge
+            VisaLegatio
           </span>
         </div>
         <div className="flex-none">
@@ -448,7 +448,7 @@ export default function HomePage() {
               <div className="flex items-center justify-center gap-3 mb-6">
                 <Globe className="w-12 h-12 text-primary" />
                 <h1 className="text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  VisaVerge
+                  VisaLegatio
                 </h1>
               </div>
               
@@ -479,151 +479,6 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-
-      <div className="container mx-auto px-4 py-16">
-        {/* Features Grid */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold mb-4">Why Choose VisaVerge?</h2>
-          <p className="text-xl opacity-70">Experience the next generation of visa applications</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          <Card className="text-center hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary">
-            <div className="flex justify-center mb-6">
-              <div className="p-4 bg-primary/10 rounded-full">
-                <Zap className="w-8 h-8 text-primary" />
-              </div>
-            </div>
-            <h3 className="text-2xl font-bold mb-4">Submit First, Documents Later</h3>
-            <p className="opacity-70 leading-relaxed">
-              Start processing immediately. Upload documents when convenient. Get your QR code for easy access anytime.
-            </p>
-            <div className="mt-4">
-              <Badge variant="primary">
-                <Sparkles className="w-3 h-3 mr-1" />
-                Instant Start
-              </Badge>
-            </div>
-          </Card>
-
-          <Card className="text-center hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-secondary">
-            <div className="flex justify-center mb-6">
-              <div className="p-4 bg-secondary/10 rounded-full">
-                <Shield className="w-8 h-8 text-secondary" />
-              </div>
-            </div>
-            <h3 className="text-2xl font-bold mb-4">Secure QR Access</h3>
-            <p className="opacity-70 leading-relaxed">
-              Your personal QR code and password ensure secure access. Check status, upload documents, and track progress from anywhere.
-            </p>
-            <div className="mt-4">
-              <Badge variant="secondary">Protected Access</Badge>
-            </div>
-          </Card>
-
-          <Card className="text-center hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-accent">
-            <div className="flex justify-center mb-6">
-              <div className="p-4 bg-accent/10 rounded-full">
-                <Users className="w-8 h-8 text-accent" />
-              </div>
-            </div>
-            <h3 className="text-2xl font-bold mb-4">Real-Time Transparency</h3>
-            <p className="opacity-70 leading-relaxed">
-              No more "application is being processed." See exactly where your application stands with live updates and approval probability.
-            </p>
-            <div className="mt-4">
-              <Badge variant="accent">Live Tracking</Badge>
-            </div>
-          </Card>
-        </div>
-
-        {/* Stats Section */}
-        <Card className="mb-16">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold mb-4">
-              Revolutionizing Visa Applications
-            </h2>
-            <p className="text-lg opacity-70">
-              See the difference VisaVerge makes
-            </p>
-          </div>
-
-          <Stats className="w-full">
-            <Stat 
-              title="Faster Processing" 
-              value="75%" 
-              description="↗︎ Compared to traditional methods"
-              className="text-primary"
-            />
-            <Stat 
-              title="User Satisfaction" 
-              value="90%" 
-              description="↗︎ Customer approval rating"
-              className="text-secondary"
-            />
-            <Stat 
-              title="Fewer Errors" 
-              value="50%" 
-              description="↘︎ Reduction in application mistakes"
-              className="text-accent"
-            />
-            <Stat 
-              title="AI Support" 
-              value="24/7" 
-              description="Always available assistance"
-              className="text-success"
-            />
-          </Stats>
-        </Card>
-
-        {/* CTA Section */}
-        <div className="text-center">
-          <Card className="bg-gradient-to-r from-primary/10 to-secondary/10 border-primary">
-            <h2 className="text-3xl font-bold mb-4">
-              Ready to Transform Your Visa Experience?
-            </h2>
-            <p className="text-lg opacity-70 mb-8 max-w-2xl mx-auto">
-              Join thousands of travelers who have already discovered a better way to apply for visas.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                size="lg"
-                onClick={startChatDirectly}
-                className="btn-lg gradient-primary text-white border-none"
-              >
-                Start Your Application Now
-                <ArrowRight className="w-6 h-6 ml-2" />
-              </Button>
-              
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={showStatusLogin}
-              >
-                Check Existing Application
-              </Button>
-            </div>
-          </Card>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <footer className="footer footer-center p-10 bg-base-300 text-base-content">
-        <div>
-          <div className="flex items-center gap-2 text-2xl font-bold">
-            <Globe className="w-8 h-8 text-primary" />
-            VisaVerge
-          </div>
-          <p className="opacity-70 max-w-md">
-            Reimagining embassy services for the digital age
-          </p>
-          <p className="text-sm opacity-50">
-            Built with ❤️ for the Embassy Innovation Hackathon
-          </p>
-        </div>
-      </footer>
-
       <AlertContainer />
     </div>
   )

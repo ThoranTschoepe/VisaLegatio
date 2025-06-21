@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Embassy Portal - VisaVerge',
+  title: 'Embassy Portal - VisaLegatio',
   description: 'Secure portal for embassy officers to manage visa applications',
   robots: 'noindex, nofollow', // Don't index embassy pages
 }

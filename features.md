@@ -2,11 +2,11 @@ Great focus! The **visa process** is one of the most frustrating, paperwork-heav
 
 ---
 
-## 💡 Groundbreaking Idea: **VisaVerge – A Smart, Transparent, AI-Guided Visa System**
+## 💡 Groundbreaking Idea: **VisaLegatio – A Smart, Transparent, AI-Guided Visa System**
 
 ### 🔍 Summary:
 
-**VisaVerge** is a **secure, AI-driven, globally unified visa experience** that replaces the traditional visa application process with an intelligent, interactive journey — accessible anytime, anywhere, on any device.
+**VisaLegatio** is a **secure, AI-driven, globally unified visa experience** that replaces the traditional visa application process with an intelligent, interactive journey — accessible anytime, anywhere, on any device.
 
 ---
 
@@ -24,7 +24,7 @@ Great focus! The **visa process** is one of the most frustrating, paperwork-heav
 
 ### 2. **Dynamic Form Generator**
 
-* Instead of long static PDFs, VisaVerge uses an **adaptive form system**:
+* Instead of long static PDFs, VisaLegatio uses an **adaptive form system**:
 
   * Asks only relevant questions.
   * Changes dynamically as you answer.
@@ -78,7 +78,7 @@ Great focus! The **visa process** is one of the most frustrating, paperwork-heav
 
 ## 🌐 Future Possibility:
 
-* Partner countries could adopt **mutual VisaVerge protocols**, reducing red tape for multi-country travel (like a **digital Schengen** for the future).
+* Partner countries could adopt **mutual VisaLegatio protocols**, reducing red tape for multi-country travel (like a **digital Schengen** for the future).
 * Could integrate with **e-wallets** for digital visa stamps or travel tax payments.
 
 ---

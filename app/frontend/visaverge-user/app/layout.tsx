@@ -6,21 +6,21 @@ import Script from 'next/script'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'VisaVerge - AI-Powered Visa Applications',
+  title: 'VisaLegatio - AI-Powered Visa Applications',
   description: 'The future of visa applications. Smart, transparent, and designed for the digital age.',
   keywords: ['visa', 'application', 'AI', 'embassy', 'travel', 'immigration'],
-  authors: [{ name: 'VisaVerge Team' }],
+  authors: [{ name: 'VisaLegatio Team' }],
   viewport: 'width=device-width, initial-scale=1',
   robots: 'index, follow',
   openGraph: {
-    title: 'VisaVerge - AI-Powered Visa Applications',
+    title: 'VisaLegatio - AI-Powered Visa Applications',
     description: 'Experience the future of visa applications with AI guidance, real-time tracking, and smart forms.',
     type: 'website',
-    siteName: 'VisaVerge',
+    siteName: 'VisaLegatio',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'VisaVerge - AI-Powered Visa Applications',
+    title: 'VisaLegatio - AI-Powered Visa Applications',
     description: 'Experience the future of visa applications with AI guidance, real-time tracking, and smart forms.',
   }
 }

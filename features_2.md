@@ -1,4 +1,4 @@
-# 🏗️ **VisaVerge: Complete Feature Breakdown**
+# 🏗️ **VisaLegatio: Complete Feature Breakdown**
 
 ## **👤 USER SIDE Features**
 
@@ -290,7 +290,7 @@ status_updates (id, application_id, status, timestamp, notes)
 5. **Real-time**: Show status change on user side
 
 ### **Act 3: The Innovation (60 seconds)**
-1. **Before/After**: Traditional vs VisaVerge comparison
+1. **Before/After**: Traditional vs VisaLegatio comparison
 2. **Key Benefits**: Speed, transparency, user experience
 3. **Impact**: Real numbers and user testimonials (mock)
 

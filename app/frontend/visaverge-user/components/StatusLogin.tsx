@@ -181,7 +181,7 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
             <div className="p-3 bg-primary rounded-full">
               <FileText className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">VisaVerge</h1>
+            <h1 className="text-3xl font-bold text-gray-800">VisaLegatio</h1>
           </div>
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Check Application Status</h2>
           <p className="text-gray-600">Enter your application details to view progress</p>

@@ -161,7 +161,7 @@ export function PageLoading({ message = 'Loading...' }: { message?: string }) {
           <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-spin" />
           <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-2">VisaVerge</h2>
+        <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-2">VisaLegatio</h2>
         <p className="text-gray-600">{message}</p>
       </div>
     </div>

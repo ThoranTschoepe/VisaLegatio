@@ -62,7 +62,7 @@ def create_demo_passport_pdf(name: str, passport_number: str, nationality: str) 
     
     # Add some official-looking elements
     p.setFont("Helvetica-Oblique", 10)
-    p.drawString(100, 100, "This is a demonstration document for VisaVerge demo purposes only.")
+    p.drawString(100, 100, "This is a demonstration document for VisaLegatio demo purposes only.")
     
     p.showPage()
     p.save()
@@ -164,7 +164,7 @@ def create_demo_bank_statement(name: str, balance: str = "15,750.00") -> bytes:
     
     # Footer
     p.setFont("Helvetica-Oblique", 8)
-    p.drawString(100, 80, "This is a demonstration document for VisaVerge demo purposes only.")
+    p.drawString(100, 80, "This is a demonstration document for VisaLegatio demo purposes only.")
     
     p.showPage()
     p.save()
@@ -249,7 +249,7 @@ def create_demo_invitation_letter(applicant_name: str, company: str, visa_type: 
     
     # Footer
     p.setFont("Helvetica-Oblique", 8)
-    p.drawString(100, 60, "This is a demonstration document for VisaVerge demo purposes only.")
+    p.drawString(100, 60, "This is a demonstration document for VisaLegatio demo purposes only.")
     
     p.showPage()
     p.save()
@@ -317,7 +317,7 @@ def create_demo_employment_letter(employee_name: str) -> bytes:
     
     # Footer
     p.setFont("Helvetica-Oblique", 8)
-    p.drawString(100, 60, "This is a demonstration document for VisaVerge demo purposes only.")
+    p.drawString(100, 60, "This is a demonstration document for VisaLegatio demo purposes only.")
     
     p.showPage()
     p.save()
@@ -380,7 +380,7 @@ def create_demo_travel_insurance() -> bytes:
     
     # Footer
     p.setFont("Helvetica-Oblique", 8)
-    p.drawString(100, 80, "This is a demonstration document for VisaVerge demo purposes only.")
+    p.drawString(100, 80, "This is a demonstration document for VisaLegatio demo purposes only.")
     
     p.showPage()
     p.save()
@@ -467,7 +467,7 @@ def create_demo_flight_itinerary() -> bytes:
     
     # Footer
     p.setFont("Helvetica-Oblique", 8)
-    p.drawString(100, 60, "This is a demonstration document for VisaVerge demo purposes only.")
+    p.drawString(100, 60, "This is a demonstration document for VisaLegatio demo purposes only.")
     
     p.showPage()
     p.save()

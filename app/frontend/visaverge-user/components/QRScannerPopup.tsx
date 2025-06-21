@@ -40,7 +40,7 @@ export default function QRScannerPopup({ onScanResult, onClose }: QRScannerPopup
         alert('Invalid QR code URL - no application ID found')
       }
     } catch (error) {
-      alert('Invalid URL format. Please enter a valid VisaVerge QR code URL.')
+      alert('Invalid URL format. Please enter a valid VisaLegatio QR code URL.')
     }
   }
 
@@ -229,7 +229,7 @@ export default function QRScannerPopup({ onScanResult, onClose }: QRScannerPopup
           <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
             <h4 className="font-semibold text-green-900 text-sm mb-2">✨ Features</h4>
             <div className="text-green-800 text-xs space-y-1">
-              <p>• Works with any VisaVerge QR code</p>
+              <p>• Works with any VisaLegatio QR code</p>
               <p>• Validates URL format and application ID</p>
               <p>• Supports both URL and image scanning</p>
               <p>• Secure processing with error handling</p>

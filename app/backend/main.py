@@ -47,7 +47,7 @@ def reset_database_and_create_organized_docs():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("🚀 Starting VisaVerge Backend...")
+    print("🚀 Starting VisaLegatio Backend...")
     print("🔄 Resetting database and creating organized document structure...")
     
     reset_database_and_create_organized_docs()
@@ -70,11 +70,11 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    print("👋 Shutting down VisaVerge Backend...")
+    print("👋 Shutting down VisaLegatio Backend...")
 
 # Create FastAPI app
 app = FastAPI(
-    title="VisaVerge API",
+    title="VisaLegatio API",
     description="AI-Powered Visa Application System with Real File Upload - Embassy Innovation Hackathon",
     version="1.0.0",
     docs_url="/api/docs",  # Swagger UI
@@ -129,7 +129,7 @@ app.include_router(documents.router, prefix="/api/documents", tags=["Documents"]
 async def health_check():
     return {
         "status": "healthy",
-        "service": "VisaVerge Backend",
+        "service": "VisaLegatio Backend",
         "version": "1.0.0",
         "embassy": "AI-Powered Visa Processing",
         "database": "Fresh reset on startup",
@@ -145,7 +145,7 @@ async def health_check():
 @app.get("/")
 async def root():
     return {
-        "message": "🏛️ Welcome to VisaVerge API with Real File Upload",
+        "message": "🏛️ Welcome to VisaLegatio API with Real File Upload",
         "docs": "/api/docs",
         "health": "/api/health",
         "frontend": "http://localhost:3000",

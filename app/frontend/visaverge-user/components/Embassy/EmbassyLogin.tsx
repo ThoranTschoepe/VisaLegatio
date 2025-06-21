@@ -70,7 +70,7 @@ export default function EmbassyLogin({ onLogin }: EmbassyLoginProps) {
             <div className="p-3 bg-primary rounded-full">
               <Shield className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">VisaVerge</h1>
+            <h1 className="text-3xl font-bold text-gray-800">VisaLegatio</h1>
           </div>
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Embassy Portal</h2>
           <p className="text-gray-600">Secure access for consular officers</p>

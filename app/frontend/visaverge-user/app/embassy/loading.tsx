@@ -8,7 +8,7 @@ export default function EmbassyLoading() {
           <div className="p-3 bg-primary rounded-full animate-pulse">
             <Shield className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-800">VisaVerge</h1>
+          <h1 className="text-3xl font-bold text-gray-800">VisaLegatio</h1>
         </div>
         
         <div className="relative">
