@@ -5,7 +5,7 @@
 ### 1. Setup
 ```bash
 # Navigate to backend folder
-cd frontend
+cd visaverge-user
 
 # Install dependencies
 npm install
