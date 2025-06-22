@@ -28,7 +28,6 @@ interface BiasReviewProps {
 interface BiasReviewCase {
   application: EmbassyApplication
   rejection_reason: string
-  ai_confidence: number
   reviewed: boolean
   review_result?: 'justified' | 'biased' | 'uncertain'
   review_notes?: string
@@ -78,7 +77,6 @@ export default function BiasReview({ officer }: BiasReviewProps) {
             lastActivity: new Date()
           },
           rejection_reason: 'High risk score due to country of origin and limited travel history',
-          ai_confidence: 78,
           reviewed: false
         },
         {
@@ -96,7 +94,6 @@ export default function BiasReview({ officer }: BiasReviewProps) {
             lastActivity: new Date()
           },
           rejection_reason: 'Insufficient financial documentation despite scholarship',
-          ai_confidence: 82,
           reviewed: true,
           review_result: 'biased',
           review_notes: 'Applicant has full scholarship. Financial requirements should be waived.',
@@ -118,7 +115,6 @@ export default function BiasReview({ officer }: BiasReviewProps) {
             lastActivity: new Date()
           },
           rejection_reason: 'Geopolitical risk factors and incomplete documentation',
-          ai_confidence: 85,
           reviewed: true,
           review_result: 'justified',
           review_notes: 'Missing critical business documents. Rejection is warranted.',
@@ -140,7 +136,6 @@ export default function BiasReview({ officer }: BiasReviewProps) {
             lastActivity: new Date()
           },
           rejection_reason: 'Name similarity to watchlist entry (false positive)',
-          ai_confidence: 68,
           reviewed: false
         },
         {
@@ -158,7 +153,6 @@ export default function BiasReview({ officer }: BiasReviewProps) {
             lastActivity: new Date()
           },
           rejection_reason: 'Previous overstay by family member',
-          ai_confidence: 71,
           reviewed: true,
           review_result: 'biased',
           review_notes: 'Applicant should not be penalized for family member actions',
@@ -371,7 +365,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
                   <th>Type</th>
                   <th>Country</th>
                   <th>Risk Score</th>
-                  <th>AI Confidence</th>
+                  <th>Status</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -400,12 +394,6 @@ export default function BiasReview({ officer }: BiasReviewProps) {
                       }`}>
                         {caseItem.application.riskScore}%
                       </span>
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <Brain className="w-4 h-4 text-info" />
-                        <span>{caseItem.ai_confidence}%</span>
-                      </div>
                     </td>
                     <td>{getReviewBadge(caseItem.review_result)}</td>
                     <td>
@@ -473,15 +461,6 @@ export default function BiasReview({ officer }: BiasReviewProps) {
                     </div>
                   </div>
 
-                  <div className="card bg-red-50 border border-red-200">
-                    <div className="card-body">
-                      <h3 className="card-title text-lg text-red-900">AI Rejection Reason</h3>
-                      <p className="text-red-800">{selectedCase.rejection_reason}</p>
-                      <div className="mt-2">
-                        <span className="text-sm text-red-700">AI Confidence: {selectedCase.ai_confidence}%</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
 
                 {/* Review Form */}
