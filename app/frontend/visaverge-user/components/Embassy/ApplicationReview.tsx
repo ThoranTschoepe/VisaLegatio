@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, AlertTriangle, FileText, Eye, X, Maximize2, ExternalLink, AlertCircle, Brain, FileWarning } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, FileText, Eye, X, Maximize2, ExternalLink, AlertCircle, Brain, FileWarning, Flag } from 'lucide-react'
 import { EmbassyApplication, Officer, EmbassyDocument } from '@/types/embassy.types'
 import { api } from '@/utils/api'
+import { useAlertStore } from '@/lib/stores/alert.store'
 
 // CONSISTENT backend URL - always use port 8000 for documents
 const BACKEND_BASE = 'http://localhost:8000'
@@ -81,6 +82,14 @@ export default function ApplicationReview({
   const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [currentAIAnalysis, setCurrentAIAnalysis] = useState<any>(null)
   const [expandedDocuments, setExpandedDocuments] = useState<Set<string>>(new Set())
+  
+  // Flag document states
+  const [showFlagModal, setShowFlagModal] = useState(false)
+  const [flaggingDocument, setFlaggingDocument] = useState<DocumentWithUrls | null>(null)
+  const [flagReason, setFlagReason] = useState('')
+  const [currentFlaggedDocId, setCurrentFlaggedDocId] = useState<string | null>(null)
+  
+  const { showSuccess, showError } = useAlertStore()
 
   // Check if this is John Doe's application
   const isJohnDoe = application.applicantName === 'John Doe' || application.id === 'VSV-240105-JDOE'
@@ -89,6 +98,13 @@ export default function ApplicationReview({
   useEffect(() => {
     loadDocuments()
   }, [application.id])
+
+  // Load current flagged document
+  useEffect(() => {
+    if (application.flaggedDocumentId) {
+      setCurrentFlaggedDocId(application.flaggedDocumentId)
+    }
+  }, [application])
 
   const loadDocuments = async () => {
     try {
@@ -514,6 +530,48 @@ export default function ApplicationReview({
     }
   }
 
+  // Flag document function
+  const handleFlagDocument = async (document: DocumentWithUrls) => {
+    setFlaggingDocument(document)
+    setShowFlagModal(true)
+  }
+
+  const submitFlagDocument = async () => {
+    if (!flaggingDocument) return
+    
+    try {
+      await api.flagDocument(application.id, {
+        document_id: flaggingDocument.id,
+        reason: flagReason,
+        officer_id: officer.id
+      })
+      
+      setCurrentFlaggedDocId(flaggingDocument.id)
+      showSuccess(`Document "${flaggingDocument.name}" flagged for applicant review`)
+      setShowFlagModal(false)
+      setFlagReason('')
+      // Reload application data to get updated flag info
+      loadDocuments()
+    } catch (error) {
+      showError('Failed to flag document')
+    }
+  }
+
+  const handleUnflagDocument = async () => {
+    try {
+      await api.flagDocument(application.id, {
+        officer_id: officer.id
+      })
+      
+      setCurrentFlaggedDocId(null)
+      showSuccess('Document flag removed')
+      // Reload application data
+      loadDocuments()
+    } catch (error) {
+      showError('Failed to remove flag')
+    }
+  }
+
   const getDocumentIcon = (type: string) => {
     switch (type) {
       case 'passport':
@@ -696,6 +754,12 @@ export default function ApplicationReview({
                                           AI
                                         </span>
                                       )}
+                                      {currentFlaggedDocId === req.uploaded?.id && (
+                                        <span className="badge badge-warning badge-xs flex-shrink-0">
+                                          <Flag className="w-3 h-3 mr-1" />
+                                          Flagged
+                                        </span>
+                                      )}
                                     </div>
                                     <p className={`text-xs ${req.missing ? 'text-gray-400' : 'text-gray-500'}`}>
                                       {req.missing ? 'Not submitted' : 
@@ -739,89 +803,89 @@ export default function ApplicationReview({
                               </div>
                               
                               {/* Expandable Summary Section */}
-{req.uploaded && !req.missing && expandedDocuments.has(req.type) && (
-  <div className="mt-3 pt-3 border-t border-gray-200">
-    <div className="text-sm">
-      <h5 className="font-medium text-gray-700 mb-2">Document Summary</h5>
-      <div className={`p-3 rounded-md ${
-        req.uploaded.ai_analysis?.status === 'critical' 
-          ? 'bg-red-50 border border-red-200' 
-          : req.uploaded.ai_analysis?.status === 'warning'
-          ? 'bg-yellow-50 border border-yellow-200'
-          : 'bg-gray-50 border border-gray-200'
-      }`}>
-        <p className="text-gray-700">
-          {(() => {
-            // Direct check for John Doe and document type
-            if (isJohnDoe) {
-              switch (req.type) {
-                case 'passport':
-                  return "The passport shows the name John Doe, passport number U12345678, and date of birth 16 OCT 1986, and all details appear consistent and correctly formatted, indicating the document is valid.";
-                case 'bank_statement':
-                  return "John Doe has -$72.47 in his account by the end of the statement period. He receives regular payroll deposits but consistently overspends through web bill payments, card use, and fixed expenses like mortgage and insurance, leading to a negative balance.";
-                case 'invitation_letter':
-                  return "The letter indicates a friendly, non-familial relationship between Maria Schneider and John Doe, with a short touristic visit planned; while the invitation is sincere and financially supportive, the lack of clearly defined personal ties may prompt further scrutiny regarding the applicant's incentive to return.";
-                case 'flight_itinerary':
-                  return "John Doe has a confirmed one-way economy flight from Istanbul (IST) to Munich (MUC) on 28 June 2021, departing at 08:45 with flight TK1639 and seat 14A.";
-                default:
-                  return `This is a verified ${req.name} document for ${application.applicantName}. The document has been successfully uploaded and verified by the system.`;
-              }
-            }
-            // For non-John Doe applications, use the default or AI analysis if available
-            return req.uploaded.ai_analysis?.summary || 
-                   `This is a verified ${req.name} document for ${application.applicantName}. The document has been successfully uploaded and verified by the system.`;
-          })()}
-        </p>
-        {/* Show concerns for John Doe based on document type */}
-        {isJohnDoe && (
-          <div>
-            {req.type === 'bank_statement' && (
-              <div className="mt-2">
-                <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
-                <ul className="list-disc list-inside text-xs text-red-700">
-                  <li>Negative account balance</li>
-                  <li>Pattern of overspending</li>
-                  <li>Financial instability</li>
-                </ul>
-              </div>
-            )}
-            {req.type === 'invitation_letter' && (
-              <div className="mt-2">
-                <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
-                <ul className="list-disc list-inside text-xs text-red-700">
-                  <li>Weak personal ties</li>
-                  <li>Unclear return incentive</li>
-                  <li>Non-familial relationship</li>
-                </ul>
-              </div>
-            )}
-            {req.type === 'flight_itinerary' && (
-              <div className="mt-2">
-                <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
-                <ul className="list-disc list-inside text-xs text-red-700">
-                  <li>ONE-WAY TICKET ONLY</li>
-                  <li>No return flight booked</li>
-                  <li>High overstay risk</li>
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-        {/* For non-John Doe applications with AI analysis */}
-        {!isJohnDoe && req.uploaded.ai_analysis?.concerns && req.uploaded.ai_analysis.concerns.length > 0 && (
-          <div className="mt-2">
-            <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
-            <ul className="list-disc list-inside text-xs text-red-700">
-              {req.uploaded.ai_analysis.concerns.map((concern, idx) => (
-                <li key={idx}>{concern}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-)}
+                              {req.uploaded && !req.missing && expandedDocuments.has(req.type) && (
+                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                  <div className="text-sm">
+                                    <h5 className="font-medium text-gray-700 mb-2">Document Summary</h5>
+                                    <div className={`p-3 rounded-md ${
+                                      req.uploaded.ai_analysis?.status === 'critical' 
+                                        ? 'bg-red-50 border border-red-200' 
+                                        : req.uploaded.ai_analysis?.status === 'warning'
+                                        ? 'bg-yellow-50 border border-yellow-200'
+                                        : 'bg-gray-50 border border-gray-200'
+                                    }`}>
+                                      <p className="text-gray-700">
+                                        {(() => {
+                                          // Direct check for John Doe and document type
+                                          if (isJohnDoe) {
+                                            switch (req.type) {
+                                              case 'passport':
+                                                return "The passport shows the name John Doe, passport number U12345678, and date of birth 16 OCT 1986, and all details appear consistent and correctly formatted, indicating the document is valid.";
+                                              case 'bank_statement':
+                                                return "John Doe has -$72.47 in his account by the end of the statement period. He receives regular payroll deposits but consistently overspends through web bill payments, card use, and fixed expenses like mortgage and insurance, leading to a negative balance.";
+                                              case 'invitation_letter':
+                                                return "The letter indicates a friendly, non-familial relationship between Maria Schneider and John Doe, with a short touristic visit planned; while the invitation is sincere and financially supportive, the lack of clearly defined personal ties may prompt further scrutiny regarding the applicant's incentive to return.";
+                                              case 'flight_itinerary':
+                                                return "John Doe has a confirmed one-way economy flight from Istanbul (IST) to Munich (MUC) on 28 June 2021, departing at 08:45 with flight TK1639 and seat 14A.";
+                                              default:
+                                                return `This is a verified ${req.name} document for ${application.applicantName}. The document has been successfully uploaded and verified by the system.`;
+                                            }
+                                          }
+                                          // For non-John Doe applications, use the default or AI analysis if available
+                                          return req.uploaded.ai_analysis?.summary || 
+                                                 `This is a verified ${req.name} document for ${application.applicantName}. The document has been successfully uploaded and verified by the system.`;
+                                        })()}
+                                      </p>
+                                      {/* Show concerns for John Doe based on document type */}
+                                      {isJohnDoe && (
+                                        <div>
+                                          {req.type === 'bank_statement' && (
+                                            <div className="mt-2">
+                                              <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
+                                              <ul className="list-disc list-inside text-xs text-red-700">
+                                                <li>Negative account balance</li>
+                                                <li>Pattern of overspending</li>
+                                                <li>Financial instability</li>
+                                              </ul>
+                                            </div>
+                                          )}
+                                          {req.type === 'invitation_letter' && (
+                                            <div className="mt-2">
+                                              <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
+                                              <ul className="list-disc list-inside text-xs text-red-700">
+                                                <li>Weak personal ties</li>
+                                                <li>Unclear return incentive</li>
+                                                <li>Non-familial relationship</li>
+                                              </ul>
+                                            </div>
+                                          )}
+                                          {req.type === 'flight_itinerary' && (
+                                            <div className="mt-2">
+                                              <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
+                                              <ul className="list-disc list-inside text-xs text-red-700">
+                                                <li>ONE-WAY TICKET ONLY</li>
+                                                <li>No return flight booked</li>
+                                                <li>High overstay risk</li>
+                                              </ul>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                      {/* For non-John Doe applications with AI analysis */}
+                                      {!isJohnDoe && req.uploaded.ai_analysis?.concerns && req.uploaded.ai_analysis.concerns.length > 0 && (
+                                        <div className="mt-2">
+                                          <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
+                                          <ul className="list-disc list-inside text-xs text-red-700">
+                                            {req.uploaded.ai_analysis.concerns.map((concern, idx) => (
+                                              <li key={idx}>{concern}</li>
+                                            ))}
+                                          </ul>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -860,6 +924,12 @@ export default function ApplicationReview({
                                     </h5>
                                     {selectedReq.mandatory && (
                                       <span className="badge badge-error badge-xs">REQUIRED</span>
+                                    )}
+                                    {currentFlaggedDocId === selectedReq.uploaded?.id && (
+                                      <span className="badge badge-warning badge-xs">
+                                        <Flag className="w-3 h-3 mr-1" />
+                                        FLAGGED
+                                      </span>
                                     )}
                                   </div>
                                   <p className={`text-sm ${
@@ -945,6 +1015,20 @@ export default function ApplicationReview({
                                       View Document
                                     </button>
                                     
+                                    <button
+                                      onClick={() => handleFlagDocument(selectedReq.uploaded!)}
+                                      className={`btn ${
+                                        currentFlaggedDocId === selectedReq.uploaded.id 
+                                          ? 'btn-warning' 
+                                          : 'btn-outline'
+                                      } btn-sm`}
+                                      title={currentFlaggedDocId === selectedReq.uploaded.id 
+                                        ? "Currently flagged document" 
+                                        : "Flag for applicant attention"}
+                                    >
+                                      <Flag className="w-4 h-4" />
+                                    </button>
+                                    
                                     {selectedReq.uploaded.ai_analysis && (
                                       <button
                                         onClick={() => handleViewAIAnalysis(selectedReq.uploaded!)}
@@ -964,6 +1048,34 @@ export default function ApplicationReview({
                                       <ExternalLink className="w-4 h-4" />
                                     </button>
                                   </div>
+
+                                  {/* Currently Flagged Info */}
+                                  {currentFlaggedDocId === selectedReq.uploaded.id && (
+                                    <div className="bg-yellow-100 border border-yellow-300 rounded-md p-3">
+                                      <div className="flex items-start gap-2">
+                                        <Flag className="w-4 h-4 text-yellow-600 mt-0.5" />
+                                        <div className="flex-1">
+                                          <p className="text-sm font-medium text-yellow-900">Document Flagged</p>
+                                          {application.flaggedDocumentReason && (
+                                            <p className="text-xs text-yellow-800 mt-1">
+                                              Reason: {application.flaggedDocumentReason}
+                                            </p>
+                                          )}
+                                          {application.flaggedAt && (
+                                            <p className="text-xs text-yellow-700 mt-1">
+                                              Flagged on: {new Date(application.flaggedAt).toLocaleDateString()}
+                                            </p>
+                                          )}
+                                          <button
+                                            onClick={handleUnflagDocument}
+                                            className="text-xs text-yellow-700 underline hover:no-underline mt-2"
+                                          >
+                                            Remove flag
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
 
                                   {/* Document Information */}
                                   <div className="bg-white rounded-md p-3 border border-blue-300">
@@ -1027,6 +1139,26 @@ export default function ApplicationReview({
                                 <li key={req.type}>• {req.name}</li>
                               ))}
                           </ul>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Currently Flagged Document Warning */}
+                  {currentFlaggedDocId && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <Flag className="w-5 h-5 text-yellow-500 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-yellow-900 text-sm">Document Flagged</h4>
+                          <p className="text-yellow-800 text-sm mt-1">
+                            You have flagged a document for applicant attention
+                          </p>
+                          {application.flaggedDocumentReason && (
+                            <p className="text-yellow-700 text-xs mt-2">
+                              Reason: {application.flaggedDocumentReason}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1226,6 +1358,68 @@ export default function ApplicationReview({
                   <strong>Note:</strong> This AI analysis is provided as a decision support tool. 
                   Officers should use their judgment and consider all factors when making final decisions.
                 </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Flag Document Modal */}
+      {showFlagModal && flaggingDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <Flag className="w-5 h-5 text-warning" />
+                Flag Document for Applicant
+              </h3>
+              
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  Flagging: <strong>{flaggingDocument.name}</strong>
+                </p>
+                <p className="text-sm text-gray-600">
+                  The applicant will see this flag in their status tracker.
+                </p>
+              </div>
+              
+              <div className="form-control mb-4">
+                <label className="label">
+                  <span className="label-text">Reason for flagging</span>
+                </label>
+                <textarea
+                  className="textarea textarea-bordered"
+                  placeholder="e.g., Document unclear, please provide a clearer scan..."
+                  value={flagReason}
+                  onChange={(e) => setFlagReason(e.target.value)}
+                  rows={3}
+                />
+              </div>
+              
+              <div className="alert alert-warning mb-4">
+                <AlertTriangle className="w-4 h-4" />
+                <span className="text-sm">
+                  Only one document can be flagged at a time. Flagging this will replace any previously flagged document.
+                </span>
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={submitFlagDocument}
+                  disabled={!flagReason.trim()}
+                  className="btn btn-warning flex-1"
+                >
+                  Flag Document
+                </button>
+                <button
+                  onClick={() => {
+                    setShowFlagModal(false)
+                    setFlagReason('')
+                  }}
+                  className="btn btn-ghost"
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>

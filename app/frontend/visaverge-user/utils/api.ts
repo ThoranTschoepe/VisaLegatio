@@ -32,6 +32,21 @@ class APIClient {
     }
   }
 
+  // Flag/unflag a document
+  async flagDocument(
+    applicationId: string, 
+    flagData: {
+      document_id?: string
+      reason?: string
+      officer_id: string
+    }
+  ): Promise<any> {
+    return await this.request(`/applications/${applicationId}/flag-document`, {
+      method: 'POST',
+      body: JSON.stringify(flagData),
+    })
+  }
+
   // Upload documents to existing application - REAL IMPLEMENTATION
   async uploadDocumentsToApplication(
     applicationId: string,
@@ -269,7 +284,14 @@ class APIClient {
       riskScore: backendApp.risk_score,
       documentsCount: backendApp.documents_count || (backendApp.documents?.length || 0),
       estimatedDays: backendApp.estimated_days,
-      lastActivity: backendApp.last_activity ? new Date(backendApp.last_activity) : new Date(backendApp.updated_at)
+      lastActivity: backendApp.last_activity ? new Date(backendApp.last_activity) : new Date(backendApp.updated_at),
+      
+      // Flagged document fields
+      flaggedDocumentId: backendApp.flagged_document_id,
+      flaggedDocumentReason: backendApp.flagged_document_reason,
+      flaggedByOfficer: backendApp.flagged_by_officer,
+      flaggedAt: backendApp.flagged_at ? new Date(backendApp.flagged_at) : undefined,
+      flaggedDocument: backendApp.flagged_document
     }
   }
 }

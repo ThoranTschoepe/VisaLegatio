@@ -42,6 +42,22 @@ export interface VisaApplication {
   submittedAt?: Date
   estimatedDecision?: Date
   approvalProbability?: number
+  
+  // Additional fields
+  applicantName?: string
+  country?: string
+  priority?: string
+  riskScore?: number
+  documentsCount?: number
+  estimatedDays?: number
+  lastActivity?: Date
+  
+  // Flagged document fields
+  flaggedDocumentId?: string
+  flaggedDocumentReason?: string
+  flaggedByOfficer?: string
+  flaggedAt?: Date
+  flaggedDocument?: Document
 }
 
 export interface Document {

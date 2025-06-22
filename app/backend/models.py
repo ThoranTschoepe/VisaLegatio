@@ -116,6 +116,12 @@ class ApplicationResponse(BaseModel):
     documents_count: Optional[int] = None
     estimated_days: Optional[int] = None
     last_activity: Optional[datetime] = None
+
+    flagged_document_id: Optional[str] = None
+    flagged_document_reason: Optional[str] = None
+    flagged_by_officer: Optional[str] = None
+    flagged_at: Optional[datetime] = None
+    flagged_document: Optional[DocumentResponse] = None
     
     # Relationships
     documents: Optional[List[DocumentResponse]] = []

@@ -486,6 +486,63 @@ async def add_documents_to_application(
         "document_status": doc_status
     }
 
+@router.post("/{application_id}/flag-document")
+async def flag_document(
+    application_id: str,
+    flag_data: dict,
+    db: Session = Depends(get_db)
+):
+    """Flag a document that needs applicant attention"""
+    
+    app = db.query(Application).filter(Application.id == application_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    document_id = flag_data.get("document_id")
+    reason = flag_data.get("reason", "")
+    officer_id = flag_data.get("officer_id")
+    
+    if document_id:
+        # Verify document exists
+        doc = db.query(Document).filter(
+            Document.id == document_id,
+            Document.application_id == application_id
+        ).first()
+        
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        
+        # Flag the document
+        app.flagged_document_id = document_id
+        app.flagged_document_reason = reason
+        app.flagged_by_officer_id = officer_id
+        app.flagged_at = datetime.utcnow()
+        
+        # Create status update
+        status_update = StatusUpdate(
+            id=generate_id("status"),
+            application_id=application_id,
+            status=app.status,
+            notes=f"Document flagged for review: {doc.name} - {reason}",
+            officer_id=officer_id,
+            timestamp=datetime.utcnow()
+        )
+        db.add(status_update)
+    else:
+        # Unflag if no document_id provided
+        app.flagged_document_id = None
+        app.flagged_document_reason = None
+        app.flagged_by_officer_id = None
+        app.flagged_at = None
+    
+    db.commit()
+    
+    return {
+        "message": "Document flagged successfully" if document_id else "Document unflagged",
+        "flagged_document_id": app.flagged_document_id,
+        "flagged_document_reason": app.flagged_document_reason
+    }
+
 # Utility functions
 def get_estimated_days(status: str, visa_type: str, requirements_met: bool = True) -> int:
     """Calculate estimated processing days based on status, visa type, and document status"""

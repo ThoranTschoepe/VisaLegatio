@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, Clock, AlertCircle, FileText, Shield, Eye, Award, AlertTriangle, Upload, X, CreditCard, Fingerprint } from 'lucide-react'
+import { CheckCircle2, Clock, AlertCircle, FileText, Shield, Eye, Award, AlertTriangle, Upload, X, CreditCard, Fingerprint, Flag } from 'lucide-react'
 import { VisaApplication, ApplicationStatus } from '@/types'
 import { api } from '@/utils/api'
 import { useAlertStore } from '@/lib/stores/alert.store'
@@ -42,6 +42,7 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [documentStatus, setDocumentStatus] = useState<DocumentStatus | null>(null)
   const [error, setError] = useState<string>('')
+  const [flaggedDocument, setFlaggedDocument] = useState<any>(null)
   const { showSuccess, showError } = useAlertStore()
 
   useEffect(() => {
@@ -60,6 +61,18 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
       // Load application data from backend
       const data = await api.getApplicationStatus(applicationId)
       setApplication(data)
+      
+      // Check for flagged document
+      if (data.flaggedDocumentId && data.flaggedDocument) {
+        setFlaggedDocument({
+          document: data.flaggedDocument,
+          reason: data.flaggedDocumentReason,
+          flagged_by: data.flaggedByOfficer,
+          flagged_at: data.flaggedAt
+        })
+      } else {
+        setFlaggedDocument(null)
+      }
       
       // Get document requirements and status from backend
       const docRequirements = await api.getDocumentRequirements(data.visaType)
@@ -139,6 +152,14 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
       requirements_met: hasAllDocs,
       total_mandatory: 3,
       total_mandatory_uploaded: hasAllDocs ? 3 : 1
+    }
+  }
+
+  const navigateToDocuments = () => {
+    if (onNavigateToDocuments) {
+      onNavigateToDocuments()
+    } else {
+      showError('Document upload navigation not available')
     }
   }
 
@@ -323,6 +344,59 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
           </div>
         </div>
       </div>
+
+      {/* Flagged Document Alert */}
+      {flaggedDocument && (
+        <div className="bg-yellow-50 border-b-4 border-yellow-200 p-6">
+          <div className="flex items-start gap-4">
+            <Flag className="w-8 h-8 text-yellow-600 mt-1 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+                Document Requires Your Attention
+              </h3>
+              <p className="text-yellow-800 mb-3">
+                An embassy officer has flagged one of your documents for review:
+              </p>
+              
+              <div className="bg-yellow-100 rounded-lg p-4 mb-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <FileText className="w-5 h-5 text-yellow-700" />
+                  <span className="font-semibold text-yellow-900">
+                    {flaggedDocument.document.name || 'Document'}
+                  </span>
+                </div>
+                
+                <div className="bg-white rounded p-3 mb-3">
+                  <p className="text-sm font-medium text-gray-700 mb-1">Officer's Note:</p>
+                  <p className="text-gray-800">{flaggedDocument.reason}</p>
+                </div>
+                
+                <p className="text-xs text-yellow-700">
+                  Flagged on {new Date(flaggedDocument.flagged_at).toLocaleDateString()}
+                </p>
+              </div>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={() => navigateToDocuments()}
+                  className="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium"
+                >
+                  <Upload className="w-4 h-4 inline mr-2" />
+                  Upload Revised Document
+                </button>
+                
+                <button
+                  onClick={() => window.open(`/api/documents/view/${application.id}/${flaggedDocument.document.name}`, '_blank')}
+                  className="px-6 py-2 border border-yellow-300 text-yellow-700 rounded-lg hover:bg-yellow-50 transition-colors"
+                >
+                  <Eye className="w-4 h-4 inline mr-2" />
+                  View Current Document
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Document Collection Alert */}
       {isDocumentBlocked && (
@@ -643,7 +717,7 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
             Refresh Status
           </button>
           
-          {isDocumentBlocked && (
+          {(isDocumentBlocked || flaggedDocument) && (
             <button
               onClick={onNavigateToDocuments}
               className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"

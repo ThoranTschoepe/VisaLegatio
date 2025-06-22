@@ -22,9 +22,15 @@ class User(Base):
     phone = Column(String)
     nationality = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+    flagged_document_id = Column(String, ForeignKey("documents.id"))
+    flagged_document_reason = Column(Text)
+    flagged_by_officer_id = Column(String, ForeignKey("officers.id"))
+    flagged_at = Column(DateTime)
     
     # Relationships
     applications = relationship("Application", back_populates="user")
+    flagged_document = relationship("Document", foreign_keys=[flagged_document_id])
+    flagged_by_officer = relationship("Officer", foreign_keys=[flagged_by_officer_id])
 
 class Application(Base):
     __tablename__ = "applications"
