@@ -1,5 +1,4 @@
 'use client'
-
 import { useState, useEffect } from 'react'
 import { 
   Users, 
@@ -12,12 +11,14 @@ import {
   TrendingUp,
   Eye,
   MoreVertical,
-  BarChart3
+  BarChart3,
+  Shield
 } from 'lucide-react'
 import { Officer, EmbassyApplication } from '@/types/embassy.types'
 import { api, apiUtils } from '@/utils/api'
 import ApplicationReview from './ApplicationReview'
 import AnalyticsDashboard from './AnalyticsDashboard'
+import { useRouter } from 'next/navigation'
 
 interface EmbassyDashboardProps {
   officer: Officer
@@ -80,6 +81,7 @@ const mockApplications: EmbassyApplication[] = [
 ]
 
 export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboardProps) {
+  const router = useRouter()
   const [applications, setApplications] = useState<EmbassyApplication[]>([])
   const [selectedApplication, setSelectedApplication] = useState<EmbassyApplication | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -242,6 +244,15 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
             <BarChart3 className="w-4 h-4 mr-2" />
             Analytics
           </button>
+          {(officer.role === 'Senior Consular Officer' || officer.role === 'System Administrator') && (
+            <button 
+              className="btn btn-warning btn-sm"
+              onClick={() => router.push('/embassy/bias-review')}
+            >
+              <Shield className="w-4 h-4 mr-2" />
+              Bias Review
+            </button>
+          )}
           <div className="dropdown dropdown-end">
             <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar">
               <div className="w-10 rounded-full bg-primary text-white flex items-center justify-center">
@@ -277,7 +288,6 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
               </div>
             </div>
           </div>
-
           <div className="card bg-base-100 shadow">
             <div className="card-body">
               <div className="flex items-center gap-3">
@@ -289,7 +299,6 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
               </div>
             </div>
           </div>
-
           <div className="card bg-base-100 shadow">
             <div className="card-body">
               <div className="flex items-center gap-3">
@@ -301,7 +310,6 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
               </div>
             </div>
           </div>
-
           <div className="card bg-base-100 shadow">
             <div className="card-body">
               <div className="flex items-center gap-3">
@@ -314,6 +322,23 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
             </div>
           </div>
         </div>
+        
+        {/* Bias Review Alert for Senior Officers */}
+        {(officer.role === 'Senior Consular Officer' || officer.role === 'System Administrator') && (
+          <div className="alert alert-warning shadow-lg mb-6">
+            <Shield className="w-6 h-6" />
+            <div className="flex-1">
+              <h3 className="font-bold">AI Bias Review Available</h3>
+              <p className="text-sm">Review rejected applications for potential AI bias patterns</p>
+            </div>
+            <button 
+              className="btn btn-sm"
+              onClick={() => router.push('/embassy/bias-review')}
+            >
+              Review Now
+            </button>
+          </div>
+        )}
 
         {/* Search and Filters */}
         <div className="card bg-base-100 shadow mb-6">

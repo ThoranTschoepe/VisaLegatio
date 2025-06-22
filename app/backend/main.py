@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from database import engine, create_tables, get_db
 from models import *
-from routes import applications, chat, officers, analytics, documents
+from routes import applications, chat, officers, analytics, documents, bias_review
 from utils import seed_demo_data
 
 def reset_database_and_create_organized_docs():
@@ -124,6 +124,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["AI Chat"])
 app.include_router(officers.router, prefix="/api/officers", tags=["Officers"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(bias_review.router, prefix="/api/bias-review", tags=["Bias Review"])
 
 # Health check endpoint
 @app.get("/api/health")
