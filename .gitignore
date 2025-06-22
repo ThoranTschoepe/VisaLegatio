@@ -1,5 +1,5 @@
-./app/uploads/*
-
+**/uploads/**
+repomix-output.xml
 
 # Node.js dependencies across all projects
 **/node_modules/
