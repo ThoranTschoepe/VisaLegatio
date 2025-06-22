@@ -50,7 +50,8 @@ export default function RootLayout({
                 } else if (theme === 'light') {
                   appliedTheme = 'cupcake';
                 } else if (!theme || theme === 'default') {
-                  appliedTheme = systemDark ? 'dracula' : 'cupcake';
+                  // Always default to light theme, ignore system preference
+                  appliedTheme = 'cupcake';
                 }
                 
                 document.documentElement.setAttribute('data-theme', appliedTheme);

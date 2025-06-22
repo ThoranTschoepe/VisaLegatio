@@ -109,7 +109,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
           showSuccess(`Starting ${response.suggestedVisaType} visa application!`)
           setTimeout(() => {
             onVisaTypeSelected(response.suggestedVisaType!)
-          }, 1000)
+          }, 5000)
         }
       }
     } catch (error) {
