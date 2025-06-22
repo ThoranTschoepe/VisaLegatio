@@ -316,7 +316,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
           <AlertTriangle className="w-6 h-6" />
           <div>
             <h3 className="font-bold">High Bias Rate Detected</h3>
-            <p>The AI system shows a {statistics.bias_rate.toFixed(1)}% bias rate in rejections. Consider retraining the model.</p>
+            <p>The system shows a {statistics.bias_rate.toFixed(1)}% bias rate in rejections. Consider retraining the model.</p>
           </div>
           <button className="btn btn-sm">View Report</button>
         </div>

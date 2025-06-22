@@ -328,7 +328,7 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
           <div className="alert alert-warning shadow-lg mb-6">
             <Shield className="w-6 h-6" />
             <div className="flex-1">
-              <h3 className="font-bold">AI Bias Review Available</h3>
+              <h3 className="font-bold">Bias Review Available</h3>
               <p className="text-sm">Review rejected applications for potential AI bias patterns</p>
             </div>
             <button 
