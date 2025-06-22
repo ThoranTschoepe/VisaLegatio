@@ -10,6 +10,7 @@ import StatusLogin from '@/components/StatusLogin'
 import ApplicationSubmitted from '@/components/ApplicationSubmitted'
 import DarkModeSwitcher from '@/components/Layout/DarkModeSwitcher/DarkModeSwitcher'
 import AlertContainer from '@/components/Alert/AlertContainer'
+import DemoWarningPopup from '@/components/DemoWarningPopup'
 import { Card, Button, Stats, Stat, Badge } from '@/components/UI'
 import { VisaType, Document } from '@/types'
 import { api } from '@/utils/api'
@@ -222,264 +223,315 @@ export default function HomePage() {
     }
   }
 
+  // Reset demo warning function for development
+  const resetDemoWarning = () => {
+    localStorage.removeItem('visalegatio-demo-warning-dismissed')
+    window.location.reload()
+  }
+
   if (currentStep === 'status-login') {
     return (
-      <div className="min-h-screen bg-base-200">
-        <div className="navbar bg-base-100 shadow-lg">
-          <div className="flex-1">
-            <button 
-              onClick={() => setCurrentStep('landing')}
-              className="btn btn-ghost normal-case text-xl font-bold"
-            >
-              <Globe className="w-6 h-6 mr-2" />
-              VisaLegatio
-            </button>
+      <>
+        {/* Demo Warning Popup */}
+        <DemoWarningPopup />
+        
+        <div className="min-h-screen bg-base-200">
+          <div className="navbar bg-base-100 shadow-lg">
+            <div className="flex-1">
+              <button 
+                onClick={() => setCurrentStep('landing')}
+                className="btn btn-ghost normal-case text-xl font-bold"
+              >
+                <Globe className="w-6 h-6 mr-2" />
+                VisaLegatio
+              </button>
+            </div>
+            <div className="flex-none">
+              <DarkModeSwitcher />
+            </div>
           </div>
-          <div className="flex-none">
-            <DarkModeSwitcher />
-          </div>
-        </div>
 
-        <StatusLogin 
-          onAccessApplication={handleAccessApplication}
-          onBack={() => setCurrentStep('landing')}
-          prefilledApplicationId={prefilledApplicationId}
-        />
-        <AlertContainer />
-      </div>
+          <StatusLogin 
+            onAccessApplication={handleAccessApplication}
+            onBack={() => setCurrentStep('landing')}
+            prefilledApplicationId={prefilledApplicationId}
+          />
+          <AlertContainer />
+        </div>
+      </>
     )
   }
 
   if (currentStep === 'chat') {
     return (
-      <div className="min-h-screen bg-base-200">
-        <div className="navbar bg-base-100 shadow-lg">
-          <div className="flex-1">
-            <button 
-              onClick={() => setCurrentStep('landing')}
-              className="btn btn-ghost normal-case text-xl font-bold"
-            >
-              <Globe className="w-6 h-6 mr-2" />
-              VisaLegatio
-            </button>
-          </div>
-          <div className="flex-none">
-            <DarkModeSwitcher />
-          </div>
-        </div>
-
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold mb-4">Chat with AVA</h1>
-              <p className="text-lg opacity-70">
-                Your AI visa assistant is ready to help you find the right visa
-              </p>
-              <Badge variant="primary" className="mt-2">
-                <Sparkles className="w-4 h-4 mr-1" />
-                AI-Powered
-              </Badge>
-            </div>
-
-            <Card className="h-[600px]">
-              <ChatInterface onVisaTypeSelected={handleVisaTypeSelected} />
-            </Card>
-
-            <div className="text-center mt-6">
-              <Button 
-                variant="ghost" 
+      <>
+        {/* Demo Warning Popup */}
+        <DemoWarningPopup />
+        
+        <div className="min-h-screen bg-base-200">
+          <div className="navbar bg-base-100 shadow-lg">
+            <div className="flex-1">
+              <button 
                 onClick={() => setCurrentStep('landing')}
-                className="btn-sm"
+                className="btn btn-ghost normal-case text-xl font-bold"
               >
-                ← Back to homepage
-              </Button>
+                <Globe className="w-6 h-6 mr-2" />
+                VisaLegatio
+              </button>
+            </div>
+            <div className="flex-none">
+              <DarkModeSwitcher />
             </div>
           </div>
+
+          <div className="container mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-8">
+                <h1 className="text-4xl font-bold mb-4">Chat with AVA</h1>
+                <p className="text-lg opacity-70">
+                  Your AI visa assistant is ready to help you find the right visa
+                </p>
+                <Badge variant="primary" className="mt-2">
+                  <Sparkles className="w-4 h-4 mr-1" />
+                  AI-Powered
+                </Badge>
+              </div>
+
+              <Card className="h-[600px]">
+                <ChatInterface onVisaTypeSelected={handleVisaTypeSelected} />
+              </Card>
+
+              <div className="text-center mt-6">
+                <Button 
+                  variant="ghost" 
+                  onClick={() => setCurrentStep('landing')}
+                  className="btn-sm"
+                >
+                  ← Back to homepage
+                </Button>
+              </div>
+            </div>
+          </div>
+          <AlertContainer />
         </div>
-        <AlertContainer />
-      </div>
+      </>
     )
   }
 
   if (currentStep === 'form' && selectedVisaType) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <div className="navbar bg-base-100 shadow-lg">
-          <div className="flex-1">
-            <span className="text-xl font-bold">
-              <Globe className="w-6 h-6 mr-2 inline" />
-              VisaLegatio
-            </span>
-          </div>
-          <div className="flex-none">
-            <DarkModeSwitcher />
-          </div>
-        </div>
+      <>
+        {/* Demo Warning Popup */}
+        <DemoWarningPopup />
         
-        <div className="container mx-auto px-4 py-8">
-          <DynamicForm
-            visaType={selectedVisaType}
-            onSubmit={handleFormSubmit}
-            onBack={() => setCurrentStep('chat')}
-          />
+        <div className="min-h-screen bg-base-200">
+          <div className="navbar bg-base-100 shadow-lg">
+            <div className="flex-1">
+              <span className="text-xl font-bold">
+                <Globe className="w-6 h-6 mr-2 inline" />
+                VisaLegatio
+              </span>
+            </div>
+            <div className="flex-none">
+              <DarkModeSwitcher />
+            </div>
+          </div>
+          
+          <div className="container mx-auto px-4 py-8">
+            <DynamicForm
+              visaType={selectedVisaType}
+              onSubmit={handleFormSubmit}
+              onBack={() => setCurrentStep('chat')}
+            />
+          </div>
+          <AlertContainer />
         </div>
-        <AlertContainer />
-      </div>
+      </>
     )
   }
 
   if (currentStep === 'submitted' && applicationData) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <div className="navbar bg-base-100 shadow-lg">
-          <div className="flex-1">
-            <span className="text-xl font-bold">
-              <Globe className="w-6 h-6 mr-2 inline" />
-              VisaLegatio
-            </span>
-          </div>
-          <div className="flex-none">
-            <DarkModeSwitcher />
-          </div>
-        </div>
+      <>
+        {/* Demo Warning Popup */}
+        <DemoWarningPopup />
         
-        <div className="container mx-auto px-4 py-8">
-          <ApplicationSubmitted
-            applicationId={applicationData.id}
-            onContinueToDocuments={handleContinueToDocuments}
-            onSkipToTracking={handleSkipToTracking}
-          />
+        <div className="min-h-screen bg-base-200">
+          <div className="navbar bg-base-100 shadow-lg">
+            <div className="flex-1">
+              <span className="text-xl font-bold">
+                <Globe className="w-6 h-6 mr-2 inline" />
+                VisaLegatio
+              </span>
+            </div>
+            <div className="flex-none">
+              <DarkModeSwitcher />
+            </div>
+          </div>
+          
+          <div className="container mx-auto px-4 py-8">
+            <ApplicationSubmitted
+              applicationId={applicationData.id}
+              onContinueToDocuments={handleContinueToDocuments}
+              onSkipToTracking={handleSkipToTracking}
+            />
+          </div>
+          <AlertContainer />
         </div>
-        <AlertContainer />
-      </div>
+      </>
     )
   }
 
   if (currentStep === 'documents' && applicationData) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <div className="navbar bg-base-100 shadow-lg">
-          <div className="flex-1">
-            <span className="text-xl font-bold">
-              <Globe className="w-6 h-6 mr-2 inline" />
-              VisaLegatio
-            </span>
-          </div>
-          <div className="flex-none">
-            <button 
-              onClick={() => setCurrentStep('status')}
-              className="btn btn-ghost btn-sm mr-2"
-            >
-              ← Back to Status
-            </button>
-            <DarkModeSwitcher />
-          </div>
-        </div>
+      <>
+        {/* Demo Warning Popup */}
+        <DemoWarningPopup />
         
-        <div className="container mx-auto px-4 py-8">
-          <DocumentUpload
-            visaType={applicationData.visaType}
-            applicationId={applicationData.id}
-            onDocumentsChange={setDocuments}
-            onComplete={handleDocumentsComplete}
-            onSkip={handleSkipToTracking}
-          />
+        <div className="min-h-screen bg-base-200">
+          <div className="navbar bg-base-100 shadow-lg">
+            <div className="flex-1">
+              <span className="text-xl font-bold">
+                <Globe className="w-6 h-6 mr-2 inline" />
+                VisaLegatio
+              </span>
+            </div>
+            <div className="flex-none">
+              <button 
+                onClick={() => setCurrentStep('status')}
+                className="btn btn-ghost btn-sm mr-2"
+              >
+                ← Back to Status
+              </button>
+              <DarkModeSwitcher />
+            </div>
+          </div>
+          
+          <div className="container mx-auto px-4 py-8">
+            <DocumentUpload
+              visaType={applicationData.visaType}
+              applicationId={applicationData.id}
+              onDocumentsChange={setDocuments}
+              onComplete={handleDocumentsComplete}
+              onSkip={handleSkipToTracking}
+            />
+          </div>
+          <AlertContainer />
         </div>
-        <AlertContainer />
-      </div>
+      </>
     )
   }
 
   if (currentStep === 'status' && applicationData) {
     return (
-      <div className="min-h-screen bg-base-200">
-        <div className="navbar bg-base-100 shadow-lg">
-          <div className="flex-1">
-            <span className="text-xl font-bold">
-              <Globe className="w-6 h-6 mr-2 inline" />
-              VisaLegatio
-            </span>
-          </div>
-          <div className="flex-none">
-            <button 
-              onClick={navigateToDocuments}
-              className="btn btn-primary btn-sm mr-2"
-            >
-              <Upload className="w-4 h-4 mr-1" />
-              Upload Documents
-            </button>
-            <DarkModeSwitcher />
-          </div>
-        </div>
+      <>
+        {/* Demo Warning Popup */}
+        <DemoWarningPopup />
         
-        <div className="container mx-auto px-4 py-8">
-          <StatusTracker
-            applicationId={applicationData.id}
-            onNewApplication={resetApplication}
-            onNavigateToDocuments={navigateToDocuments}
-          />
+        <div className="min-h-screen bg-base-200">
+          <div className="navbar bg-base-100 shadow-lg">
+            <div className="flex-1">
+              <span className="text-xl font-bold">
+                <Globe className="w-6 h-6 mr-2 inline" />
+                VisaLegatio
+              </span>
+            </div>
+            <div className="flex-none">
+              <button 
+                onClick={navigateToDocuments}
+                className="btn btn-primary btn-sm mr-2"
+              >
+                <Upload className="w-4 h-4 mr-1" />
+                Upload Documents
+              </button>
+              <DarkModeSwitcher />
+            </div>
+          </div>
+          
+          <div className="container mx-auto px-4 py-8">
+            <StatusTracker
+              applicationId={applicationData.id}
+              onNewApplication={resetApplication}
+              onNavigateToDocuments={navigateToDocuments}
+            />
+          </div>
+          <AlertContainer />
         </div>
-        <AlertContainer />
-      </div>
+      </>
     )
   }
 
   // Landing page
   return (
-    <div className="min-h-screen bg-base-200">
-      {/* Navbar */}
-      <div className="navbar bg-base-100 shadow-lg">
-        <div className="flex-1">
-          <span className="text-2xl font-bold">
-            <Globe className="w-8 h-8 mr-2 inline text-primary" />
-            VisaLegatio
-          </span>
+    <>
+      {/* Demo Warning Popup - Shows on first visit */}
+      <DemoWarningPopup />
+      
+      <div className="min-h-screen bg-base-200">
+        {/* Navbar */}
+        <div className="navbar bg-base-100 shadow-lg">
+          <div className="flex-1">
+            <span className="text-2xl font-bold">
+              <Globe className="w-8 h-8 mr-2 inline text-primary" />
+              VisaLegatio
+            </span>
+          </div>
+          <div className="flex-none">
+            <DarkModeSwitcher />
+          </div>
         </div>
-        <div className="flex-none">
-          <DarkModeSwitcher />
-        </div>
-      </div>
 
-      {/* Hero Section */}
-      <div className="hero min-h-screen bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10">
-        <div className="hero-content text-center">
-          <div className="max-w-4xl">
-            <div className="mb-8">
-              <div className="flex items-center justify-center gap-3 mb-6">
-                <Globe className="w-12 h-12 text-primary" />
-                <h1 className="text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  VisaLegatio
-                </h1>
-              </div>
-              
-              <p className="text-xl mb-8 opacity-80 max-w-3xl mx-auto leading-relaxed">
-                The future of visa applications. Smart, transparent, and designed for the digital age.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button
-                  size="lg"
-                  onClick={startChatDirectly}
-                  className="btn-lg gradient-primary text-white border-none"
-                >
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Start New Application
-                </Button>
+        {/* Hero Section */}
+        <div className="hero min-h-screen bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10">
+          <div className="hero-content text-center">
+            <div className="max-w-4xl">
+              <div className="mb-8">
+                <div className="flex items-center justify-center gap-3 mb-6">
+                  <Globe className="w-12 h-12 text-primary" />
+                  <h1 className="text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                    VisaLegatio
+                  </h1>
+                </div>
                 
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  onClick={showStatusLogin}
-                >
-                  Check Application Status
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
+                <p className="text-xl mb-8 opacity-80 max-w-3xl mx-auto leading-relaxed">
+                  The future of visa applications. Smart, transparent, and designed for the digital age.
+                </p>
+
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Button
+                    size="lg"
+                    onClick={startChatDirectly}
+                    className="btn-lg gradient-primary text-white border-none"
+                  >
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Start New Application
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="lg"
+                    onClick={showStatusLogin}
+                  >
+                    Check Application Status
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
         </div>
+        <AlertContainer />
+        
+        {/* Development reset button */}
+        {process.env.NODE_ENV === 'development' && (
+          <button
+            onClick={resetDemoWarning}
+            className="fixed bottom-4 left-4 btn btn-xs btn-outline opacity-50 hover:opacity-100"
+          >
+            Reset Demo Warning
+          </button>
+        )}
       </div>
-      <AlertContainer />
-    </div>
+    </>
   )
 }
