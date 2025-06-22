@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, Clock, AlertCircle, FileText, Shield, Eye, Award, AlertTriangle, Upload, X } from 'lucide-react'
+import { CheckCircle2, Clock, AlertCircle, FileText, Shield, Eye, Award, AlertTriangle, Upload, X, CreditCard, Fingerprint } from 'lucide-react'
 import { VisaApplication, ApplicationStatus } from '@/types'
 import { api } from '@/utils/api'
+import { useAlertStore } from '@/lib/stores/alert.store'
 
 interface StatusTrackerProps {
   applicationId: string
@@ -12,7 +13,7 @@ interface StatusTrackerProps {
 }
 
 interface StatusStep {
-  status: ApplicationStatus | 'document_collection'
+  status: ApplicationStatus | 'document_collection' | 'fingerprint_scan' | 'payment'
   title: string
   description: string
   icon: React.ReactNode
@@ -21,6 +22,7 @@ interface StatusStep {
   current: boolean
   blocked?: boolean
   timestamp?: Date
+  clickable?: boolean
 }
 
 interface DocumentStatus {
@@ -40,6 +42,7 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [documentStatus, setDocumentStatus] = useState<DocumentStatus | null>(null)
   const [error, setError] = useState<string>('')
+  const { showSuccess, showError } = useAlertStore()
 
   useEffect(() => {
     loadApplicationStatus()
@@ -88,6 +91,7 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
     } catch (error) {
       console.error('Error loading application status:', error)
       setError('Failed to load application status')
+      showError('Failed to load application status. Using cached data.')
       
       // Fallback for demo - create consistent mock data based on applicationId
       const mockApp = createMockApplication(applicationId)
@@ -167,16 +171,25 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
 
   // Check if processing is blocked by documents
   const isDocumentBlocked = !documentStatus.requirements_met
+  
+  // Check completion status from localStorage (for demo)
+  const fingerprintCompleted = localStorage.getItem(`fingerprint_${applicationId}`) === 'true'
+  const paymentCompleted = localStorage.getItem(`payment_${applicationId}`) === 'true'
+  
+  // Check if processing is blocked by fingerprints or payment
+  const isFingerprintBlocked = !isDocumentBlocked && !fingerprintCompleted
+  const isPaymentBlocked = !isDocumentBlocked && fingerprintCompleted && !paymentCompleted
+  const anyBlockage = isDocumentBlocked || isFingerprintBlocked || isPaymentBlocked
 
-  // Define status steps with document collection
+  // Define status steps with document collection, fingerprint, and payment
   const statusSteps: StatusStep[] = [
     {
       status: 'submitted',
       title: 'Application Submitted',
       description: 'Your application has been received and assigned a unique ID',
       icon: <FileText className="w-6 h-6" />,
-      completed: ['submitted', 'document_review', 'background_check', 'officer_review', 'approved', 'rejected'].includes(application.status),
-      current: application.status === 'submitted' && !isDocumentBlocked
+      completed: true,
+      current: application.status === 'submitted' && !anyBlockage
     },
     {
       status: 'document_collection',
@@ -191,22 +204,30 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
       estimatedDays: isDocumentBlocked ? undefined : 0
     },
     {
-      status: 'document_review',
-      title: 'Document Review',
-      description: 'Our team is verifying your documents and checking for completeness',
-      icon: <Eye className="w-6 h-6" />,
-      estimatedDays: 2,
-      completed: ['document_review', 'background_check', 'officer_review', 'approved', 'rejected'].includes(application.status) && !isDocumentBlocked,
-      current: application.status === 'document_review' && !isDocumentBlocked
+      status: 'fingerprint_scan',
+      title: 'Biometric Collection',
+      description: isFingerprintBlocked
+        ? 'Visit the embassy terminal to complete fingerprint scanning'
+        : 'Fingerprints have been successfully captured and verified',
+      icon: <Fingerprint className="w-6 h-6" />,
+      completed: fingerprintCompleted,
+      current: isFingerprintBlocked,
+      blocked: isFingerprintBlocked,
+      estimatedDays: isFingerprintBlocked ? undefined : 0,
+      clickable: isFingerprintBlocked // Make it clickable for demo
     },
     {
-      status: 'background_check',
-      title: 'Background Verification',
-      description: 'Security and background checks are being conducted',
-      icon: <Shield className="w-6 h-6" />,
-      estimatedDays: 5,
-      completed: ['background_check', 'officer_review', 'approved', 'rejected'].includes(application.status) && !isDocumentBlocked,
-      current: application.status === 'background_check' && !isDocumentBlocked
+      status: 'payment',
+      title: 'Fee Payment',
+      description: isPaymentBlocked
+        ? 'Complete visa application fee payment to proceed'
+        : 'Payment has been successfully processed',
+      icon: <CreditCard className="w-6 h-6" />,
+      completed: paymentCompleted,
+      current: isPaymentBlocked,
+      blocked: isPaymentBlocked,
+      estimatedDays: isPaymentBlocked ? undefined : 0,
+      clickable: isPaymentBlocked // Make it clickable for demo
     },
     {
       status: 'officer_review',
@@ -214,8 +235,8 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
       description: 'A consular officer is reviewing your application for final decision',
       icon: <Eye className="w-6 h-6" />,
       estimatedDays: 3,
-      completed: ['officer_review', 'approved', 'rejected'].includes(application.status) && !isDocumentBlocked,
-      current: application.status === 'officer_review' && !isDocumentBlocked
+      completed: ['officer_review', 'approved', 'rejected'].includes(application.status) && !anyBlockage,
+      current: application.status === 'officer_review' && !anyBlockage
     },
     {
       status: 'approved',
@@ -231,8 +252,22 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
   const completedSteps = statusSteps.filter(step => step.completed).length
   const progress = (completedSteps / statusSteps.length) * 100
 
+  const handleMarkStepComplete = (stepType: string) => {
+    if (stepType === 'fingerprint_scan') {
+      localStorage.setItem(`fingerprint_${applicationId}`, 'true')
+      showSuccess('Fingerprint scanning marked as complete (Demo)')
+      loadApplicationStatus() // Reload to update status
+    } else if (stepType === 'payment') {
+      localStorage.setItem(`payment_${applicationId}`, 'true')
+      showSuccess('Payment marked as complete (Demo)')
+      loadApplicationStatus() // Reload to update status
+    }
+  }
+
   const getStatusColor = (status: ApplicationStatus) => {
-    if (isDocumentBlocked && status === 'submitted') return 'text-orange-600'
+    if (isDocumentBlocked && status === 'submitted') return 'text-red-600'
+    if (isFingerprintBlocked && status === 'submitted') return 'text-orange-600'
+    if (isPaymentBlocked && status === 'submitted') return 'text-yellow-600'
     
     switch (status) {
       case 'approved': return 'text-green-600'
@@ -243,7 +278,9 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
   }
 
   const getStatusBg = (status: ApplicationStatus) => {
-    if (isDocumentBlocked && status === 'submitted') return 'bg-orange-50 border-orange-200'
+    if (isDocumentBlocked && status === 'submitted') return 'bg-red-50 border-red-200'
+    if (isFingerprintBlocked && status === 'submitted') return 'bg-orange-50 border-orange-200'
+    if (isPaymentBlocked && status === 'submitted') return 'bg-yellow-50 border-yellow-200'
     
     switch (status) {
       case 'approved': return 'bg-green-50 border-green-200'
@@ -254,8 +291,14 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
   }
 
   const getDisplayStatus = () => {
-    if (isDocumentBlocked && application.status === 'submitted') {
+    if (isDocumentBlocked) {
       return 'Document Collection Required'
+    }
+    if (isFingerprintBlocked) {
+      return 'Biometric Collection Required'
+    }
+    if (isPaymentBlocked) {
+      return 'Payment Required'
     }
     return application.status.replace('_', ' ')
   }
@@ -304,7 +347,7 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
                   <div>
                     <h4 className="font-semibold text-red-900 mb-1">Processing Status:</h4>
                     <p className="text-red-800">Current: Document Collection</p>
-                    <p className="text-red-800">Next: {documentStatus.requirements_met ? 'Document Review' : 'Upload Required Documents'}</p>
+                    <p className="text-red-800">Next: {documentStatus.requirements_met ? 'Biometric Collection' : 'Upload Required Documents'}</p>
                   </div>
                 </div>
               </div>
@@ -328,6 +371,88 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
         </div>
       )}
 
+      {/* Fingerprint Scanning Alert */}
+      {isFingerprintBlocked && (
+        <div className="bg-orange-50 border-b-4 border-orange-200 p-6">
+          <div className="flex items-start gap-4">
+            <Fingerprint className="w-8 h-8 text-orange-500 mt-1 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-orange-900 mb-2">
+                Processing Blocked - Biometric Collection Required
+              </h3>
+              <p className="text-orange-800 mb-3">
+                Your application requires <strong>fingerprint scanning at the embassy terminal</strong>. 
+                Please visit the embassy during business hours to complete this step.
+              </p>
+              <div className="bg-orange-100 rounded-lg p-3 mb-4">
+                <div className="text-sm">
+                  <h4 className="font-semibold text-orange-900 mb-1">Terminal Location:</h4>
+                  <p className="text-orange-800">Embassy Building, Ground Floor</p>
+                  <p className="text-orange-800">Open: Monday-Friday, 9:00 AM - 4:00 PM</p>
+                  <p className="text-orange-800 mt-2">Bring: Application ID and valid photo ID</p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => handleMarkStepComplete('fingerprint_scan')}
+                  className="px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors font-medium"
+                >
+                  <Fingerprint className="w-4 h-4 inline mr-2" />
+                  Mark as Complete (Demo)
+                </button>
+                <button
+                  onClick={() => window.open('https://maps.google.com', '_blank')}
+                  className="px-6 py-2 border border-orange-300 text-orange-700 rounded-lg hover:bg-orange-50 transition-colors"
+                >
+                  Get Directions
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Alert */}
+      {isPaymentBlocked && (
+        <div className="bg-yellow-50 border-b-4 border-yellow-200 p-6">
+          <div className="flex items-start gap-4">
+            <CreditCard className="w-8 h-8 text-yellow-600 mt-1 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-lg font-semibold text-yellow-900 mb-2">
+                Processing Blocked - Payment Required
+              </h3>
+              <p className="text-yellow-800 mb-3">
+                Please complete the <strong>visa application fee payment</strong> to proceed with processing.
+              </p>
+              <div className="bg-yellow-100 rounded-lg p-3 mb-4">
+                <div className="text-sm">
+                  <h4 className="font-semibold text-yellow-900 mb-1">Payment Details:</h4>
+                  <p className="text-yellow-800">Application Fee: $160.00</p>
+                  <p className="text-yellow-800">Processing Fee: $35.00</p>
+                  <p className="text-yellow-800 font-semibold mt-2">Total: $195.00</p>
+                  <p className="text-yellow-700 text-xs mt-2">Accepted: Credit/Debit Cards, Bank Transfer</p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => handleMarkStepComplete('payment')}
+                  className="px-6 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors font-medium"
+                >
+                  <CreditCard className="w-4 h-4 inline mr-2" />
+                  Mark as Paid (Demo)
+                </button>
+                <button
+                  onClick={() => alert('Payment gateway would open here')}
+                  className="px-6 py-2 border border-yellow-300 text-yellow-700 rounded-lg hover:bg-yellow-50 transition-colors"
+                >
+                  Pay Online
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Progress Overview */}
       <div className="p-6 bg-gray-50 border-b">
         <div className="flex justify-between items-center mb-4">
@@ -338,7 +463,9 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
         <div className="w-full bg-gray-200 rounded-full h-3 mb-4">
           <div 
             className={`h-3 rounded-full transition-all duration-1000 ${
-              isDocumentBlocked ? 'bg-orange-500' :
+              isDocumentBlocked ? 'bg-red-500' :
+              isFingerprintBlocked ? 'bg-orange-500' :
+              isPaymentBlocked ? 'bg-yellow-500' :
               application.status === 'approved' ? 'bg-green-500' :
               application.status === 'rejected' ? 'bg-red-500' : 'bg-blue-500'
             }`}
@@ -363,12 +490,28 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
               <p className="text-sm text-gray-600">Documents Missing</p>
             </div>
           )}
+          {isFingerprintBlocked && (
+            <div className="bg-white rounded-lg p-4">
+              <p className="text-2xl font-bold text-orange-600">1</p>
+              <p className="text-sm text-gray-600">Fingerprint Pending</p>
+            </div>
+          )}
+          {isPaymentBlocked && (
+            <div className="bg-white rounded-lg p-4">
+              <p className="text-2xl font-bold text-yellow-600">$195</p>
+              <p className="text-sm text-gray-600">Payment Due</p>
+            </div>
+          )}
         </div>
 
-        {isDocumentBlocked && (
+        {anyBlockage && (
           <div className="mt-4 p-3 bg-orange-100 border border-orange-200 rounded-lg">
             <p className="text-orange-800 text-sm text-center">
-              <strong>⚠ Processing Timeline:</strong> The official processing timeline will begin after all required documents are uploaded and verified.
+              <strong>⚠ Processing Note:</strong> Your application will remain in its current status until all requirements are satisfied:
+              {isDocumentBlocked && ' documents uploaded,'}
+              {isFingerprintBlocked && ' fingerprints scanned,'}
+              {isPaymentBlocked && ' payment completed.'}
+              {' '}The processing timeline only begins after all requirements are met.
             </p>
           </div>
         )}
@@ -382,21 +525,25 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
           {statusSteps.map((step, index) => (
             <div key={step.status} className="flex gap-4">
               {/* Icon */}
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
-                step.blocked
-                  ? 'bg-red-500 text-white'
-                  : step.completed 
-                  ? application.status === 'approved' && step.status === 'approved'
-                    ? 'bg-green-500 text-white'
-                    : application.status === 'rejected' && step.status === 'approved'
+              <div 
+                className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  step.blocked
                     ? 'bg-red-500 text-white'
-                    : 'bg-blue-500 text-white'
-                  : step.current
-                  ? step.blocked
-                    ? 'bg-red-100 text-red-600 border-2 border-red-500'
-                    : 'bg-blue-100 text-blue-600 border-2 border-blue-500'
-                  : 'bg-gray-100 text-gray-400'
-              }`}>
+                    : step.completed 
+                    ? application.status === 'approved' && step.status === 'approved'
+                      ? 'bg-green-500 text-white'
+                      : application.status === 'rejected' && step.status === 'approved'
+                      ? 'bg-red-500 text-white'
+                      : 'bg-blue-500 text-white'
+                    : step.current
+                    ? step.blocked
+                      ? 'bg-red-100 text-red-600 border-2 border-red-500'
+                      : 'bg-blue-100 text-blue-600 border-2 border-blue-500'
+                    : 'bg-gray-100 text-gray-400'
+                } ${step.clickable ? 'cursor-pointer hover:scale-110 transition-transform' : ''}`}
+                onClick={() => step.clickable && handleMarkStepComplete(step.status)}
+                title={step.clickable ? 'Click to mark as complete (Demo)' : ''}
+              >
                 {step.blocked ? (
                   <AlertTriangle className="w-6 h-6" />
                 ) : step.completed ? (
@@ -442,15 +589,37 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
                   <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                     <p className="text-sm text-red-800">
                       <strong>Action Required:</strong> This step is blocked and requires your action to continue. 
-                      Please upload the required documents to proceed with processing.
+                      {step.status === 'document_collection' && 'Please upload the required documents to proceed.'}
+                      {step.status === 'fingerprint_scan' && 'Please visit the embassy to complete fingerprint scanning.'}
+                      {step.status === 'payment' && 'Please complete the payment to proceed with processing.'}
                     </p>
-                    <button 
-                      onClick={onNavigateToDocuments}
-                      className="mt-2 px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
-                    >
-                      <Upload className="w-4 h-4 inline mr-1" />
-                      Upload Documents
-                    </button>
+                    {step.status === 'document_collection' && (
+                      <button 
+                        onClick={onNavigateToDocuments}
+                        className="mt-2 px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+                      >
+                        <Upload className="w-4 h-4 inline mr-1" />
+                        Upload Documents
+                      </button>
+                    )}
+                    {step.status === 'fingerprint_scan' && (
+                      <button 
+                        onClick={() => handleMarkStepComplete('fingerprint_scan')}
+                        className="mt-2 px-4 py-2 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 transition-colors"
+                      >
+                        <Fingerprint className="w-4 h-4 inline mr-1" />
+                        Mark Complete (Demo)
+                      </button>
+                    )}
+                    {step.status === 'payment' && (
+                      <button 
+                        onClick={() => handleMarkStepComplete('payment')}
+                        className="mt-2 px-4 py-2 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors"
+                      >
+                        <CreditCard className="w-4 h-4 inline mr-1" />
+                        Mark as Paid (Demo)
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -466,7 +635,7 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
 
       {/* Action Buttons */}
       <div className="p-6 bg-gray-50 border-t">
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <button
             onClick={loadApplicationStatus}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
@@ -481,6 +650,26 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
             >
               <Upload className="w-4 h-4 inline mr-1" />
               Upload Documents
+            </button>
+          )}
+          
+          {isFingerprintBlocked && (
+            <button
+              onClick={() => handleMarkStepComplete('fingerprint_scan')}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            >
+              <Fingerprint className="w-4 h-4 inline mr-1" />
+              Complete Fingerprints (Demo)
+            </button>
+          )}
+          
+          {isPaymentBlocked && (
+            <button
+              onClick={() => handleMarkStepComplete('payment')}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+            >
+              <CreditCard className="w-4 h-4 inline mr-1" />
+              Complete Payment (Demo)
             </button>
           )}
           
