@@ -1,3 +1,3 @@
 # VisaLegatio
 
-Seperate readme in app/frontend and app/backend
+VisaLegatio is a smart, AI-assisted visa application system designed to streamline the experience for both applicants and bureaucrats. Applicants are guided through a clear interface to submit personal details and documents, then receive a QR code to finalize their process at an embassy terminal. For bureaucrats, VisaVerge offers AI-generated document summaries, bias insights, and a structured review dashboard to enhance speed, transparency, and fairness in decision-making—without replacing human judgment. Our system aims to reduce overhead, improve accessibility, and support data-informed policy refinement.
