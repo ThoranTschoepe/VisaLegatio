@@ -76,7 +76,7 @@ export const Card: React.FC<CardProps> = ({
     'bg-base-100',
     'shadow-lg',
     bordered ? 'card-bordered' : '',
-    compact ? 'card-compact' : '',
+    compact ? 'card-sm' : '',
     className
   ].filter(Boolean).join(' ')
 
