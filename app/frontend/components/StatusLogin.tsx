@@ -173,7 +173,7 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-100 to-base-200 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-100 to-base-200 flex items-center justify-center p-4 pt-20">
       <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">

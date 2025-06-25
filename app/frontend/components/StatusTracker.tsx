@@ -404,24 +404,24 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
           <div className="flex items-start gap-4">
             <AlertTriangle className="w-8 h-8 text-error mt-1 flex-shrink-0" />
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-error-content mb-2">
+              <h3 className="text-lg font-semibold text-sm mb-2">
                 Processing Blocked - Documents Required
               </h3>
-              <p className="text-error-content/90 mb-3">
+              <p className="text-sm mb-3">
                 Your application is currently on hold because <strong>required documents have not been uploaded</strong>. 
                 Processing cannot continue until all mandatory documents are provided and verified.
               </p>
               <div className="bg-error/20 rounded-lg p-3 mb-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <h4 className="font-semibold text-error-content mb-1">Document Status:</h4>
-                    <p className="text-error-content/90">Required: {documentStatus.total_mandatory_uploaded}/{documentStatus.total_mandatory} uploaded</p>
-                    <p className="text-error-content/90">Missing: {documentStatus.mandatory_missing.join(', ')}</p>
+                    <h4 className="font-semibold text-sm mb-1">Document Status:</h4>
+                    <p className="text-sm">Required: {documentStatus.total_mandatory_uploaded}/{documentStatus.total_mandatory} uploaded</p>
+                    <p className="text-sm">Missing: {documentStatus.mandatory_missing.join(', ')}</p>
                   </div>
                   <div>
-                    <h4 className="font-semibold text-error-content mb-1">Processing Status:</h4>
-                    <p className="text-error-content/90">Current: Document Collection</p>
-                    <p className="text-error-content/90">Next: {documentStatus.requirements_met ? 'Biometric Collection' : 'Upload Required Documents'}</p>
+                    <h4 className="font-semibold text-sm mb-1">Processing Status:</h4>
+                    <p className="text-sm">Current: Document Collection</p>
+                    <p className="text-sm">Next: {documentStatus.requirements_met ? 'Biometric Collection' : 'Upload Required Documents'}</p>
                   </div>
                 </div>
               </div>
