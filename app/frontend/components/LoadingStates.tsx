@@ -30,7 +30,7 @@ export function TextSkeleton({ lines = 3, className = '' }: {
       {Array.from({ length: lines }).map((_, i) => (
         <div
           key={i}
-          className={`h-4 bg-gray-200 rounded animate-pulse ${
+          className={`h-4 bg-base-300 rounded animate-pulse ${
             i === lines - 1 ? 'w-3/4' : 'w-full'
           }`}
         />
@@ -42,16 +42,16 @@ export function TextSkeleton({ lines = 3, className = '' }: {
 // Loading card skeleton
 export function CardSkeleton({ className = '' }: { className?: string }) {
   return (
-    <div className={`bg-white rounded-lg shadow p-6 ${className}`}>
+    <div className={`bg-base-100 rounded-lg shadow p-6 ${className}`}>
       <div className="space-y-4">
-        <div className="h-6 bg-gray-200 rounded w-1/3 animate-pulse" />
+        <div className="h-6 bg-base-300 rounded w-1/3 animate-pulse" />
         <div className="space-y-2">
-          <div className="h-4 bg-gray-200 rounded animate-pulse" />
-          <div className="h-4 bg-gray-200 rounded w-5/6 animate-pulse" />
+          <div className="h-4 bg-base-300 rounded animate-pulse" />
+          <div className="h-4 bg-base-300 rounded w-5/6 animate-pulse" />
         </div>
         <div className="flex space-x-2">
-          <div className="h-8 bg-gray-200 rounded w-20 animate-pulse" />
-          <div className="h-8 bg-gray-200 rounded w-16 animate-pulse" />
+          <div className="h-8 bg-base-300 rounded w-20 animate-pulse" />
+          <div className="h-8 bg-base-300 rounded w-16 animate-pulse" />
         </div>
       </div>
     </div>
@@ -62,18 +62,18 @@ export function CardSkeleton({ className = '' }: { className?: string }) {
 export function ChatLoading() {
   return (
     <div className="flex gap-3 justify-start">
-      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
         <Bot className="w-5 h-5 text-white" />
       </div>
-      <div className="bg-white px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm border">
+      <div className="bg-base-100 px-4 py-3 rounded-2xl rounded-bl-sm shadow-sm border border-base-300">
         <div className="flex gap-1">
-          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+          <div className="w-2 h-2 bg-base-content/40 rounded-full animate-bounce" />
           <div 
-            className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" 
+            className="w-2 h-2 bg-base-content/40 rounded-full animate-bounce" 
             style={{ animationDelay: '0.1s' }} 
           />
           <div 
-            className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" 
+            className="w-2 h-2 bg-base-content/40 rounded-full animate-bounce" 
             style={{ animationDelay: '0.2s' }} 
           />
         </div>
@@ -85,10 +85,10 @@ export function ChatLoading() {
 // Form loading overlay
 export function FormLoading({ message = 'Loading...' }: { message?: string }) {
   return (
-    <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
+    <div className="absolute inset-0 bg-base-100 bg-opacity-75 flex items-center justify-center z-10 rounded-lg">
       <div className="text-center">
-        <LoadingSpinner size="lg" className="text-blue-500 mx-auto mb-4" />
-        <p className="text-gray-600 font-medium">{message}</p>
+        <LoadingSpinner size="lg" className="text-primary mx-auto mb-4" />
+        <p className="text-base-content/70 font-medium">{message}</p>
       </div>
     </div>
   )
@@ -98,13 +98,13 @@ export function FormLoading({ message = 'Loading...' }: { message?: string }) {
 export function DocumentLoading({ fileName }: { fileName: string }) {
   return (
     <div className="space-y-3">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto" />
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
       <div className="text-center">
-        <p className="text-blue-600 font-medium">Uploading & Verifying...</p>
-        <p className="text-sm text-gray-600">{fileName}</p>
+        <p className="text-primary font-medium">Uploading & Verifying...</p>
+        <p className="text-sm text-base-content/70">{fileName}</p>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2">
-        <div className="bg-blue-500 h-2 rounded-full animate-pulse w-3/4" />
+      <div className="w-full bg-base-300 rounded-full h-2">
+        <div className="bg-primary h-2 rounded-full animate-pulse w-3/4" />
       </div>
     </div>
   )
@@ -121,8 +121,8 @@ export function StepLoading({
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <LoadingSpinner size="lg" className="text-blue-500 mx-auto mb-4" />
-        <p className="text-lg font-medium text-gray-800">Processing...</p>
+        <LoadingSpinner size="lg" className="text-primary mx-auto mb-4" />
+        <p className="text-lg font-medium text-base-content">Processing...</p>
       </div>
       
       <div className="space-y-2">
@@ -131,10 +131,10 @@ export function StepLoading({
             key={index}
             className={`flex items-center gap-3 p-2 rounded ${
               index < currentStep
-                ? 'text-green-600'
+                ? 'text-success'
                 : index === currentStep
-                ? 'text-blue-600 bg-blue-50'
-                : 'text-gray-400'
+                ? 'text-primary bg-primary/10'
+                : 'text-base-content/40'
             }`}
           >
             {index < currentStep ? (
@@ -142,7 +142,7 @@ export function StepLoading({
             ) : index === currentStep ? (
               <LoadingSpinner size="sm" />
             ) : (
-              <div className="w-5 h-5 border-2 border-gray-300 rounded-full" />
+              <div className="w-5 h-5 border-2 border-base-300 rounded-full" />
             )}
             <span className="text-sm">{step}</span>
           </div>
@@ -155,14 +155,14 @@ export function StepLoading({
 // Page loading screen
 export function PageLoading({ message = 'Loading...' }: { message?: string }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-100 to-base-200 flex items-center justify-center">
       <div className="text-center">
         <div className="relative">
-          <div className="w-20 h-20 border-4 border-blue-200 rounded-full animate-spin" />
-          <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" />
+          <div className="w-20 h-20 border-4 border-primary/20 rounded-full animate-spin" />
+          <div className="absolute inset-0 w-20 h-20 border-4 border-transparent border-t-primary rounded-full animate-spin" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 mt-6 mb-2">VisaLegatio</h2>
-        <p className="text-gray-600">{message}</p>
+        <h2 className="text-2xl font-bold text-base-content mt-6 mb-2">VisaLegatio</h2>
+        <p className="text-base-content/70">{message}</p>
       </div>
     </div>
   )
@@ -180,13 +180,13 @@ export function SubmissionLoading() {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+      <div className="bg-base-100 rounded-lg p-8 max-w-md w-full mx-4">
         <div className="text-center mb-6">
-          <div className="w-16 h-16 border-4 border-blue-200 rounded-full animate-spin mx-auto mb-4">
-            <div className="w-16 h-16 border-4 border-transparent border-t-blue-500 rounded-full animate-spin" />
+          <div className="w-16 h-16 border-4 border-primary/20 rounded-full animate-spin mx-auto mb-4">
+            <div className="w-16 h-16 border-4 border-transparent border-t-primary rounded-full animate-spin" />
           </div>
-          <h3 className="text-xl font-bold text-gray-800">Submitting Application</h3>
-          <p className="text-gray-600 text-sm mt-2">This may take a few moments...</p>
+          <h3 className="text-xl font-bold text-base-content">Submitting Application</h3>
+          <p className="text-base-content/70 text-sm mt-2">This may take a few moments...</p>
         </div>
 
         <div className="space-y-3">
@@ -194,17 +194,17 @@ export function SubmissionLoading() {
             <div key={index} className="flex items-center gap-3">
               <div className="w-6 h-6 flex items-center justify-center">
                 {index < 2 ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  <CheckCircle2 className="w-5 h-5 text-success" />
                 ) : index === 2 ? (
-                  <LoadingSpinner size="sm" className="text-blue-500" />
+                  <LoadingSpinner size="sm" className="text-primary" />
                 ) : (
-                  <div className="w-3 h-3 border-2 border-gray-300 rounded-full" />
+                  <div className="w-3 h-3 border-2 border-base-300 rounded-full" />
                 )}
               </div>
               <span className={`text-sm ${
-                index < 2 ? 'text-green-600' : 
-                index === 2 ? 'text-blue-600' : 
-                'text-gray-400'
+                index < 2 ? 'text-success' : 
+                index === 2 ? 'text-primary' : 
+                'text-base-content/40'
               }`}>
                 {step}
               </span>

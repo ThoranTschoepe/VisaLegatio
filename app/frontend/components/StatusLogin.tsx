@@ -31,61 +31,61 @@ const QRScannerPopup = ({ onScanResult, onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="modal-box max-w-md w-full mx-4">
         <div className="flex items-center justify-between p-4 border-b">
           <div className="flex items-center gap-2">
-            <QrCode className="w-6 h-6 text-blue-600" />
+            <QrCode className="w-6 h-6 text-primary" />
             <h2 className="text-lg font-semibold">QR Code Scanner</h2>
           </div>
           <button onClick={onClose} className="btn btn-ghost btn-sm btn-circle">✕</button>
         </div>
 
         <div className="p-6">
-          <div className="w-64 h-64 border-4 border-dashed border-blue-300 rounded-lg bg-blue-50 flex items-center justify-center mx-auto mb-6">
+          <div className="w-64 h-64 border-4 border-dashed border-primary/30 rounded-lg bg-primary/10 flex items-center justify-center mx-auto mb-6">
             {isScanning ? (
               <div className="text-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                <p className="text-blue-600 font-medium">Scanning...</p>
+                <div className="loading loading-spinner loading-lg text-primary mx-auto mb-4"></div>
+                <p className="text-primary font-medium">Scanning...</p>
               </div>
             ) : (
               <div className="text-center">
-                <QrCode className="w-16 h-16 text-blue-400 mx-auto mb-2" />
-                <p className="text-gray-600 text-sm">Position QR code here</p>
+                <QrCode className="w-16 h-16 text-primary/60 mx-auto mb-2" />
+                <p className="text-base-content/60 text-sm">Position QR code here</p>
               </div>
             )}
           </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-            <h3 className="font-semibold text-yellow-900 mb-2">Test Options</h3>
+          <div className="bg-warning/10 border border-warning/20 rounded-lg p-4 mb-4">
+            <h3 className="font-semibold text-warning-content mb-2">Test Options</h3>
             <div className="space-y-2">
               <button
                 onClick={() => handleDemoScan('VSV-240101-A1B2', 'DEMO123')}
                 disabled={isScanning}
-                className="w-full p-2 bg-white border rounded text-left text-sm"
+                className="w-full p-2 bg-base-100 border border-base-300 rounded text-left text-sm"
               >
                 📄 Business Visa (VSV-240101-A1B2)
               </button>
               <button
                 onClick={() => handleDemoScan('VSV-240102-C3D4', 'DEMO456')}
                 disabled={isScanning}
-                className="w-full p-2 bg-white border rounded text-left text-sm"
+                className="w-full p-2 bg-base-100 border border-base-300 rounded text-left text-sm"
               >
                 🏖️ Tourist Visa (VSV-240102-C3D4)
               </button>
               <button
                 onClick={handleManualQREntry}
                 disabled={isScanning}
-                className="w-full p-2 bg-blue-100 border border-blue-300 rounded text-left text-sm"
+                className="w-full p-2 bg-primary/10 border border-primary/30 rounded text-left text-sm"
               >
                 📱 Paste QR URL Manually
               </button>
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <h4 className="font-semibold text-blue-900 text-sm mb-2">💡 How to Use</h4>
-            <ul className="text-blue-800 text-xs space-y-1">
+          <div className="bg-info/10 border border-info/20 rounded-lg p-3">
+            <h4 className="font-semibold text-info-content text-sm mb-2">💡 How to Use</h4>
+            <ul className="text-info-content text-xs space-y-1">
               <li>• Use demo buttons above for testing</li>
               <li>• Or paste a real QR code URL manually</li>
               <li>• Real camera scanning would work in production</li>
@@ -173,7 +173,7 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-blue-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-100 to-base-200 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
@@ -181,14 +181,14 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
             <div className="p-3 bg-primary rounded-full">
               <FileText className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">VisaLegatio</h1>
+            <h1 className="text-3xl font-bold text-base-content">VisaLegatio</h1>
           </div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Check Application Status</h2>
-          <p className="text-gray-600">Enter your application details to view progress</p>
+          <h2 className="text-xl font-semibold text-base-content mb-2">Check Application Status</h2>
+          <p className="text-base-content/70">Enter your application details to view progress</p>
           
           {prefilledApplicationId && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-green-800 text-sm">
+            <div className="mt-4 p-3 bg-success/10 border border-success/20 rounded-lg">
+              <p className="text-success-content text-sm">
                 ✅ QR code scanned! Application ID auto-filled. Please enter your password.
               </p>
             </div>
@@ -222,14 +222,14 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
                   <button
                     type="button"
                     onClick={handleQRScan}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-500 transition-colors"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/40 hover:text-primary transition-colors"
                     title="Scan QR Code"
                   >
                     <QrCode className="w-5 h-5" />
                   </button>
                 </div>
                 <label className="label">
-                  <span className="label-text-alt text-gray-500">
+                  <span className="label-text-alt text-base-content/50">
                     {prefilledApplicationId 
                       ? '✅ Auto-filled from QR code' 
                       : 'Found in your confirmation email or scan your QR code'
@@ -240,12 +240,12 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
 
               {/* QR Code Scanner Section */}
               <div className="form-control">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-4">
                   <div className="flex items-center gap-3 mb-3">
-                    <QrCode className="w-6 h-6 text-blue-600" />
-                    <h4 className="font-semibold text-blue-900">Have a QR Code?</h4>
+                    <QrCode className="w-6 h-6 text-primary" />
+                    <h4 className="font-semibold text-sm">Have a QR Code?</h4>
                   </div>
-                  <p className="text-blue-800 text-sm mb-3">
+                  <p className="text-sm text-sm mb-3">
                     Scan the QR code you received when submitting your application for instant access.
                   </p>
                   <button
@@ -256,7 +256,7 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
                     <QrCode className="w-4 h-4 mr-2" />
                     Open QR Scanner
                   </button>
-                  <p className="text-xs text-blue-700 mt-2 text-center">
+                  <p className="text-xs text-sm mt-2 text-center">
                     Scan your application QR code for instant login
                   </p>
                 </div>
@@ -282,14 +282,14 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-500"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/40 hover:text-primary"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
                 <label className="label">
-                  <span className="label-text-alt text-gray-500">
+                  <span className="label-text-alt text-base-content/50">
                     The password you set when submitting your application
                   </span>
                 </label>
@@ -327,9 +327,9 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
             <div className="divider">Need Help?</div>
             
             <div className="space-y-3">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <h4 className="font-semibold text-blue-900 text-sm mb-2">Can't find your information?</h4>
-                <ul className="text-blue-800 text-xs space-y-1">
+              <div className="bg-info/10 border border-info/20 rounded-lg p-3">
+                <h4 className="font-semibold text-sm text-sm mb-2">Can't find your information?</h4>
+                <ul className="text-sm text-xs space-y-1">
                   <li>• Check your email confirmation for the application ID</li>
                   <li>• Use the QR code you saved when submitting</li>
                   <li>• Make sure you're entering the password correctly</li>
@@ -397,12 +397,12 @@ export default function StatusLogin({ onAccessApplication, onBack, prefilledAppl
         </div>
 
         {/* Security Notice */}
-        <div className="mt-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+        <div className="mt-6 p-4 bg-base-200 border border-base-300 rounded-lg">
           <div className="flex items-start gap-3">
-            <Shield className="w-5 h-5 text-gray-600 mt-0.5" />
+            <Shield className="w-5 h-5 text-base-content/60 mt-0.5" />
             <div>
-              <h4 className="font-semibold text-gray-900 text-sm">Security & Privacy</h4>
-              <p className="text-gray-700 text-xs mt-1">
+              <h4 className="font-semibold text-base-content text-sm">Security & Privacy</h4>
+              <p className="text-base-content/70 text-xs mt-1">
                 Your application data is encrypted and secure. Never share your access password with anyone.
               </p>
             </div>

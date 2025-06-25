@@ -43,7 +43,7 @@ export default function RootLayout({
                 const theme = localStorage.getItem('theme');
                 const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                 
-                let appliedTheme = 'cupcake'; // default light theme
+                let appliedTheme = 'winter'; // default light theme
                 
                 if (theme === 'dark') {
                   appliedTheme = 'dracula';

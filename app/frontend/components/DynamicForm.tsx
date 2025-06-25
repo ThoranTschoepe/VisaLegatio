@@ -184,8 +184,8 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading your personalized form...</p>
+          <div className="loading loading-spinner loading-lg text-primary mx-auto mb-4"></div>
+          <p className="text-base-content/70">Loading your personalized form...</p>
         </div>
       </div>
     )
@@ -194,22 +194,22 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
   if (!currentQuestion && !showPasswordStep) {
     return (
       <div className="text-center p-8">
-        <AlertCircle className="w-12 h-12 text-yellow-500 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">No questions available</h3>
-        <p className="text-gray-600">Please try again or contact support.</p>
+        <AlertCircle className="w-12 h-12 text-warning mx-auto mb-4" />
+        <h3 className="text-lg font-semibold text-base-content mb-2">No questions available</h3>
+        <p className="text-base-content/70">Please try again or contact support.</p>
       </div>
     )
   }
 
   if (showPasswordStep) {
     return (
-      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="max-w-2xl mx-auto card bg-base-100 shadow-xl overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6">
+        <div className="bg-gradient-to-r from-success to-primary text-white p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold">Secure Your Application</h2>
-              <p className="text-green-100 text-sm mt-1">
+              <p className="text-success-content/80 text-sm mt-1">
                 Set a password to access your application later
               </p>
             </div>
@@ -221,11 +221,11 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
 
           {/* Progress bar */}
           <div className="mt-4">
-            <div className="flex justify-between text-sm text-green-100 mb-2">
+            <div className="flex justify-between text-sm text-success-content/80 mb-2">
               <span>Ready to Submit</span>
               <span>100% complete</span>
             </div>
-            <div className="w-full bg-green-500 bg-opacity-30 rounded-full h-2">
+            <div className="w-full bg-success/30 rounded-full h-2">
               <div className="bg-white h-2 rounded-full w-full" />
             </div>
           </div>
@@ -235,18 +235,18 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
         <div className="p-6">
           <div className="space-y-6">
             <div className="text-center mb-6">
-              <Lock className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              <Lock className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-base-content mb-2">
                 Create Your Access Password
               </h3>
-              <p className="text-gray-600 text-sm">
+              <p className="text-base-content/70 text-sm">
                 You'll use this password to check your application status and upload documents later
               </p>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-base-content mb-2">
                   Password
                 </label>
                 <div className="relative">
@@ -254,13 +254,13 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12 font-mono"
+                    className="input input-bordered w-full pr-12 font-mono"
                     placeholder="Enter a secure password..."
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/40 hover:text-base-content/60"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -268,7 +268,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-base-content mb-2">
                   Confirm Password
                 </label>
                 <div className="relative">
@@ -276,13 +276,13 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
                     type={showConfirmPassword ? 'text' : 'password'}
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12 font-mono"
+                    className="input input-bordered w-full pr-12 font-mono"
                     placeholder="Confirm your password..."
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-base-content/40 hover:text-base-content/60"
                   >
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -290,17 +290,17 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
               </div>
 
               {passwordError && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-red-600 text-sm flex items-center gap-2">
+                <div className="alert alert-error">
+                  <p className="text-error text-sm flex items-center gap-2">
                     <AlertCircle className="w-4 h-4" />
                     {passwordError}
                   </p>
                 </div>
               )}
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-semibold text-blue-900 text-sm mb-2">💡 Password Tips</h4>
-                <ul className="text-blue-800 text-sm space-y-1">
+              <div className="alert alert-info">
+                <h4 className="font-semibold text-info-content text-sm mb-2">💡 Password Tips</h4>
+                <ul className="text-info-content text-sm space-y-1">
                   <li>• We've suggested a secure password for you</li>
                   <li>• You can change it to something memorable</li>
                   <li>• Minimum 6 characters required</li>
@@ -313,7 +313,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
             <div className="flex justify-between items-center pt-6 border-t">
               <button
                 onClick={goToPrevious}
-                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="btn btn-ghost"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Back to Questions
@@ -322,7 +322,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
               <button
                 onClick={handleSubmit}
                 disabled={!password || !confirmPassword}
-                className="flex items-center gap-2 px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="btn btn-success"
               >
                 <Send className="w-4 h-4" />
                 Submit Application
@@ -335,13 +335,13 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
   }
 
   return (
-    <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="max-w-2xl mx-auto card bg-base-100 shadow-xl overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6">
+      <div className="bg-gradient-to-r from-primary to-secondary text-white p-6">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold">{getVisaTypeTitle(visaType)}</h2>
-            <p className="text-blue-100 text-sm mt-1">
+            <p className="text-primary-content/80 text-sm mt-1">
               Question {currentQuestionIndex + 1} of {questions.length}
             </p>
           </div>
@@ -357,11 +357,11 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
 
         {/* Progress bar */}
         <div className="mt-4">
-          <div className="flex justify-between text-sm text-blue-100 mb-2">
+          <div className="flex justify-between text-sm text-primary-content/80 mb-2">
             <span>Progress</span>
             <span>{Math.round(progress)}% complete</span>
           </div>
-          <div className="w-full bg-blue-500 bg-opacity-30 rounded-full h-2">
+          <div className="w-full bg-primary/30 rounded-full h-2">
             <div 
               className="bg-white h-2 rounded-full transition-all duration-500 ease-out"
               style={{ width: `${progress}%` }}
@@ -373,7 +373,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
       {/* Question content */}
       <div className="p-6">
         <div className="mb-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+          <h3 className="text-lg font-semibold text-base-content mb-4">
             {currentQuestion.text}
           </h3>
 
@@ -385,13 +385,13 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
                   type="text"
                   value={answers[currentQuestion.id] || ''}
                   onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors[currentQuestion.id] ? 'border-red-500' : 'border-gray-300'
+                  className={`input input-bordered w-full ${
+                    errors[currentQuestion.id] ? 'input-error' : ''
                   }`}
                   placeholder="Enter your answer..."
                 />
                 {errors[currentQuestion.id] && (
-                  <p className="text-red-500 text-sm mt-2 flex items-center gap-2">
+                  <p className="text-error text-sm mt-2 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4" />
                     {errors[currentQuestion.id]}
                   </p>
@@ -407,14 +407,14 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
                     onClick={() => handleAnswer(currentQuestion.id, option)}
                     className={`p-4 text-left border rounded-lg transition-all ${
                       answers[currentQuestion.id] === option
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 hover:border-blue-300 hover:bg-blue-50'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-base-300 hover:border-primary/50 hover:bg-primary/5'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span>{option}</span>
                       {answers[currentQuestion.id] === option && (
-                        <CheckCircle2 className="w-5 h-5 text-blue-500" />
+                        <CheckCircle2 className="w-5 h-5 text-primary" />
                       )}
                     </div>
                   </button>
@@ -430,13 +430,13 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
                   onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
                   min={currentQuestion.validation?.min}
                   max={currentQuestion.validation?.max}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors[currentQuestion.id] ? 'border-red-500' : 'border-gray-300'
+                  className={`input input-bordered w-full ${
+                    errors[currentQuestion.id] ? 'input-error' : ''
                   }`}
                   placeholder="Enter number..."
                 />
                 {currentQuestion.validation && (
-                  <p className="text-gray-500 text-sm mt-2">
+                  <p className="text-base-content/60 text-sm mt-2">
                     {currentQuestion.validation.min && currentQuestion.validation.max
                       ? `Enter a number between ${currentQuestion.validation.min} and ${currentQuestion.validation.max}`
                       : currentQuestion.validation.min
@@ -448,7 +448,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
                   </p>
                 )}
                 {errors[currentQuestion.id] && (
-                  <p className="text-red-500 text-sm mt-2 flex items-center gap-2">
+                  <p className="text-error text-sm mt-2 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4" />
                     {errors[currentQuestion.id]}
                   </p>
@@ -462,12 +462,12 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
                   type="date"
                   value={answers[currentQuestion.id] || ''}
                   onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors[currentQuestion.id] ? 'border-red-500' : 'border-gray-300'
+                  className={`input input-bordered w-full ${
+                    errors[currentQuestion.id] ? 'input-error' : ''
                   }`}
                 />
                 {errors[currentQuestion.id] && (
-                  <p className="text-red-500 text-sm mt-2 flex items-center gap-2">
+                  <p className="text-error text-sm mt-2 flex items-center gap-2">
                     <AlertCircle className="w-4 h-4" />
                     {errors[currentQuestion.id]}
                   </p>
@@ -481,7 +481,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
         <div className="flex justify-between items-center pt-6 border-t">
           <button
             onClick={onBack || goToPrevious}
-            className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+            className="btn btn-ghost"
             disabled={currentQuestionIndex === 0 && !onBack}
           >
             <ChevronLeft className="w-4 h-4" />
@@ -491,7 +491,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
           <button
             onClick={goToNext}
             disabled={!canProceed}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="btn btn-primary"
           >
             {isLastQuestion ? 'Continue to Security' : 'Next'}
             <ChevronRight className="w-4 h-4" />
@@ -500,24 +500,24 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
       </div>
 
       {/* Form summary sidebar (for larger screens) */}
-      <div className="hidden lg:block fixed right-4 top-24 w-64 bg-white rounded-lg shadow-lg p-4 max-h-96 overflow-y-auto">
-        <h4 className="font-semibold text-gray-800 mb-3">Your Answers</h4>
+      <div className="hidden lg:block fixed right-4 top-24 w-64 card bg-base-100 shadow-xl p-4 max-h-96 overflow-y-auto">
+        <h4 className="font-semibold text-base-content mb-3">Your Answers</h4>
         <div className="space-y-2">
           {questions.slice(0, currentQuestionIndex + 1).map((q, index) => (
             <div key={q.id} className="text-sm">
-              <p className="text-gray-600 font-medium">{q.text}</p>
-              <p className="text-gray-800">{answers[q.id] || 'Not answered'}</p>
+              <p className="text-base-content/70 font-medium">{q.text}</p>
+              <p className="text-base-content">{answers[q.id] || 'Not answered'}</p>
               {index < currentQuestionIndex && (
-                <div className="w-full h-px bg-gray-200 my-2" />
+                <div className="w-full h-px bg-base-300 my-2" />
               )}
             </div>
           ))}
         </div>
         
         {/* Next Step Preview */}
-        <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <h5 className="font-semibold text-green-900 text-sm mb-1">Next Step</h5>
-          <p className="text-green-800 text-xs">
+        <div className="mt-4 p-3 bg-success/10 border border-success/20 rounded-lg">
+          <h5 className="font-semibold text-success text-sm mb-1">Next Step</h5>
+          <p className="text-success text-xs">
             Set your access password and submit your application for immediate processing!
           </p>
         </div>

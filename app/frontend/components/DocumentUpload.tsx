@@ -250,8 +250,8 @@ export default function DocumentUpload({
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-600">Loading document requirements...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-base-content/60">Loading document requirements...</p>
         </div>
       </div>
     )
@@ -260,31 +260,31 @@ export default function DocumentUpload({
   // Backend unavailable state
   if (!backendAvailable) {
     return (
-      <div className="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-8">
+      <div className="max-w-2xl mx-auto bg-base-100 rounded-lg shadow-lg p-8">
         <div className="text-center">
-          <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Backend Unavailable</h2>
-          <p className="text-gray-600 mb-6">
+          <AlertTriangle className="w-16 h-16 text-error mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-base-content mb-4">Backend Unavailable</h2>
+          <p className="text-base-content/60 mb-6">
             The document upload service is currently unavailable. Please ensure the backend server is running.
           </p>
           <div className="space-y-3">
             <button
               onClick={loadDocumentData}
-              className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              className="btn btn-primary"
             >
               <Loader2 className="w-4 h-4 inline mr-2" />
               Retry Connection
             </button>
             <button
               onClick={onSkip}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors ml-3"
+              className="btn btn-outline ml-3"
             >
               Skip For Now
             </button>
           </div>
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-left">
-            <h4 className="font-semibold text-blue-900 mb-2">For Developers:</h4>
-            <ul className="text-blue-800 text-sm space-y-1">
+          <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-lg text-left">
+            <h4 className="font-semibold text-primary mb-2">For Developers:</h4>
+            <ul className="text-primary/80 text-sm space-y-1">
               <li>• Make sure the backend server is running on http://localhost:8000</li>
               <li>• Check that the /api/health endpoint is accessible</li>
               <li>• Verify CORS settings allow frontend connections</li>
@@ -304,14 +304,14 @@ export default function DocumentUpload({
       <div
         className={`border-2 border-dashed rounded-lg p-6 transition-all ${
           draggedOver === docType
-            ? 'border-blue-500 bg-blue-50'
+            ? 'border-primary bg-primary/10'
             : document?.verified
-            ? 'border-green-500 bg-green-50'
+            ? 'border-success bg-success/10'
             : document && !document.verified
-            ? 'border-yellow-500 bg-yellow-50'
+            ? 'border-warning bg-warning/10'
             : isMandatory
-            ? 'border-red-300 bg-red-50 hover:border-red-400'
-            : 'border-gray-300 hover:border-blue-400'
+            ? 'border-error/50 bg-error/10 hover:border-error'
+            : 'border-base-300 hover:border-primary'
         }`}
         onDragOver={(e) => {
           e.preventDefault()
@@ -330,7 +330,7 @@ export default function DocumentUpload({
 
         {/* Header with mandatory/optional indicator */}
         <div className="flex items-center justify-between mb-3">
-          <h3 className="font-medium text-gray-800">
+          <h3 className="font-medium text-base-content">
             {DOCUMENT_NAMES[docType] || docType}
           </h3>
           <span className={`badge badge-sm ${
@@ -343,25 +343,25 @@ export default function DocumentUpload({
         <div className="text-center">
           {uploading ? (
             <div className="space-y-3">
-              <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto" />
-              <p className="text-blue-600 font-medium">Uploading & Verifying...</p>
-              <p className="text-sm text-gray-600">Please wait while we process your document</p>
+              <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
+              <p className="text-primary font-medium">Uploading & Verifying...</p>
+              <p className="text-sm text-base-content/60">Please wait while we process your document</p>
             </div>
           ) : document ? (
             <div className="space-y-3">
               <div className="flex items-center justify-center">
                 {document.verified ? (
-                  <CheckCircle2 className="w-12 h-12 text-green-500" />
+                  <CheckCircle2 className="w-12 h-12 text-success" />
                 ) : (
-                  <Clock className="w-12 h-12 text-yellow-500" />
+                  <Clock className="w-12 h-12 text-warning" />
                 )}
               </div>
               
               <div>
-                <p className="font-medium text-gray-800">{document.name}</p>
-                <p className="text-sm text-gray-600">{formatFileSize(document.size)}</p>
+                <p className="font-medium text-base-content">{document.name}</p>
+                <p className="text-sm text-base-content/60">{formatFileSize(document.size)}</p>
                 <p className={`text-sm font-medium ${
-                  document.verified ? 'text-green-600' : 'text-yellow-600'
+                  document.verified ? 'text-success' : 'text-warning'
                 }`}>
                   {document.verified ? 'Verified ✓' : 'Pending Verification ⏳'}
                 </p>
@@ -370,14 +370,14 @@ export default function DocumentUpload({
               <div className="flex gap-2 justify-center">
                 <button
                   onClick={() => fileInputRefs.current[docType]?.click()}
-                  className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+                  className="btn btn-primary btn-sm"
                   disabled={!backendAvailable}
                 >
                   Replace
                 </button>
                 <button
                   onClick={() => removeDocument(docType)}
-                  className="px-3 py-1 text-sm bg-red-500 text-white rounded hover:bg-red-600"
+                  className="btn btn-error btn-sm"
                   disabled={!backendAvailable}
                 >
                   <Trash2 className="w-4 h-4" />
@@ -385,7 +385,7 @@ export default function DocumentUpload({
                 {document.url && (
                   <button
                     onClick={() => window.open(document.url, '_blank')}
-                    className="px-3 py-1 text-sm bg-gray-500 text-white rounded hover:bg-gray-600"
+                    className="btn btn-neutral btn-sm"
                   >
                     View
                   </button>
@@ -394,9 +394,9 @@ export default function DocumentUpload({
             </div>
           ) : (
             <div className="space-y-3">
-              <Upload className="w-12 h-12 text-gray-400 mx-auto" />
+              <Upload className="w-12 h-12 text-base-content/40 mx-auto" />
               <div>
-                <p className="text-sm text-gray-600 mb-3">
+                <p className="text-sm text-base-content/60 mb-3">
                   {DOCUMENT_DESCRIPTIONS[docType] || `Upload your ${docType.replace('_', ' ')}`}
                 </p>
               </div>
@@ -405,10 +405,10 @@ export default function DocumentUpload({
                 <button
                   onClick={() => fileInputRefs.current[docType]?.click()}
                   disabled={!backendAvailable}
-                  className={`w-full px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                  className={`btn w-full disabled:opacity-50 disabled:cursor-not-allowed ${
                     isMandatory 
-                      ? 'bg-red-500 text-white hover:bg-red-600' 
-                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                      ? 'btn-error' 
+                      : 'btn-primary'
                   }`}
                 >
                   <FileText className="w-4 h-4 inline mr-2" />
@@ -418,14 +418,14 @@ export default function DocumentUpload({
                 <button
                   onClick={() => fileInputRefs.current[docType]?.click()}
                   disabled={!backendAvailable}
-                  className="w-full px-4 py-2 border border-gray-400 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-outline w-full disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Camera className="w-4 h-4 inline mr-2" />
                   Take Photo
                 </button>
               </div>
               
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-base-content/50">
                 Drag & drop or click to upload<br />
                 Supports: JPG, PNG, PDF (max 10MB)
               </p>
@@ -437,26 +437,26 @@ export default function DocumentUpload({
   }
 
   return (
-    <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="max-w-5xl mx-auto bg-base-100 rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
-      <div className={`text-white p-6 ${
+      <div className={`text-primary-content p-6 ${
         processingBlocked 
-          ? 'bg-gradient-to-r from-red-600 to-orange-600' 
-          : 'bg-gradient-to-r from-blue-600 to-purple-600'
+          ? 'bg-gradient-to-r from-error to-warning' 
+          : 'bg-gradient-to-r from-primary to-secondary'
       }`}>
         <div className="flex justify-between items-start">
           <div>
             <h2 className="text-xl font-bold mb-2">Upload Required Documents</h2>
-            <p className="text-white/90 text-sm">
+            <p className="text-primary-content/90 text-sm">
               Application ID: <span className="font-mono">{applicationId}</span>
             </p>
-            <p className="text-white/90 text-sm">
+            <p className="text-primary-content/90 text-sm">
               {processingBlocked ? 'Processing is blocked until required documents are uploaded' : 'Ready for processing'}
             </p>
           </div>
           <div className="text-right">
             <div className={`rounded-lg p-3 ${
-              processingBlocked ? 'bg-white/20' : 'bg-white/20'
+              processingBlocked ? 'bg-primary-content/20' : 'bg-primary-content/20'
             }`}>
               {processingBlocked ? (
                 <AlertTriangle className="w-6 h-6 mx-auto mb-1" />
@@ -474,15 +474,15 @@ export default function DocumentUpload({
       <div className="p-6">
         {/* Processing Status Alert */}
         {processingBlocked && backendAvailable && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="mb-6 bg-error/10 border border-error/20 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="w-6 h-6 text-red-500 mt-0.5" />
+              <AlertTriangle className="w-6 h-6 text-error mt-0.5" />
               <div>
-                <h3 className="font-semibold text-red-900 mb-1">Processing Currently Blocked</h3>
-                <p className="text-red-800 text-sm mb-2">
+                <h3 className="font-semibold text-error mb-1">Processing Currently Blocked</h3>
+                <p className="text-error/80 text-sm mb-2">
                   Your application has been received, but processing cannot continue until all required documents are uploaded and verified.
                 </p>
-                <div className="text-sm text-red-700">
+                <div className="text-sm text-error">
                   <p><strong>Required documents missing:</strong> {mandatoryTotal - mandatoryUploaded} of {mandatoryTotal}</p>
                   <p><strong>Processing status:</strong> Waiting for required documents</p>
                 </div>
@@ -492,15 +492,15 @@ export default function DocumentUpload({
         )}
 
         {mandatoryComplete && backendAvailable && (
-          <div className="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="mb-6 bg-success/10 border border-success/20 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <CheckCircle2 className="w-6 h-6 text-green-500 mt-0.5" />
+              <CheckCircle2 className="w-6 h-6 text-success mt-0.5" />
               <div>
-                <h3 className="font-semibold text-green-900 mb-1">All Required Documents Uploaded!</h3>
-                <p className="text-green-800 text-sm mb-2">
+                <h3 className="font-semibold text-success mb-1">All Required Documents Uploaded!</h3>
+                <p className="text-success/80 text-sm mb-2">
                   Your application now has all required documents and can proceed with full processing.
                 </p>
-                <div className="flex gap-3 text-xs text-green-700">
+                <div className="flex gap-3 text-xs text-success">
                   <span>✓ All required documents verified</span>
                   <span>✓ Processing can continue</span>
                   <span>✓ Faster review possible</span>
@@ -512,39 +512,39 @@ export default function DocumentUpload({
 
         {/* Progress Summary */}
         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-medium text-gray-800 mb-3">Required Documents</h4>
+          <div className="bg-base-200 rounded-lg p-4">
+            <h4 className="font-medium text-base-content mb-3">Required Documents</h4>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm">Progress</span>
-                <span className="font-bold text-red-600">{mandatoryUploaded}/{mandatoryTotal}</span>
+                <span className="font-bold text-error">{mandatoryUploaded}/{mandatoryTotal}</span>
               </div>
-              <div className="w-full bg-red-200 rounded-full h-2">
+              <div className="w-full bg-error/20 rounded-full h-2">
                 <div 
-                  className="bg-red-500 h-2 rounded-full transition-all duration-500"
+                  className="bg-error h-2 rounded-full transition-all duration-500"
                   style={{ width: `${mandatoryTotal > 0 ? (mandatoryUploaded / mandatoryTotal) * 100 : 0}%` }}
                 />
               </div>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-base-content/60">
                 {processingBlocked ? 'Upload required documents to enable processing' : 'All required documents uploaded'}
               </p>
             </div>
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-4">
-            <h4 className="font-medium text-gray-800 mb-3">Optional Documents</h4>
+          <div className="bg-base-200 rounded-lg p-4">
+            <h4 className="font-medium text-base-content mb-3">Optional Documents</h4>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <span className="text-sm">Progress</span>
-                <span className="font-bold text-blue-600">{optionalUploaded}/{requirements.optional.length}</span>
+                <span className="font-bold text-primary">{optionalUploaded}/{requirements.optional.length}</span>
               </div>
-              <div className="w-full bg-blue-200 rounded-full h-2">
+              <div className="w-full bg-primary/20 rounded-full h-2">
                 <div 
-                  className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+                  className="bg-primary h-2 rounded-full transition-all duration-500"
                   style={{ width: requirements.optional.length > 0 ? `${(optionalUploaded / requirements.optional.length) * 100}%` : '0%' }}
                 />
               </div>
-              <p className="text-xs text-gray-600">
+              <p className="text-xs text-base-content/60">
                 Optional documents may improve approval chances
               </p>
             </div>
@@ -555,8 +555,8 @@ export default function DocumentUpload({
         {requirements.mandatory.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <h3 className="text-xl font-semibold text-gray-800">Required Documents</h3>
+              <AlertTriangle className="w-5 h-5 text-error" />
+              <h3 className="text-xl font-semibold text-base-content">Required Documents</h3>
               <span className="badge badge-error">Processing Blocked Without These</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -571,8 +571,8 @@ export default function DocumentUpload({
         {requirements.optional.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
-              <FileText className="w-5 h-5 text-blue-500" />
-              <h3 className="text-xl font-semibold text-gray-800">Optional Documents</h3>
+              <FileText className="w-5 h-5 text-primary" />
+              <h3 className="text-xl font-semibold text-base-content">Optional Documents</h3>
               <span className="badge badge-warning">May Improve Approval Chances</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -588,7 +588,7 @@ export default function DocumentUpload({
           {mandatoryComplete && backendAvailable && (
             <button
               onClick={onComplete}
-              className="px-8 py-3 bg-green-500 text-white text-lg font-medium rounded-lg hover:bg-green-600 transition-colors"
+              className="btn btn-success btn-lg"
             >
               <CheckCircle2 className="w-5 h-5 inline mr-2" />
               Continue Processing
@@ -597,10 +597,10 @@ export default function DocumentUpload({
           
           <button
             onClick={onSkip}
-            className={`px-8 py-3 text-lg font-medium rounded-lg transition-colors ${
+            className={`btn btn-lg ${
               processingBlocked
-                ? 'border-2 border-red-300 text-red-700 hover:bg-red-50'
-                : 'border-2 border-gray-300 text-gray-700 hover:bg-gray-50'
+                ? 'btn-outline btn-error'
+                : 'btn-outline'
             }`}
           >
             <ArrowRight className="w-5 h-5 inline mr-2" />

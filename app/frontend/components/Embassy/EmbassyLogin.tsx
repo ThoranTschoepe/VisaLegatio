@@ -62,7 +62,7 @@ export default function EmbassyLogin({ onLogin }: EmbassyLoginProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-gray-50 to-blue-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-100 to-base-200 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
@@ -70,10 +70,10 @@ export default function EmbassyLogin({ onLogin }: EmbassyLoginProps) {
             <div className="p-3 bg-primary rounded-full">
               <Shield className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-3xl font-bold text-gray-800">VisaLegatio</h1>
+            <h1 className="text-3xl font-bold text-base-content">VisaLegatio</h1>
           </div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Embassy Portal</h2>
-          <p className="text-gray-600">Secure access for consular officers</p>
+          <h2 className="text-xl font-semibold text-base-content/90 mb-2">Embassy Portal</h2>
+          <p className="text-base-content/70">Secure access for consular officers</p>
         </div>
 
         {/* Login Card */}
@@ -143,7 +143,7 @@ export default function EmbassyLogin({ onLogin }: EmbassyLoginProps) {
                     className="absolute right-3 top-1/2 transform -translate-y-1/2"
                     onClick={() => setShowPassword(!showPassword)}
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5 text-gray-400" /> : <Eye className="w-5 h-5 text-gray-400" />}
+                    {showPassword ? <EyeOff className="w-5 h-5 text-base-content/40" /> : <Eye className="w-5 h-5 text-base-content/40" />}
                   </button>
                 </div>
               </div>
@@ -208,12 +208,12 @@ export default function EmbassyLogin({ onLogin }: EmbassyLoginProps) {
         </div>
 
         {/* Security Notice */}
-        <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mt-6 p-4 bg-info/10 border border-info/20 rounded-lg">
           <div className="flex items-start gap-3">
-            <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+            <Shield className="w-5 h-5 text-info mt-0.5" />
             <div>
-              <h4 className="font-semibold text-blue-900 text-sm">Security Notice</h4>
-              <p className="text-blue-800 text-xs mt-1">
+              <h4 className="font-semibold text-info text-sm">Security Notice</h4>
+              <p className="text-info/80 text-xs mt-1">
                 This is a secure government system. All activities are logged and monitored.
               </p>
             </div>

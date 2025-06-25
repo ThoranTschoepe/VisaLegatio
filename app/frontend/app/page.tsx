@@ -499,9 +499,9 @@ export default function HomePage() {
 
                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
                   <Button
+                    variant="primary"
                     size="lg"
                     onClick={startChatDirectly}
-                    className="btn-lg gradient-primary text-white border-none"
                   >
                     <Sparkles className="w-5 h-5 mr-2" />
                     Start New Application

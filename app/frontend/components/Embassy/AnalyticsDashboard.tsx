@@ -67,10 +67,10 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
                 <Users className="w-8 h-8 text-primary" />
                 <div>
                   <p className="text-2xl font-bold">{mockData.totalApplications.toLocaleString()}</p>
-                  <p className="text-sm text-gray-600">Total Applications</p>
+                  <p className="text-sm text-base-content/70">Total Applications</p>
                 </div>
               </div>
-              <div className="text-sm text-green-600 flex items-center gap-1 mt-2">
+              <div className="text-sm text-success flex items-center gap-1 mt-2">
                 <TrendingUp className="w-4 h-4" />
                 +12% from last period
               </div>
@@ -83,10 +83,10 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
                 <CheckCircle2 className="w-8 h-8 text-success" />
                 <div>
                   <p className="text-2xl font-bold">{mockData.approvalRate}%</p>
-                  <p className="text-sm text-gray-600">Approval Rate</p>
+                  <p className="text-sm text-base-content/70">Approval Rate</p>
                 </div>
               </div>
-              <div className="text-sm text-green-600 flex items-center gap-1 mt-2">
+              <div className="text-sm text-success flex items-center gap-1 mt-2">
                 <TrendingUp className="w-4 h-4" />
                 +2.3% from last period
               </div>
@@ -99,10 +99,10 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
                 <Clock className="w-8 h-8 text-info" />
                 <div>
                   <p className="text-2xl font-bold">{mockData.avgProcessingTime}d</p>
-                  <p className="text-sm text-gray-600">Avg Processing</p>
+                  <p className="text-sm text-base-content/70">Avg Processing</p>
                 </div>
               </div>
-              <div className="text-sm text-green-600 flex items-center gap-1 mt-2">
+              <div className="text-sm text-success flex items-center gap-1 mt-2">
                 <TrendingDown className="w-4 h-4" />
                 -1.2 days improvement
               </div>
@@ -115,10 +115,10 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
                 <AlertTriangle className="w-8 h-8 text-warning" />
                 <div>
                   <p className="text-2xl font-bold">{mockData.pendingApplications}</p>
-                  <p className="text-sm text-gray-600">Pending Review</p>
+                  <p className="text-sm text-base-content/70">Pending Review</p>
                 </div>
               </div>
-              <div className="text-sm text-yellow-600 flex items-center gap-1 mt-2">
+              <div className="text-sm text-warning flex items-center gap-1 mt-2">
                 <Clock className="w-4 h-4" />
                 6 urgent priority
               </div>
@@ -139,7 +139,7 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
                         <span className="font-medium">{month.month}</span>
                         <span>{month.applications} total</span>
                       </div>
-                      <div className="flex h-4 bg-gray-200 rounded overflow-hidden">
+                      <div className="flex h-4 bg-base-300 rounded overflow-hidden">
                         <div 
                           className="bg-success" 
                           style={{ width: `${(month.approvals / month.applications) * 100}%` }}
@@ -149,7 +149,7 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
                           style={{ width: `${(month.rejections / month.applications) * 100}%` }}
                         />
                       </div>
-                      <div className="flex justify-between text-xs text-gray-600">
+                      <div className="flex justify-between text-xs text-base-content/70">
                         <span>✅ {month.approvals} approved</span>
                         <span>❌ {month.rejections} rejected</span>
                       </div>
@@ -172,7 +172,7 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
                     </div>
                     <div className="text-right">
                       <span className="font-bold">{item.count}</span>
-                      <span className="text-sm text-gray-600 ml-1">({item.percentage}%)</span>
+                      <span className="text-sm text-base-content/70 ml-1">({item.percentage}%)</span>
                     </div>
                   </div>
                 ))}
@@ -243,7 +243,7 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
             <div className="card-body">
               <h4 className="font-semibold">Peak Application Period</h4>
               <p className="text-2xl font-bold text-primary">June 2024</p>
-              <p className="text-sm text-gray-600">280 applications received</p>
+              <p className="text-sm text-base-content/70">280 applications received</p>
             </div>
           </div>
 
@@ -251,7 +251,7 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
             <div className="card-body">
               <h4 className="font-semibold">Highest Approval Rate</h4>
               <p className="text-2xl font-bold text-success">88.6%</p>
-              <p className="text-sm text-gray-600">June 2024</p>
+              <p className="text-sm text-base-content/70">June 2024</p>
             </div>
           </div>
 
@@ -259,7 +259,7 @@ export default function AnalyticsDashboard({ onBack, officer }: AnalyticsDashboa
             <div className="card-body">
               <h4 className="font-semibold">Growth Rate</h4>
               <p className="text-2xl font-bold text-info">+79%</p>
-              <p className="text-sm text-gray-600">Compared to last 6 months</p>
+              <p className="text-sm text-base-content/70">Compared to last 6 months</p>
             </div>
           </div>
         </div>

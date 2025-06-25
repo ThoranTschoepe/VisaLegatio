@@ -69,19 +69,19 @@ export function daysBetween(date1: Date, date2: Date): number {
 export function getStatusColor(status: ApplicationStatus): string {
   switch (status) {
     case 'approved':
-      return 'text-green-600'
+      return 'text-success'
     case 'rejected':
-      return 'text-red-600'
+      return 'text-error'
     case 'requires_interview':
-      return 'text-yellow-600'
+      return 'text-warning'
     case 'submitted':
-      return 'text-blue-600'
+      return 'text-info'
     case 'document_review':
     case 'background_check':
     case 'officer_review':
-      return 'text-purple-600'
+      return 'text-primary'
     default:
-      return 'text-gray-600'
+      return 'text-base-content/70'
   }
 }
 
@@ -91,19 +91,19 @@ export function getStatusColor(status: ApplicationStatus): string {
 export function getStatusBgColor(status: ApplicationStatus): string {
   switch (status) {
     case 'approved':
-      return 'bg-green-50 border-green-200'
+      return 'bg-success/10 border-success/20'
     case 'rejected':
-      return 'bg-red-50 border-red-200'
+      return 'bg-error/10 border-error/20'
     case 'requires_interview':
-      return 'bg-yellow-50 border-yellow-200'
+      return 'bg-warning/10 border-warning/20'
     case 'submitted':
-      return 'bg-blue-50 border-blue-200'
+      return 'bg-info/10 border-info/20'
     case 'document_review':
     case 'background_check':
     case 'officer_review':
-      return 'bg-purple-50 border-purple-200'
+      return 'bg-primary/10 border-primary/20'
     default:
-      return 'bg-gray-50 border-gray-200'
+      return 'bg-base-200 border-base-300'
   }
 }
 

@@ -267,7 +267,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
               <Users className="w-8 h-8 text-primary" />
               <div>
                 <p className="text-2xl font-bold">{statistics?.total_rejected || 0}</p>
-                <p className="text-sm text-gray-600">Total Rejections</p>
+                <p className="text-sm text-base-content/70">Total Rejections</p>
               </div>
             </div>
           </div>
@@ -279,7 +279,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
               <Scale className="w-8 h-8 text-info" />
               <div>
                 <p className="text-2xl font-bold">{statistics?.sample_size || 0}</p>
-                <p className="text-sm text-gray-600">Sample Size (10%)</p>
+                <p className="text-sm text-base-content/70">Sample Size (10%)</p>
               </div>
             </div>
           </div>
@@ -291,7 +291,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
               <Brain className="w-8 h-8 text-warning" />
               <div>
                 <p className="text-2xl font-bold">{statistics?.reviewed_count || 0}/{statistics?.sample_size || 0}</p>
-                <p className="text-sm text-gray-600">Reviewed</p>
+                <p className="text-sm text-base-content/70">Reviewed</p>
               </div>
             </div>
           </div>
@@ -303,7 +303,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
               <AlertTriangle className="w-8 h-8 text-error" />
               <div>
                 <p className="text-2xl font-bold">{statistics?.bias_rate.toFixed(1) || 0}%</p>
-                <p className="text-sm text-gray-600">Bias Rate</p>
+                <p className="text-sm text-base-content/70">Bias Rate</p>
               </div>
             </div>
           </div>
@@ -377,7 +377,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
                     <td>
                       <div>
                         <div className="font-semibold">{caseItem.application.applicantName}</div>
-                        <div className="text-xs text-gray-600">
+                        <div className="text-xs text-base-content/70">
                           {new Date(caseItem.application.submittedAt).toLocaleDateString()}
                         </div>
                       </div>
@@ -388,9 +388,9 @@ export default function BiasReview({ officer }: BiasReviewProps) {
                     <td>{caseItem.application.country}</td>
                     <td>
                       <span className={`font-bold ${
-                        caseItem.application.riskScore >= 70 ? 'text-red-600' :
-                        caseItem.application.riskScore >= 50 ? 'text-yellow-600' :
-                        'text-green-600'
+                        caseItem.application.riskScore >= 70 ? 'text-error' :
+                        caseItem.application.riskScore >= 50 ? 'text-warning' :
+                        'text-success'
                       }`}>
                         {caseItem.application.riskScore}%
                       </span>
@@ -431,7 +431,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h2 className="text-2xl font-bold mb-2">Bias Review: {selectedCase.application.id}</h2>
-                  <p className="text-gray-600">Review this rejection for potential bias</p>
+                  <p className="text-base-content/70">Review this rejection for potential bias</p>
                 </div>
                 <button
                   onClick={() => {
@@ -455,7 +455,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
                         <p><strong>Applicant:</strong> {selectedCase.application.applicantName}</p>
                         <p><strong>Country:</strong> {selectedCase.application.country}</p>
                         <p><strong>Visa Type:</strong> {selectedCase.application.visaType}</p>
-                        <p><strong>Risk Score:</strong> <span className="text-red-600 font-bold">{selectedCase.application.riskScore}%</span></p>
+                        <p><strong>Risk Score:</strong> <span className="text-error font-bold">{selectedCase.application.riskScore}%</span></p>
                         <p><strong>Documents:</strong> {selectedCase.application.documentsCount} submitted</p>
                       </div>
                     </div>
@@ -516,16 +516,16 @@ export default function BiasReview({ officer }: BiasReviewProps) {
 
                   {/* Previous Reviews */}
                   {selectedCase.reviewed && (
-                    <div className="card bg-blue-50 border border-blue-200">
+                    <div className="card bg-info/10 border border-info/20">
                       <div className="card-body">
-                        <h4 className="font-semibold text-blue-900">Previous Review</h4>
-                        <p className="text-sm text-blue-800">
+                        <h4 className="font-semibold text-info">Previous Review</h4>
+                        <p className="text-sm text-info">
                           <strong>Result:</strong> {selectedCase.review_result}
                         </p>
-                        <p className="text-sm text-blue-800">
+                        <p className="text-sm text-info">
                           <strong>Notes:</strong> {selectedCase.review_notes}
                         </p>
-                        <p className="text-xs text-blue-700 mt-2">
+                        <p className="text-xs text-info mt-2">
                           Reviewed by {selectedCase.reviewed_by} on {selectedCase.reviewed_at}
                         </p>
                       </div>

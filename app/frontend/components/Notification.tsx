@@ -102,26 +102,26 @@ function NotificationItem({ notification }: { notification: Notification }) {
   const getIcon = () => {
     switch (notification.type) {
       case 'success':
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />
+        return <CheckCircle2 className="w-5 h-5 text-success" />
       case 'error':
-        return <AlertCircle className="w-5 h-5 text-red-500" />
+        return <AlertCircle className="w-5 h-5 text-error" />
       case 'warning':
-        return <AlertTriangle className="w-5 h-5 text-yellow-500" />
+        return <AlertTriangle className="w-5 h-5 text-warning" />
       case 'info':
-        return <Info className="w-5 h-5 text-blue-500" />
+        return <Info className="w-5 h-5 text-info" />
     }
   }
 
   const getBorderColor = () => {
     switch (notification.type) {
       case 'success':
-        return 'border-l-green-500'
+        return 'border-l-success'
       case 'error':
-        return 'border-l-red-500'
+        return 'border-l-error'
       case 'warning':
-        return 'border-l-yellow-500'
+        return 'border-l-warning'
       case 'info':
-        return 'border-l-blue-500'
+        return 'border-l-info'
     }
   }
 
@@ -130,7 +130,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
       className={`
         transform transition-all duration-300 ease-in-out
         ${isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
-        bg-white border-l-4 ${getBorderColor()} shadow-lg rounded-lg p-4 min-w-80
+        bg-base-100 border-l-4 ${getBorderColor()} shadow-lg rounded-lg p-4 min-w-80
       `}
     >
       <div className="flex items-start gap-3">
@@ -139,18 +139,18 @@ function NotificationItem({ notification }: { notification: Notification }) {
         </div>
         
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-gray-900">
+          <h4 className="text-sm font-semibold text-base-content">
             {notification.title}
           </h4>
           {notification.message && (
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-base-content/70 mt-1">
               {notification.message}
             </p>
           )}
           {notification.action && (
             <button
               onClick={notification.action.onClick}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium mt-2 underline"
+              className="text-sm text-primary hover:text-primary/80 font-medium mt-2 underline"
             >
               {notification.action.label}
             </button>
@@ -159,7 +159,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
 
         <button
           onClick={handleClose}
-          className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+          className="flex-shrink-0 text-base-content/40 hover:text-base-content/60 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -218,26 +218,26 @@ export function Alert({
   const getIcon = () => {
     switch (type) {
       case 'success':
-        return <CheckCircle2 className="w-5 h-5 text-green-500" />
+        return <CheckCircle2 className="w-5 h-5 text-success" />
       case 'error':
-        return <AlertCircle className="w-5 h-5 text-red-500" />
+        return <AlertCircle className="w-5 h-5 text-error" />
       case 'warning':
-        return <AlertTriangle className="w-5 h-5 text-yellow-500" />
+        return <AlertTriangle className="w-5 h-5 text-warning" />
       case 'info':
-        return <Info className="w-5 h-5 text-blue-500" />
+        return <Info className="w-5 h-5 text-info" />
     }
   }
 
   const getBgColor = () => {
     switch (type) {
       case 'success':
-        return 'bg-green-50 border-green-200'
+        return 'bg-success/10 border-success/20'
       case 'error':
-        return 'bg-red-50 border-red-200'
+        return 'bg-error/10 border-error/20'
       case 'warning':
-        return 'bg-yellow-50 border-yellow-200'
+        return 'bg-warning/10 border-warning/20'
       case 'info':
-        return 'bg-blue-50 border-blue-200'
+        return 'bg-info/10 border-info/20'
     }
   }
 
@@ -249,11 +249,11 @@ export function Alert({
         </div>
         
         <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-gray-900">
+          <h4 className="text-sm font-semibold text-base-content">
             {title}
           </h4>
           {message && (
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-base-content/70 mt-1">
               {message}
             </p>
           )}
@@ -262,7 +262,7 @@ export function Alert({
         {onClose && (
           <button
             onClick={onClose}
-            className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+            className="flex-shrink-0 text-base-content/40 hover:text-base-content/60 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
@@ -290,13 +290,13 @@ export function Banner({
   const getBgColor = () => {
     switch (type) {
       case 'success':
-        return 'bg-green-600'
+        return 'bg-success'
       case 'error':
-        return 'bg-red-600'
+        return 'bg-error'
       case 'warning':
-        return 'bg-yellow-600'
+        return 'bg-warning'
       case 'info':
-        return 'bg-blue-600'
+        return 'bg-info'
     }
   }
 
@@ -326,7 +326,7 @@ export function Banner({
             {onClose && (
               <button
                 onClick={onClose}
-                className="text-white hover:text-gray-200 transition-colors"
+                className="text-white hover:text-white/80 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>

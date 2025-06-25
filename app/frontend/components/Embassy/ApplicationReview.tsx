@@ -1,42 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, AlertTriangle, FileText, Eye, X, Maximize2, ExternalLink, AlertCircle, Brain, FileWarning, Flag } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Eye, Maximize2, ExternalLink, AlertCircle, Brain, FileWarning, Flag } from 'lucide-react'
 import { EmbassyApplication, Officer, EmbassyDocument } from '@/types/embassy.types'
 import { api } from '@/utils/api'
 import { useAlertStore } from '@/lib/stores/alert.store'
+import { JOHN_DOE_ANALYSIS, JOHN_DOE_WARNINGS, DOCUMENT_NAMES, DOCUMENT_DESCRIPTIONS } from '@/lib/constants/mock-data.constants'
+import { getDocumentIcon, getAIStatusIcon, formatFileSize } from '@/utils/document.utils'
+import DocumentViewer from './DocumentViewer'
+import DocumentAnalysisPanel from './DocumentAnalysisPanel'
+import DocumentFlagging from './DocumentFlagging'
 
 // CONSISTENT backend URL - always use port 8000 for documents
 const BACKEND_BASE = 'http://localhost:8000'
 
-// John Doe AI Analysis Data
-const JOHN_DOE_ANALYSIS = {
-  passport: {
-    summary: "The passport shows the name John Doe, passport number U12345678, and date of birth 16 OCT 1986, and all details appear consistent and correctly formatted, indicating the document is valid.",
-    status: "verified",
-    concerns: []
-  },
-  bank_statement: {
-    summary: "John Doe has -$72.47 in his account by the end of the statement period. He receives regular payroll deposits but consistently overspends through web bill payments, card use, and fixed expenses like mortgage and insurance, leading to a negative balance.",
-    status: "warning",
-    concerns: ["Negative account balance", "Pattern of overspending", "Financial instability"]
-  },
-  invitation_letter: {
-    summary: "The letter indicates a friendly, non-familial relationship between Maria Schneider and John Doe, with a short touristic visit planned; while the invitation is sincere and financially supportive, the lack of clearly defined personal ties may prompt further scrutiny regarding the applicant's incentive to return.",
-    status: "warning",
-    concerns: ["Weak personal ties", "Unclear return incentive", "Non-familial relationship"]
-  },
-  flight_itinerary: {
-    summary: "John Doe has a confirmed one-way economy flight from Istanbul (IST) to Munich (MUC) on 28 June 2021, departing at 08:45 with flight TK1639 and seat 14A.",
-    status: "critical",
-    concerns: ["ONE-WAY TICKET ONLY", "No return flight booked", "High overstay risk"]
-  }
-}
-
-const JOHN_DOE_WARNINGS = [
-  "Applicant shows financial instability with a negative account balance despite regular income.",
-  "One-way flight and weak personal ties raise concerns about return intention."
-]
 
 interface ApplicationReviewProps {
   application: EmbassyApplication
@@ -76,9 +53,9 @@ export default function ApplicationReview({
   const [documents, setDocuments] = useState<DocumentWithUrls[]>([])
   const [documentRequirements, setDocumentRequirements] = useState<DocumentRequirement[]>([])
   const [isLoadingDocuments, setIsLoadingDocuments] = useState(true)
+  const [documentError, setDocumentError] = useState('')
   const [showDocumentModal, setShowDocumentModal] = useState(false)
   const [currentDocumentUrl, setCurrentDocumentUrl] = useState('')
-  const [documentError, setDocumentError] = useState('')
   const [showAIAnalysis, setShowAIAnalysis] = useState(false)
   const [currentAIAnalysis, setCurrentAIAnalysis] = useState<any>(null)
   const [expandedDocuments, setExpandedDocuments] = useState<Set<string>>(new Set())
@@ -86,7 +63,6 @@ export default function ApplicationReview({
   // Flag document states
   const [showFlagModal, setShowFlagModal] = useState(false)
   const [flaggingDocument, setFlaggingDocument] = useState<DocumentWithUrls | null>(null)
-  const [flagReason, setFlagReason] = useState('')
   const [currentFlaggedDocId, setCurrentFlaggedDocId] = useState<string | null>(null)
   
   const { showSuccess, showError } = useAlertStore()
@@ -113,18 +89,56 @@ export default function ApplicationReview({
       
       console.log(`🔍 Loading documents for application: ${application.id}`)
       
+      // Check backend connectivity first
+      try {
+        const healthResponse = await fetch(`${BACKEND_BASE}/api/health`)
+        console.log('🏥 Backend health check:', healthResponse.ok ? 'OK' : 'FAILED')
+      } catch (healthError) {
+        console.error('❌ Backend not accessible:', healthError)
+        setDocumentError('Backend server not accessible. Please check if the backend is running on http://localhost:8000')
+        return
+      }
+      
       // Load document requirements first
       const requirements = await api.getDocumentRequirements(application.visaType as any)
       console.log('📋 Document requirements loaded:', requirements)
       
-      // Get documents with view URLs from backend
-      const response = await fetch(`${BACKEND_BASE}/api/documents/list/${application.id}`)
-      
+      // Get documents with view URLs from backend - use the proper API client
       let uploadedDocs: any[] = []
       
-      if (response.ok) {
-        uploadedDocs = await response.json()
-        console.log('📄 Loaded documents from backend:', uploadedDocs)
+      try {
+        // First try the dedicated list endpoint
+        const response = await fetch(`${BACKEND_BASE}/api/documents/list/${application.id}`)
+        
+        if (response.ok) {
+          uploadedDocs = await response.json()
+          console.log('📄 Loaded documents from backend (list endpoint):', uploadedDocs)
+        } else {
+          console.warn(`List endpoint failed (${response.status}), trying application endpoint...`)
+          // Fallback to application documents endpoint
+          uploadedDocs = await api.getApplicationDocuments(application.id)
+          console.log('📄 Loaded documents from backend (app endpoint):', uploadedDocs)
+        }
+      } catch (fetchError) {
+        console.warn('Document fetch error:', fetchError)
+        // Fallback to application documents endpoint
+        try {
+          uploadedDocs = await api.getApplicationDocuments(application.id)
+          console.log('📄 Loaded documents from fallback endpoint:', uploadedDocs)
+        } catch (fallbackError) {
+          console.error('Both document endpoints failed:', fallbackError)
+          uploadedDocs = []
+        }
+      }
+      
+      if (uploadedDocs.length === 0) {
+        console.warn(`⚠️  No documents found for application ${application.id}`)
+        console.log('📊 Debug info:', {
+          applicationId: application.id,
+          backendBase: BACKEND_BASE,
+          visaType: application.visaType,
+          applicantName: application.applicantName
+        })
         
         // Process documents and add AI analysis for John Doe
         const docsWithFullUrls = uploadedDocs.map((doc: any) => {
@@ -158,8 +172,11 @@ export default function ApplicationReview({
         })
         
         setDocuments(docsWithFullUrls)
-      } else {
-        // Fallback or create John Doe demo documents
+      }
+      
+      // If no documents found, use demo/mock data based on application type
+      if (uploadedDocs.length === 0) {
+        console.log('📝 No documents found, using demo/mock data')
         if (isJohnDoe) {
           const johnDoeDocs = createJohnDoeDemoDocuments()
           setDocuments(johnDoeDocs)
@@ -171,26 +188,7 @@ export default function ApplicationReview({
         }
       }
 
-      // Create comprehensive document requirements list
-      const documentNames = {
-        passport: 'Passport (Photo Page)',
-        photo: 'Passport Photo',
-        bank_statement: 'Bank Statement',
-        invitation_letter: 'Invitation Letter',
-        travel_insurance: 'Travel Insurance',
-        employment_letter: 'Employment Letter',
-        flight_itinerary: 'Flight Itinerary'
-      }
-
-      const documentDescriptions = {
-        passport: 'Clear photo of your passport information page',
-        photo: 'Recent passport-sized photo (white background)',
-        bank_statement: 'Last 3 months bank statements showing sufficient funds',
-        invitation_letter: 'Official invitation letter from host organization',
-        travel_insurance: 'Valid travel insurance covering your entire stay',
-        employment_letter: 'Letter from employer confirming your employment',
-        flight_itinerary: 'Flight booking confirmation or itinerary'
-      }
+      // Use imported document constants
 
       // Create comprehensive document list
       const allDocRequirements: DocumentRequirement[] = []
@@ -200,8 +198,8 @@ export default function ApplicationReview({
         const uploadedDoc = uploadedDocs.find(doc => doc.type === docType)
         allDocRequirements.push({
           type: docType,
-          name: documentNames[docType] || docType,
-          description: documentDescriptions[docType] || `Required ${docType.replace('_', ' ')}`,
+          name: DOCUMENT_NAMES[docType as keyof typeof DOCUMENT_NAMES] || docType,
+          description: DOCUMENT_DESCRIPTIONS[docType as keyof typeof DOCUMENT_DESCRIPTIONS] || `Required ${docType.replace('_', ' ')}`,
           mandatory: true,
           uploaded: uploadedDoc,
           missing: !uploadedDoc || !uploadedDoc.verified
@@ -213,8 +211,8 @@ export default function ApplicationReview({
         const uploadedDoc = uploadedDocs.find(doc => doc.type === docType)
         allDocRequirements.push({
           type: docType,
-          name: documentNames[docType] || docType,
-          description: documentDescriptions[docType] || `Optional ${docType.replace('_', ' ')}`,
+          name: DOCUMENT_NAMES[docType as keyof typeof DOCUMENT_NAMES] || docType,
+          description: DOCUMENT_DESCRIPTIONS[docType as keyof typeof DOCUMENT_DESCRIPTIONS] || `Optional ${docType.replace('_', ' ')}`,
           mandatory: false,
           uploaded: uploadedDoc,
           missing: !uploadedDoc || !uploadedDoc.verified
@@ -536,27 +534,6 @@ export default function ApplicationReview({
     setShowFlagModal(true)
   }
 
-  const submitFlagDocument = async () => {
-    if (!flaggingDocument) return
-    
-    try {
-      await api.flagDocument(application.id, {
-        document_id: flaggingDocument.id,
-        reason: flagReason,
-        officer_id: officer.id
-      })
-      
-      setCurrentFlaggedDocId(flaggingDocument.id)
-      showSuccess(`Document "${flaggingDocument.name}" flagged for applicant review`)
-      setShowFlagModal(false)
-      setFlagReason('')
-      // Reload application data to get updated flag info
-      loadDocuments()
-    } catch (error) {
-      showError('Failed to flag document')
-    }
-  }
-
   const handleUnflagDocument = async () => {
     try {
       await api.flagDocument(application.id, {
@@ -565,54 +542,13 @@ export default function ApplicationReview({
       
       setCurrentFlaggedDocId(null)
       showSuccess('Document flag removed')
-      // Reload application data
       loadDocuments()
     } catch (error) {
       showError('Failed to remove flag')
     }
   }
 
-  const getDocumentIcon = (type: string) => {
-    switch (type) {
-      case 'passport':
-        return '📘'
-      case 'photo':
-        return '📷'
-      case 'bank_statement':
-        return '💰'
-      case 'invitation_letter':
-        return '✉️'
-      case 'employment_letter':
-        return '💼'
-      case 'travel_insurance':
-        return '🛡️'
-      case 'flight_itinerary':
-        return '✈️'
-      default:
-        return '📄'
-    }
-  }
 
-  const getAIStatusIcon = (status: string) => {
-    switch (status) {
-      case 'verified':
-        return <CheckCircle2 className="w-4 h-4 text-green-500" />
-      case 'warning':
-        return <AlertTriangle className="w-4 h-4 text-yellow-500" />
-      case 'critical':
-        return <FileWarning className="w-4 h-4 text-red-500" />
-      default:
-        return <FileText className="w-4 h-4 text-gray-500" />
-    }
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
 
   return (
     <div className="min-h-screen bg-base-200">
@@ -632,7 +568,7 @@ export default function ApplicationReview({
           )}
         </div>
         <div className="flex-none">
-          <span className="text-sm text-gray-600">Reviewing as: {officer.name}</span>
+          <span className="text-sm text-base-content/60">Reviewing as: {officer.name}</span>
         </div>
       </div>
 
@@ -646,27 +582,27 @@ export default function ApplicationReview({
                 <h3 className="card-title">Applicant Information</h3>
                 <div className="space-y-3">
                   <div>
-                    <p className="text-sm text-gray-600">Name</p>
+                    <p className="text-sm text-base-content/60">Name</p>
                     <p className="font-semibold">{application.applicantName}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Application ID</p>
+                    <p className="text-sm text-base-content/60">Application ID</p>
                     <p className="font-mono text-sm">{application.id}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Visa Type</p>
+                    <p className="text-sm text-base-content/60">Visa Type</p>
                     <span className="badge badge-primary">{application.visaType}</span>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Country of Origin</p>
+                    <p className="text-sm text-base-content/60">Country of Origin</p>
                     <p className="font-semibold">{application.country}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Risk Assessment</p>
+                    <p className="text-sm text-base-content/60">Risk Assessment</p>
                     <p className={`font-bold ${
-                      isJohnDoe ? 'text-red-600' : 
-                      application.riskScore < 10 ? 'text-green-600' : 
-                      application.riskScore < 20 ? 'text-yellow-600' : 'text-red-600'
+                      isJohnDoe ? 'text-error' : 
+                      application.riskScore < 10 ? 'text-success' : 
+                      application.riskScore < 20 ? 'text-warning' : 'text-error'
                     }`}>
                       {isJohnDoe ? '85' : application.riskScore}% Risk Score
                     </p>
@@ -682,9 +618,9 @@ export default function ApplicationReview({
                 <div className="space-y-3">
                   {Object.entries(mockAnswers).map(([key, value]) => (
                     <div key={key}>
-                      <p className="text-sm text-gray-600">{key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                      <p className="text-sm text-base-content/60">{key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
                       <p className={`font-semibold ${
-                        key === 'return_flight' && value === 'Not booked' ? 'text-red-600' : ''
+                        key === 'return_flight' && value === 'Not booked' ? 'text-error' : ''
                       }`}>{value}</p>
                     </div>
                   ))}
@@ -716,14 +652,28 @@ export default function ApplicationReview({
                   <div className="flex items-center justify-center h-64">
                     <div className="text-center">
                       <div className="loading loading-spinner loading-md mb-3"></div>
-                      <span className="text-sm text-gray-600">Loading documents...</span>
+                      <span className="text-sm text-base-content/60">Loading documents...</span>
+                    </div>
+                  </div>
+                ) : documentError ? (
+                  <div className="flex items-center justify-center h-64">
+                    <div className="text-center">
+                      <AlertTriangle className="w-8 h-8 text-error mb-3 mx-auto" />
+                      <p className="text-sm text-error font-medium mb-2">Failed to load documents</p>
+                      <p className="text-xs text-base-content/60 mb-4">{documentError}</p>
+                      <button 
+                        onClick={loadDocuments}
+                        className="btn btn-primary btn-sm"
+                      >
+                        Retry
+                      </button>
                     </div>
                   </div>
                 ) : (
                   <div className="space-y-6">
                     {/* Document List Section */}
                     <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-3">Document Requirements</h4>
+                      <h4 className="text-sm font-medium text-base-content/70 mb-3">Document Requirements</h4>
                       <div className="space-y-3">
                         {documentRequirements.map((req, index) => (
                           <div key={req.type}>
@@ -732,8 +682,8 @@ export default function ApplicationReview({
                                 selectedDocumentIndex === index 
                                   ? 'border-primary bg-primary/10 shadow-sm' 
                                   : req.missing 
-                                  ? 'border-gray-200 bg-gray-50/50' 
-                                  : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
+                                  ? 'border-base-300 bg-base-200/50' 
+                                  : 'border-base-300 hover:border-primary/50 hover:bg-base-200/50'
                               }`}
                               onClick={() => setSelectedDocumentIndex(index)}
                             >
@@ -742,7 +692,7 @@ export default function ApplicationReview({
                                   <span className="text-xl flex-shrink-0">{getDocumentIcon(req.type)}</span>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
-                                      <p className={`font-medium text-sm truncate ${req.missing ? 'text-gray-400' : 'text-gray-900'}`}>
+                                      <p className={`font-medium text-sm truncate ${req.missing ? 'text-base-content/40' : 'text-base-content'}`}>
                                         {req.name}
                                       </p>
                                       {req.mandatory && (
@@ -761,7 +711,7 @@ export default function ApplicationReview({
                                         </span>
                                       )}
                                     </div>
-                                    <p className={`text-xs ${req.missing ? 'text-gray-400' : 'text-gray-500'}`}>
+                                    <p className={`text-xs ${req.missing ? 'text-base-content/40' : 'text-base-content/50'}`}>
                                       {req.missing ? 'Not submitted' : 
                                        req.uploaded ? `${req.uploaded.size ? formatFileSize(req.uploaded.size) : 'Unknown size'} • ${req.uploaded.uploadedAt}` : 
                                        'No file info'}
@@ -772,7 +722,7 @@ export default function ApplicationReview({
                                   {req.uploaded?.ai_analysis ? (
                                     getAIStatusIcon(req.uploaded.ai_analysis.status)
                                   ) : req.missing ? (
-                                    <AlertTriangle className={`w-5 h-5 ${req.mandatory ? 'text-red-500' : 'text-yellow-500'}`} />
+                                    <AlertTriangle className={`w-5 h-5 ${req.mandatory ? 'text-error' : 'text-warning'}`} />
                                   ) : req.uploaded?.verified ? (
                                     <CheckCircle2 className="w-5 h-5 text-success" />
                                   ) : (
@@ -804,17 +754,17 @@ export default function ApplicationReview({
                               
                               {/* Expandable Summary Section */}
                               {req.uploaded && !req.missing && expandedDocuments.has(req.type) && (
-                                <div className="mt-3 pt-3 border-t border-gray-200">
+                                <div className="mt-3 pt-3 border-t border-base-300">
                                   <div className="text-sm">
-                                    <h5 className="font-medium text-gray-700 mb-2">Document Summary</h5>
+                                    <h5 className="font-medium text-base-content/70 mb-2">Document Summary</h5>
                                     <div className={`p-3 rounded-md ${
                                       req.uploaded.ai_analysis?.status === 'critical' 
-                                        ? 'bg-red-50 border border-red-200' 
+                                        ? 'bg-error/10 border border-error/20' 
                                         : req.uploaded.ai_analysis?.status === 'warning'
-                                        ? 'bg-yellow-50 border border-yellow-200'
-                                        : 'bg-gray-50 border border-gray-200'
+                                        ? 'bg-warning/10 border border-warning/20'
+                                        : 'bg-base-200 border border-base-300'
                                     }`}>
-                                      <p className="text-gray-700">
+                                      <p className="text-base-content/70">
                                         {(() => {
                                           // Direct check for John Doe and document type
                                           if (isJohnDoe) {
@@ -841,8 +791,8 @@ export default function ApplicationReview({
                                         <div>
                                           {req.type === 'bank_statement' && (
                                             <div className="mt-2">
-                                              <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
-                                              <ul className="list-disc list-inside text-xs text-red-700">
+                                              <p className="font-medium text-error text-xs mb-1">Concerns:</p>
+                                              <ul className="list-disc list-inside text-xs text-error/80">
                                                 <li>Negative account balance</li>
                                                 <li>Pattern of overspending</li>
                                                 <li>Financial instability</li>
@@ -851,8 +801,8 @@ export default function ApplicationReview({
                                           )}
                                           {req.type === 'invitation_letter' && (
                                             <div className="mt-2">
-                                              <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
-                                              <ul className="list-disc list-inside text-xs text-red-700">
+                                              <p className="font-medium text-error text-xs mb-1">Concerns:</p>
+                                              <ul className="list-disc list-inside text-xs text-error/80">
                                                 <li>Weak personal ties</li>
                                                 <li>Unclear return incentive</li>
                                                 <li>Non-familial relationship</li>
@@ -861,8 +811,8 @@ export default function ApplicationReview({
                                           )}
                                           {req.type === 'flight_itinerary' && (
                                             <div className="mt-2">
-                                              <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
-                                              <ul className="list-disc list-inside text-xs text-red-700">
+                                              <p className="font-medium text-error text-xs mb-1">Concerns:</p>
+                                              <ul className="list-disc list-inside text-xs text-error/80">
                                                 <li>ONE-WAY TICKET ONLY</li>
                                                 <li>No return flight booked</li>
                                                 <li>High overstay risk</li>
@@ -874,8 +824,8 @@ export default function ApplicationReview({
                                       {/* For non-John Doe applications with AI analysis */}
                                       {!isJohnDoe && req.uploaded.ai_analysis?.concerns && req.uploaded.ai_analysis.concerns.length > 0 && (
                                         <div className="mt-2">
-                                          <p className="font-medium text-red-800 text-xs mb-1">Concerns:</p>
-                                          <ul className="list-disc list-inside text-xs text-red-700">
+                                          <p className="font-medium text-error text-xs mb-1">Concerns:</p>
+                                          <ul className="list-disc list-inside text-xs text-error/80">
                                             {req.uploaded.ai_analysis.concerns.map((concern, idx) => (
                                               <li key={idx}>{concern}</li>
                                             ))}
@@ -895,7 +845,7 @@ export default function ApplicationReview({
                     {/* Selected Document Details Section */}
                     {documentRequirements.length > 0 && (
                       <div className="border-t pt-6">
-                        <h4 className="text-sm font-medium text-gray-700 mb-4">Document Details</h4>
+                        <h4 className="text-sm font-medium text-base-content/70 mb-4">Document Details</h4>
                         {(() => {
                           const selectedReq = documentRequirements[selectedDocumentIndex]
                           if (!selectedReq) return null
@@ -903,22 +853,22 @@ export default function ApplicationReview({
                           return (
                             <div className={`rounded-lg p-5 border-2 ${
                               selectedReq.missing 
-                                ? 'bg-red-50 border-red-200' 
+                                ? 'bg-error/10 border-error/20' 
                                 : selectedReq.uploaded?.ai_analysis?.status === 'critical'
-                                ? 'bg-red-50 border-red-200'
+                                ? 'bg-error/10 border-error/20'
                                 : selectedReq.uploaded?.ai_analysis?.status === 'warning'
-                                ? 'bg-yellow-50 border-yellow-200'
-                                : 'bg-blue-50 border-blue-200'
+                                ? 'bg-warning/10 border-warning/20'
+                                : 'bg-info/10 border-info/20'
                             }`}>
                               <div className="flex items-start gap-3 mb-4">
                                 <span className="text-2xl flex-shrink-0">{getDocumentIcon(selectedReq.type)}</span>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-2">
                                     <h5 className={`font-semibold ${
-                                      selectedReq.missing ? 'text-red-900' : 
-                                      selectedReq.uploaded?.ai_analysis?.status === 'critical' ? 'text-red-900' :
-                                      selectedReq.uploaded?.ai_analysis?.status === 'warning' ? 'text-yellow-900' :
-                                      'text-blue-900'
+                                      selectedReq.missing ? 'text-error' : 
+                                      selectedReq.uploaded?.ai_analysis?.status === 'critical' ? 'text-error' :
+                                      selectedReq.uploaded?.ai_analysis?.status === 'warning' ? 'text-warning' :
+                                      'text-info'
                                     }`}>
                                       {selectedReq.name}
                                     </h5>
@@ -933,7 +883,7 @@ export default function ApplicationReview({
                                     )}
                                   </div>
                                   <p className={`text-sm ${
-                                    selectedReq.missing ? 'text-red-700' : 'text-blue-700'
+                                    selectedReq.missing ? 'text-error' : 'text-info'
                                   }`}>
                                     {selectedReq.description}
                                   </p>
@@ -943,21 +893,21 @@ export default function ApplicationReview({
                               {selectedReq.missing ? (
                                 <div className={`p-3 rounded-md border ${
                                   selectedReq.mandatory 
-                                    ? 'bg-red-100 border-red-300' 
-                                    : 'bg-yellow-100 border-yellow-300'
+                                    ? 'bg-error/10 border-error/20' 
+                                    : 'bg-warning/10 border-warning/20'
                                 }`}>
                                   <div className="flex items-start gap-2">
                                     <AlertTriangle className={`w-4 h-4 mt-0.5 ${
-                                      selectedReq.mandatory ? 'text-red-600' : 'text-yellow-600'
+                                      selectedReq.mandatory ? 'text-error' : 'text-warning'
                                     }`} />
                                     <div>
                                       <p className={`text-sm font-medium ${
-                                        selectedReq.mandatory ? 'text-red-900' : 'text-yellow-900'
+                                        selectedReq.mandatory ? 'text-error' : 'text-warning'
                                       }`}>
                                         {selectedReq.mandatory ? 'Required Document Missing' : 'Optional Document Not Provided'}
                                       </p>
                                       <p className={`text-xs mt-1 ${
-                                        selectedReq.mandatory ? 'text-red-800' : 'text-yellow-800'
+                                        selectedReq.mandatory ? 'text-error' : 'text-warning'
                                       }`}>
                                         {selectedReq.mandatory 
                                           ? 'This document must be provided before the application can be approved.'
@@ -973,18 +923,18 @@ export default function ApplicationReview({
                                   {selectedReq.uploaded.ai_analysis && (
                                     <div className={`p-3 rounded-md border ${
                                       selectedReq.uploaded.ai_analysis.status === 'critical' 
-                                        ? 'bg-red-100 border-red-300' 
+                                        ? 'bg-error/10 border-error/20' 
                                         : selectedReq.uploaded.ai_analysis.status === 'warning'
-                                        ? 'bg-yellow-100 border-yellow-300'
-                                        : 'bg-green-100 border-green-300'
+                                        ? 'bg-warning/10 border-warning/20'
+                                        : 'bg-success/10 border-success/20'
                                     }`}>
                                       <div className="flex items-start gap-2">
                                         <Brain className={`w-4 h-4 mt-0.5 ${
                                           selectedReq.uploaded.ai_analysis.status === 'critical' 
-                                            ? 'text-red-600' 
+                                            ? 'text-error' 
                                             : selectedReq.uploaded.ai_analysis.status === 'warning'
-                                            ? 'text-yellow-600'
-                                            : 'text-green-600'
+                                            ? 'text-warning'
+                                            : 'text-success'
                                         }`} />
                                         <div className="flex-1">
                                           <p className="text-sm font-medium mb-1">AI Analysis</p>
@@ -1051,24 +1001,24 @@ export default function ApplicationReview({
 
                                   {/* Currently Flagged Info */}
                                   {currentFlaggedDocId === selectedReq.uploaded.id && (
-                                    <div className="bg-yellow-100 border border-yellow-300 rounded-md p-3">
+                                    <div className="bg-warning/10 border border-warning/20 rounded-md p-3">
                                       <div className="flex items-start gap-2">
-                                        <Flag className="w-4 h-4 text-yellow-600 mt-0.5" />
+                                        <Flag className="w-4 h-4 text-warning mt-0.5" />
                                         <div className="flex-1">
-                                          <p className="text-sm font-medium text-yellow-900">Document Flagged</p>
+                                          <p className="text-sm font-medium text-warning">Document Flagged</p>
                                           {application.flaggedDocumentReason && (
-                                            <p className="text-xs text-yellow-800 mt-1">
+                                            <p className="text-xs text-warning mt-1">
                                               Reason: {application.flaggedDocumentReason}
                                             </p>
                                           )}
                                           {application.flaggedAt && (
-                                            <p className="text-xs text-yellow-700 mt-1">
+                                            <p className="text-xs text-warning mt-1">
                                               Flagged on: {new Date(application.flaggedAt).toLocaleDateString()}
                                             </p>
                                           )}
                                           <button
                                             onClick={handleUnflagDocument}
-                                            className="text-xs text-yellow-700 underline hover:no-underline mt-2"
+                                            className="text-xs text-warning underline hover:no-underline mt-2"
                                           >
                                             Remove flag
                                           </button>
@@ -1078,25 +1028,25 @@ export default function ApplicationReview({
                                   )}
 
                                   {/* Document Information */}
-                                  <div className="bg-white rounded-md p-3 border border-blue-300">
+                                  <div className="bg-base-100 rounded-md p-3 border border-info/20">
                                     <div className="grid grid-cols-2 gap-3 text-xs">
                                       <div>
-                                        <span className="font-medium text-gray-700">Type:</span>
-                                        <span className="ml-1 text-gray-600">{selectedReq.type.replace('_', ' ')}</span>
+                                        <span className="font-medium text-base-content/70">Type:</span>
+                                        <span className="ml-1 text-base-content/70">{selectedReq.type.replace('_', ' ')}</span>
                                       </div>
                                       <div>
-                                        <span className="font-medium text-gray-700">Status:</span>
-                                        <span className={`ml-1 ${selectedReq.uploaded.verified ? 'text-green-600' : 'text-yellow-600'}`}>
+                                        <span className="font-medium text-base-content/70">Status:</span>
+                                        <span className={`ml-1 ${selectedReq.uploaded.verified ? 'text-success' : 'text-warning'}`}>
                                           {selectedReq.uploaded.verified ? 'Verified ✓' : 'Pending'}
                                         </span>
                                       </div>
                                       <div>
-                                        <span className="font-medium text-gray-700">Uploaded:</span>
-                                        <span className="ml-1 text-gray-600">{selectedReq.uploaded.uploadedAt}</span>
+                                        <span className="font-medium text-base-content/70">Uploaded:</span>
+                                        <span className="ml-1 text-base-content/70">{selectedReq.uploaded.uploadedAt}</span>
                                       </div>
                                       <div>
-                                        <span className="font-medium text-gray-700">Size:</span>
-                                        <span className="ml-1 text-gray-600">
+                                        <span className="font-medium text-base-content/70">Size:</span>
+                                        <span className="ml-1 text-base-content/70">
                                           {selectedReq.uploaded.size ? formatFileSize(selectedReq.uploaded.size) : 'Unknown'}
                                         </span>
                                       </div>
@@ -1124,15 +1074,15 @@ export default function ApplicationReview({
                 <div className="space-y-4">
                   {/* Missing Documents Warning */}
                   {mandatoryDocsMissing && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="bg-error/10 border border-error/20 rounded-lg p-4">
                       <div className="flex items-start gap-3">
-                        <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5" />
+                        <AlertTriangle className="w-5 h-5 text-error mt-0.5" />
                         <div>
-                          <h4 className="font-semibold text-red-900 text-sm">Cannot Approve</h4>
-                          <p className="text-red-800 text-sm mt-1">
+                          <h4 className="font-semibold text-error text-sm">Cannot Approve</h4>
+                          <p className="text-error text-sm mt-1">
                             {documentRequirements.filter(req => req.mandatory && req.missing).length} required document(s) missing
                           </p>
-                          <ul className="text-red-700 text-xs mt-2 space-y-1">
+                          <ul className="text-error text-xs mt-2 space-y-1">
                             {documentRequirements
                               .filter(req => req.mandatory && req.missing)
                               .map(req => (
@@ -1146,16 +1096,16 @@ export default function ApplicationReview({
 
                   {/* Currently Flagged Document Warning */}
                   {currentFlaggedDocId && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
                       <div className="flex items-start gap-3">
-                        <Flag className="w-5 h-5 text-yellow-500 mt-0.5" />
+                        <Flag className="w-5 h-5 text-warning mt-0.5" />
                         <div>
-                          <h4 className="font-semibold text-yellow-900 text-sm">Document Flagged</h4>
-                          <p className="text-yellow-800 text-sm mt-1">
+                          <h4 className="font-semibold text-warning text-sm">Document Flagged</h4>
+                          <p className="text-warning text-sm mt-1">
                             You have flagged a document for applicant attention
                           </p>
                           {application.flaggedDocumentReason && (
-                            <p className="text-yellow-700 text-xs mt-2">
+                            <p className="text-warning text-xs mt-2">
                               Reason: {application.flaggedDocumentReason}
                             </p>
                           )}
@@ -1166,15 +1116,15 @@ export default function ApplicationReview({
 
                   {/* John Doe Risk Warning */}
                   {isJohnDoe && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                    <div className="bg-error/10 border border-error/20 rounded-lg p-4">
                       <div className="flex items-start gap-3">
-                        <FileWarning className="w-5 h-5 text-red-500 mt-0.5" />
+                        <FileWarning className="w-5 h-5 text-error mt-0.5" />
                         <div>
-                          <h4 className="font-semibold text-red-900 text-sm">High Risk Application</h4>
-                          <p className="text-red-800 text-sm mt-1">
+                          <h4 className="font-semibold text-error text-sm">High Risk Application</h4>
+                          <p className="text-error text-sm mt-1">
                             AI analysis has identified critical risk factors
                           </p>
-                          <ul className="text-red-700 text-xs mt-2 space-y-1">
+                          <ul className="text-error text-xs mt-2 space-y-1">
                             <li>• Negative bank balance (-$72.47)</li>
                             <li>• One-way ticket only (no return flight)</li>
                             <li>• Weak personal ties to home country</li>
@@ -1242,11 +1192,11 @@ export default function ApplicationReview({
                   <ul className="text-sm space-y-1">
                     {isJohnDoe ? (
                       <>
-                        <li className="text-red-600">• Critical: {JOHN_DOE_WARNINGS[0]}</li>
-                        <li className="text-red-600">• Critical: {JOHN_DOE_WARNINGS[1]}</li>
-                        <li className="text-yellow-600">• Warning: No travel insurance provided</li>
-                        <li className="text-red-600">• High overstay risk detected (85% risk score)</li>
-                        <li className="text-green-600">• Valid passport and invitation letter</li>
+                        <li className="text-error">• Critical: {JOHN_DOE_WARNINGS[0]}</li>
+                        <li className="text-error">• Critical: {JOHN_DOE_WARNINGS[1]}</li>
+                        <li className="text-warning">• Warning: No travel insurance provided</li>
+                        <li className="text-error">• High overstay risk detected (85% risk score)</li>
+                        <li className="text-success">• Valid passport and invitation letter</li>
                       </>
                     ) : !mandatoryDocsMissing ? (
                       <>
@@ -1258,8 +1208,8 @@ export default function ApplicationReview({
                       </>
                     ) : (
                       <>
-                        <li className="text-red-600">• {documentRequirements.filter(req => req.mandatory && req.missing).length} required document(s) missing</li>
-                        <li className="text-yellow-600">• Cannot process until documents submitted</li>
+                        <li className="text-error">• {documentRequirements.filter(req => req.mandatory && req.missing).length} required document(s) missing</li>
+                        <li className="text-warning">• Cannot process until documents submitted</li>
                         <li>• Application data otherwise complete</li>
                         <li>• Ready for review after document submission</li>
                       </>
@@ -1273,158 +1223,31 @@ export default function ApplicationReview({
       </div>
 
       {/* Document Viewer Modal */}
-      {showDocumentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold">Document Viewer</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => window.open(currentDocumentUrl, '_blank')}
-                  className="btn btn-ghost btn-sm"
-                  title="Open in new tab"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => setShowDocumentModal(false)}
-                  className="btn btn-ghost btn-sm"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 p-4">
-              <iframe
-                src={currentDocumentUrl}
-                className="w-full h-full border rounded"
-                title="Document Viewer"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      <DocumentViewer
+        isOpen={showDocumentModal}
+        documentUrl={currentDocumentUrl}
+        onClose={() => setShowDocumentModal(false)}
+      />
 
       {/* AI Analysis Modal */}
-      {showAIAnalysis && currentAIAnalysis && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Brain className="w-5 h-5 text-yellow-600" />
-                AI Document Analysis
-              </h3>
-              <button
-                onClick={() => setShowAIAnalysis(false)}
-                className="btn btn-ghost btn-sm"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-6">
-              <div className={`p-4 rounded-lg border-2 ${
-                currentAIAnalysis.status === 'critical' 
-                  ? 'bg-red-50 border-red-200' 
-                  : currentAIAnalysis.status === 'warning'
-                  ? 'bg-yellow-50 border-yellow-200'
-                  : 'bg-green-50 border-green-200'
-              }`}>
-                <div className="flex items-start gap-3">
-                  {getAIStatusIcon(currentAIAnalysis.status)}
-                  <div className="flex-1">
-                    <h4 className="font-semibold mb-2">Analysis Summary</h4>
-                    <p className="text-sm mb-4">{currentAIAnalysis.summary}</p>
-                    
-                    {currentAIAnalysis.concerns.length > 0 && (
-                      <div>
-                        <h5 className="font-semibold text-sm mb-2">Identified Concerns:</h5>
-                        <ul className="list-disc list-inside text-sm space-y-1">
-                          {currentAIAnalysis.concerns.map((concern, idx) => (
-                            <li key={idx} className={
-                              currentAIAnalysis.status === 'critical' ? 'text-red-700' :
-                              currentAIAnalysis.status === 'warning' ? 'text-yellow-700' :
-                              'text-green-700'
-                            }>{concern}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> This AI analysis is provided as a decision support tool. 
-                  Officers should use their judgment and consider all factors when making final decisions.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DocumentAnalysisPanel
+        isOpen={showAIAnalysis}
+        analysis={currentAIAnalysis}
+        onClose={() => setShowAIAnalysis(false)}
+      />
 
       {/* Flag Document Modal */}
-      {showFlagModal && flaggingDocument && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Flag className="w-5 h-5 text-warning" />
-                Flag Document for Applicant
-              </h3>
-              
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">
-                  Flagging: <strong>{flaggingDocument.name}</strong>
-                </p>
-                <p className="text-sm text-gray-600">
-                  The applicant will see this flag in their status tracker.
-                </p>
-              </div>
-              
-              <div className="form-control mb-4">
-                <label className="label">
-                  <span className="label-text">Reason for flagging</span>
-                </label>
-                <textarea
-                  className="textarea textarea-bordered"
-                  placeholder="e.g., Document unclear, please provide a clearer scan..."
-                  value={flagReason}
-                  onChange={(e) => setFlagReason(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              
-              <div className="alert alert-warning mb-4">
-                <AlertTriangle className="w-4 h-4" />
-                <span className="text-sm">
-                  Only one document can be flagged at a time. Flagging this will replace any previously flagged document.
-                </span>
-              </div>
-              
-              <div className="flex gap-2">
-                <button
-                  onClick={submitFlagDocument}
-                  disabled={!flagReason.trim()}
-                  className="btn btn-warning flex-1"
-                >
-                  Flag Document
-                </button>
-                <button
-                  onClick={() => {
-                    setShowFlagModal(false)
-                    setFlagReason('')
-                  }}
-                  className="btn btn-ghost"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <DocumentFlagging
+        isOpen={showFlagModal}
+        document={flaggingDocument}
+        applicationId={application.id}
+        officer={officer}
+        currentFlaggedDocId={currentFlaggedDocId}
+        onClose={() => setShowFlagModal(false)}
+        onFlagSuccess={(flaggedDocId) => setCurrentFlaggedDocId(flaggedDocId)}
+        onUnflagSuccess={() => setCurrentFlaggedDocId(null)}
+        onReloadDocuments={loadDocuments}
+      />
     </div>
   )
 }

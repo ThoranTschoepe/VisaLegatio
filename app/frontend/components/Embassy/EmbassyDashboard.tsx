@@ -153,17 +153,17 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'text-red-600'
-      case 'high': return 'text-orange-600'
-      case 'normal': return 'text-blue-600'
-      default: return 'text-gray-600'
+      case 'urgent': return 'text-error'
+      case 'high': return 'text-warning'
+      case 'normal': return 'text-primary'
+      default: return 'text-base-content/60'
     }
   }
 
   const getRiskColor = (score: number) => {
-    if (score < 10) return 'text-green-600'
-    if (score < 20) return 'text-yellow-600'
-    return 'text-red-600'
+    if (score < 10) return 'text-success'
+    if (score < 20) return 'text-warning'
+    return 'text-error'
   }
 
   const handleReviewApplication = (application: EmbassyApplication) => {
@@ -272,7 +272,7 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
         {/* Welcome Section */}
         <div className="mb-6">
           <h2 className="text-3xl font-bold mb-2">Welcome back, {officer.name.split(' ')[1]}</h2>
-          <p className="text-gray-600">Manage visa applications and track processing status</p>
+          <p className="text-base-content/60">Manage visa applications and track processing status</p>
         </div>
 
         {/* Stats Cards */}
@@ -283,7 +283,7 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
                 <FileText className="w-8 h-8 text-primary" />
                 <div>
                   <p className="text-2xl font-bold">{stats.total}</p>
-                  <p className="text-sm text-gray-600">Total Applications</p>
+                  <p className="text-sm text-base-content/60">Total Applications</p>
                 </div>
               </div>
             </div>
@@ -294,7 +294,7 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
                 <Clock className="w-8 h-8 text-warning" />
                 <div>
                   <p className="text-2xl font-bold">{stats.pending}</p>
-                  <p className="text-sm text-gray-600">Pending Review</p>
+                  <p className="text-sm text-base-content/60">Pending Review</p>
                 </div>
               </div>
             </div>
@@ -305,7 +305,7 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
                 <CheckCircle2 className="w-8 h-8 text-success" />
                 <div>
                   <p className="text-2xl font-bold">{stats.approved}</p>
-                  <p className="text-sm text-gray-600">Approved Today</p>
+                  <p className="text-sm text-base-content/60">Approved Today</p>
                 </div>
               </div>
             </div>
@@ -316,7 +316,7 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
                 <TrendingUp className="w-8 h-8 text-info" />
                 <div>
                   <p className="text-2xl font-bold">{stats.avgProcessingTime}d</p>
-                  <p className="text-sm text-gray-600">Avg Processing</p>
+                  <p className="text-sm text-base-content/60">Avg Processing</p>
                 </div>
               </div>
             </div>
@@ -422,7 +422,7 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
                           </div>
                           <div>
                             <div className="font-semibold">{app.applicantName}</div>
-                            <div className="text-sm text-gray-600">{app.country}</div>
+                            <div className="text-sm text-base-content/60">{app.country}</div>
                           </div>
                         </div>
                       </td>
