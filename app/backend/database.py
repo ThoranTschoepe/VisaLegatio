@@ -22,15 +22,10 @@ class User(Base):
     phone = Column(String)
     nationality = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
-    flagged_document_id = Column(String, ForeignKey("documents.id"))
-    flagged_document_reason = Column(Text)
-    flagged_by_officer_id = Column(String, ForeignKey("officers.id"))
-    flagged_at = Column(DateTime)
     
     # Relationships
     applications = relationship("Application", back_populates="user")
-    flagged_document = relationship("Document", foreign_keys=[flagged_document_id])
-    flagged_by_officer = relationship("Officer", foreign_keys=[flagged_by_officer_id])
+    flagged_documents = relationship("FlaggedDocument", back_populates="user")
 
 class Application(Base):
     __tablename__ = "applications"
@@ -53,6 +48,7 @@ class Application(Base):
     documents = relationship("Document", back_populates="application")
     status_updates = relationship("StatusUpdate", back_populates="application")
     assigned_officer = relationship("Officer", back_populates="assigned_applications")
+    flagged_documents = relationship("FlaggedDocument", back_populates="application")
 
 class Document(Base):
     __tablename__ = "documents"
@@ -68,6 +64,7 @@ class Document(Base):
     
     # Relationships
     application = relationship("Application", back_populates="documents")
+    flags = relationship("FlaggedDocument", back_populates="document")
 
 class Officer(Base):
     __tablename__ = "officers"
@@ -83,6 +80,7 @@ class Officer(Base):
     # Relationships
     assigned_applications = relationship("Application", back_populates="assigned_officer")
     status_updates = relationship("StatusUpdate", back_populates="officer")
+    flagged_documents = relationship("FlaggedDocument", back_populates="flagged_by_officer")
 
 class StatusUpdate(Base):
     __tablename__ = "status_updates"
@@ -97,6 +95,25 @@ class StatusUpdate(Base):
     # Relationships
     application = relationship("Application", back_populates="status_updates")
     officer = relationship("Officer", back_populates="status_updates")
+
+class FlaggedDocument(Base):
+    __tablename__ = "flagged_documents"
+    
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    document_id = Column(String, ForeignKey("documents.id"), nullable=False)
+    application_id = Column(String, ForeignKey("applications.id"), nullable=False)
+    reason = Column(Text)
+    flagged_by_officer_id = Column(String, ForeignKey("officers.id"))
+    flagged_at = Column(DateTime, default=datetime.utcnow)
+    resolved = Column(Boolean, default=False)
+    resolved_at = Column(DateTime)
+    
+    # Relationships
+    user = relationship("User", back_populates="flagged_documents")
+    document = relationship("Document", back_populates="flags")
+    application = relationship("Application", back_populates="flagged_documents")
+    flagged_by_officer = relationship("Officer", back_populates="flagged_documents")
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"

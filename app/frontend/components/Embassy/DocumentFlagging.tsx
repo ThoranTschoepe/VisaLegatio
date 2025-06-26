@@ -21,10 +21,11 @@ interface DocumentFlaggingProps {
   document: DocumentWithUrls | null
   applicationId: string
   officer: Officer
-  currentFlaggedDocId: string | null
+  flaggedDocumentIds: Set<string>
+  flaggedDocuments?: any[]  // Full flag objects with IDs
   onClose: () => void
   onFlagSuccess: (flaggedDocId: string) => void
-  onUnflagSuccess: () => void
+  onUnflagSuccess: (documentId: string) => void
   onReloadDocuments: () => void
 }
 
@@ -33,7 +34,8 @@ export default function DocumentFlagging({
   document,
   applicationId,
   officer,
-  currentFlaggedDocId,
+  flaggedDocumentIds,
+  flaggedDocuments = [],
   onClose,
   onFlagSuccess,
   onUnflagSuccess,
@@ -50,11 +52,7 @@ export default function DocumentFlagging({
     
     setIsSubmitting(true)
     try {
-      await api.flagDocument(applicationId, {
-        document_id: document.id,
-        reason: flagReason,
-        officer_id: officer.id
-      })
+      await api.flagDocument(applicationId, document.id, flagReason, officer.id)
       
       onFlagSuccess(document.id)
       showSuccess(`Document "${document.name}" flagged for applicant review`)
@@ -67,16 +65,14 @@ export default function DocumentFlagging({
     }
   }
 
-  const handleUnflag = async () => {
+  const handleUnflag = async (flagId: string) => {
     if (isSubmitting) return
     
     setIsSubmitting(true)
     try {
-      await api.flagDocument(applicationId, {
-        officer_id: officer.id
-      })
+      await api.unflagDocument(applicationId, flagId)
       
-      onUnflagSuccess()
+      onUnflagSuccess(document.id)
       showSuccess('Document unflagged successfully')
       handleClose()
       onReloadDocuments()
@@ -124,12 +120,21 @@ export default function DocumentFlagging({
             />
           </div>
           
-          <div className="alert alert-warning mb-4">
-            <AlertTriangle className="w-4 h-4" />
-            <span className="text-sm">
-              Only one document can be flagged at a time. Flagging this will replace any previously flagged document.
-            </span>
-          </div>
+          {flaggedDocumentIds.has(document.id) ? (
+            <div className="alert alert-info mb-4">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="text-sm">
+                This document is already flagged. You can update the reason or remove the flag.
+              </span>
+            </div>
+          ) : (
+            <div className="alert alert-warning mb-4">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="text-sm">
+                The applicant will be notified about this flag and can upload a revised document.
+              </span>
+            </div>
+          )}
           
           <div className="flex gap-2">
             <button
@@ -148,17 +153,20 @@ export default function DocumentFlagging({
             </button>
           </div>
 
-          {currentFlaggedDocId && (
-            <div className="mt-4 pt-4 border-t">
-              <button
-                onClick={handleUnflag}
-                disabled={isSubmitting}
-                className="btn btn-outline btn-sm w-full"
-              >
-                {isSubmitting ? 'Unflagging...' : 'Remove Current Flag'}
-              </button>
-            </div>
-          )}
+          {flaggedDocumentIds.has(document.id) && (() => {
+            const flag = flaggedDocuments.find(f => f.documentId === document.id)
+            return flag && (
+              <div className="mt-4 pt-4 border-t">
+                <button
+                  onClick={() => handleUnflag(flag.id)}
+                  disabled={isSubmitting}
+                  className="btn btn-outline btn-sm w-full"
+                >
+                  {isSubmitting ? 'Unflagging...' : 'Remove Flag from This Document'}
+                </button>
+              </div>
+            )
+          })()}
         </div>
       </div>
     </div>

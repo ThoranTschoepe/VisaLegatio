@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { CheckCircle2, Clock, AlertCircle, FileText, Shield, Eye, Award, AlertTriangle, Upload, X, CreditCard, Fingerprint, Flag } from 'lucide-react'
-import { VisaApplication, ApplicationStatus } from '@/types'
+import { VisaApplication, ApplicationStatus, VisaType } from '@/types'
 import { api } from '@/utils/api'
 import { useAlertStore } from '@/lib/stores/alert.store'
 
@@ -42,7 +42,7 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [documentStatus, setDocumentStatus] = useState<DocumentStatus | null>(null)
   const [error, setError] = useState<string>('')
-  const [flaggedDocument, setFlaggedDocument] = useState<any>(null)
+  const [flaggedDocuments, setFlaggedDocuments] = useState<any[]>([])
   const { showSuccess, showError } = useAlertStore()
 
   useEffect(() => {
@@ -62,20 +62,15 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
       const data = await api.getApplicationStatus(applicationId)
       setApplication(data)
       
-      // Check for flagged document
-      if (data.flaggedDocumentId && data.flaggedDocument) {
-        setFlaggedDocument({
-          document: data.flaggedDocument,
-          reason: data.flaggedDocumentReason,
-          flagged_by: data.flaggedByOfficer,
-          flagged_at: data.flaggedAt
-        })
+      // Check for flagged documents (supports multiple)
+      if (data.flaggedDocuments && data.flaggedDocuments.length > 0) {
+        setFlaggedDocuments(data.flaggedDocuments)
       } else {
-        setFlaggedDocument(null)
+        setFlaggedDocuments([])
       }
       
       // Get document requirements and status from backend
-      const docRequirements = await api.getDocumentRequirements(data.visaType)
+      const docRequirements = await api.getDocumentRequirements(data.visaType as VisaType)
       const uploadedDocs = await api.getApplicationDocuments(applicationId)
       
       // Calculate document status
@@ -345,54 +340,58 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
         </div>
       </div>
 
-      {/* Flagged Document Alert */}
-      {flaggedDocument && (
+      {/* Flagged Documents Alert */}
+      {flaggedDocuments.length > 0 && (
         <div className="bg-warning/10 border-b-4 border-warning/30 p-6">
           <div className="flex items-start gap-4">
             <Flag className="w-8 h-8 text-warning mt-1 flex-shrink-0" />
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-warning-content mb-2">
-                Document Requires Your Attention
+              <h3 className="text-lg font-semibold text-sm mb-2">
+                {flaggedDocuments.length === 1 ? 'Document Requires Your Attention' : `${flaggedDocuments.length} Documents Require Your Attention`}
               </h3>
-              <p className="text-warning-content/90 mb-3">
-                An embassy officer has flagged one of your documents for review:
+              <p className="text-sm mb-3">
+                An embassy officer has flagged {flaggedDocuments.length === 1 ? 'one of your documents' : 'some of your documents'} for review:
               </p>
               
-              <div className="bg-warning/20 rounded-lg p-4 mb-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <FileText className="w-5 h-5 text-warning-content" />
-                  <span className="font-semibold text-warning-content">
-                    {flaggedDocument.document.name || 'Document'}
-                  </span>
+              {flaggedDocuments.map((flag, index) => (
+                <div key={flag.id} className="bg-warning/20 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <FileText className="w-5 h-5 text-sm" />
+                    <span className="font-semibold text-sm">
+                      {flag.document?.name || 'Document'}
+                    </span>
+                  </div>
+                  
+                  <div className="bg-base-100 rounded p-3 mb-3">
+                    <p className="text-sm font-medium text-base-content/70 mb-1">Officer's Note:</p>
+                    <p className="text-base-content">{flag.reason}</p>
+                  </div>
+                  
+                  <p className="text-xs text-sm">
+                    Flagged on {new Date(flag.flaggedAt).toLocaleDateString()}
+                  </p>
+                  
+                  {index === 0 && (
+                    <div className="flex gap-3 mt-3">
+                      <button
+                        onClick={() => navigateToDocuments()}
+                        className="btn btn-warning font-medium"
+                      >
+                        <Upload className="w-4 h-4 inline mr-2" />
+                        Upload Revised Documents
+                      </button>
+                      
+                      <button
+                        onClick={() => window.open(`/api/documents/view/${application.id}/${flag.document?.name}`, '_blank')}
+                        className="btn btn-outline btn-warning"
+                      >
+                        <Eye className="w-4 h-4 inline mr-2" />
+                        View Current Document
+                      </button>
+                    </div>
+                  )}
                 </div>
-                
-                <div className="bg-base-100 rounded p-3 mb-3">
-                  <p className="text-sm font-medium text-base-content/70 mb-1">Officer's Note:</p>
-                  <p className="text-base-content">{flaggedDocument.reason}</p>
-                </div>
-                
-                <p className="text-xs text-warning-content/70">
-                  Flagged on {new Date(flaggedDocument.flagged_at).toLocaleDateString()}
-                </p>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => navigateToDocuments()}
-                  className="btn btn-warning font-medium"
-                >
-                  <Upload className="w-4 h-4 inline mr-2" />
-                  Upload Revised Document
-                </button>
-                
-                <button
-                  onClick={() => window.open(`/api/documents/view/${application.id}/${flaggedDocument.document.name}`, '_blank')}
-                  className="btn btn-outline btn-warning"
-                >
-                  <Eye className="w-4 h-4 inline mr-2" />
-                  View Current Document
-                </button>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -717,7 +716,7 @@ export default function StatusTracker({ applicationId, onNewApplication, onNavig
             Refresh Status
           </button>
           
-          {(isDocumentBlocked || flaggedDocument) && (
+          {(isDocumentBlocked || flaggedDocuments.length > 0) && (
             <button
               onClick={onNavigateToDocuments}
               className="btn btn-error"

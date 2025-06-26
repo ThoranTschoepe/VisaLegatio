@@ -86,6 +86,21 @@ class DocumentResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class FlaggedDocumentResponse(BaseModel):
+    id: str
+    user_id: str
+    document_id: str
+    application_id: str
+    reason: Optional[str]
+    flagged_by_officer_id: Optional[str]
+    flagged_at: datetime
+    resolved: bool = False
+    resolved_at: Optional[datetime] = None
+    document: Optional[DocumentResponse] = None
+
+    class Config:
+        from_attributes = True
+
 class StatusUpdateResponse(BaseModel):
     id: str
     status: str
@@ -117,11 +132,8 @@ class ApplicationResponse(BaseModel):
     estimated_days: Optional[int] = None
     last_activity: Optional[datetime] = None
 
-    flagged_document_id: Optional[str] = None
-    flagged_document_reason: Optional[str] = None
-    flagged_by_officer: Optional[str] = None
-    flagged_at: Optional[datetime] = None
-    flagged_document: Optional[DocumentResponse] = None
+    # List of flagged documents for this application
+    flagged_documents: Optional[List[FlaggedDocumentResponse]] = []
     
     # Relationships
     documents: Optional[List[DocumentResponse]] = []
@@ -180,3 +192,12 @@ class Question(BaseModel):
 
 class FormQuestionsResponse(BaseModel):
     questions: List[Question]
+
+# Additional request models for flagging
+class FlagDocumentRequest(BaseModel):
+    document_id: str
+    reason: str
+    officer_id: Optional[str] = None
+
+class UnflagDocumentRequest(BaseModel):
+    flag_id: str

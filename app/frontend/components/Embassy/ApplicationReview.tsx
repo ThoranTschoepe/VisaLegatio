@@ -20,6 +20,7 @@ interface ApplicationReviewProps {
   onBack: () => void
   onUpdateStatus: (id: string, status: EmbassyApplication['status']) => void
   officer: Officer
+  onRefreshApplication?: (applicationId: string) => Promise<EmbassyApplication | void>
 }
 
 interface DocumentWithUrls extends EmbassyDocument {
@@ -45,7 +46,8 @@ export default function ApplicationReview({
   application, 
   onBack, 
   onUpdateStatus, 
-  officer 
+  officer,
+  onRefreshApplication
 }: ApplicationReviewProps) {
   const [decision, setDecision] = useState<'approve' | 'reject' | null>(null)
   const [notes, setNotes] = useState('')
@@ -63,7 +65,7 @@ export default function ApplicationReview({
   // Flag document states
   const [showFlagModal, setShowFlagModal] = useState(false)
   const [flaggingDocument, setFlaggingDocument] = useState<DocumentWithUrls | null>(null)
-  const [currentFlaggedDocId, setCurrentFlaggedDocId] = useState<string | null>(null)
+  const [flaggedDocumentIds, setFlaggedDocumentIds] = useState<Set<string>>(new Set())
   
   const { showSuccess, showError } = useAlertStore()
 
@@ -73,14 +75,53 @@ export default function ApplicationReview({
   // Load documents when component mounts
   useEffect(() => {
     loadDocuments()
+    // Delay reloadApplicationData slightly to ensure it runs after initial load
+    setTimeout(() => reloadApplicationData(), 100)
   }, [application.id])
 
-  // Load current flagged document
+  // Load current flagged documents
   useEffect(() => {
-    if (application.flaggedDocumentId) {
-      setCurrentFlaggedDocId(application.flaggedDocumentId)
+    console.log('📋 Application data changed, updating flagged documents:', application.flaggedDocuments)
+    if (application.flaggedDocuments && application.flaggedDocuments.length > 0) {
+      const flaggedIds = new Set(application.flaggedDocuments.map(f => f.documentId))
+      setFlaggedDocumentIds(flaggedIds)
+      console.log('✅ Set flagged document IDs:', flaggedIds)
+    } else {
+      // If no flagged documents in application data, clear the state
+      setFlaggedDocumentIds(new Set())
+      console.log('🧹 Cleared flagged document IDs')
     }
   }, [application])
+
+  // Function to reload fresh application data including flagged documents
+  const reloadApplicationData = async () => {
+    try {
+      console.log('🔄 Reloading fresh application data...')
+      
+      // Try to use parent callback first (to update the parent's application state)
+      if (onRefreshApplication) {
+        await onRefreshApplication(application.id)
+      }
+      
+      // Also get fresh data directly for flagged documents
+      const freshAppData = await api.getApplicationStatus(application.id)
+      
+      // Update flagged documents state with fresh data
+      if (freshAppData.flaggedDocuments && freshAppData.flaggedDocuments.length > 0) {
+        const flaggedIds = new Set(freshAppData.flaggedDocuments.map(f => f.documentId))
+        setFlaggedDocumentIds(flaggedIds)
+        console.log('✅ Updated flagged documents:', flaggedIds)
+      } else {
+        setFlaggedDocumentIds(new Set())
+        console.log('✅ No flagged documents found')
+      }
+      
+      // Also reload documents to ensure everything is in sync
+      await loadDocuments()
+    } catch (error) {
+      console.error('❌ Failed to reload application data:', error)
+    }
+  }
 
   const loadDocuments = async () => {
     try {
@@ -534,19 +575,25 @@ export default function ApplicationReview({
     setShowFlagModal(true)
   }
 
-  const handleUnflagDocument = async () => {
+  const handleUnflagDocument = async (flagId: string, documentId: string) => {
     try {
-      await api.flagDocument(application.id, {
-        officer_id: officer.id
-      })
+      await api.unflagDocument(application.id, flagId)
       
-      setCurrentFlaggedDocId(null)
+      setFlaggedDocumentIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(documentId)
+        return newSet
+      })
       showSuccess('Document flag removed')
-      loadDocuments()
+      
+      // Reload both documents and application data to ensure sync
+      await loadDocuments()
+      await reloadApplicationData()
     } catch (error) {
       showError('Failed to remove flag')
     }
   }
+
 
 
 
@@ -567,7 +614,17 @@ export default function ApplicationReview({
             </span>
           )}
         </div>
-        <div className="flex-none">
+        <div className="flex-none flex items-center gap-3">
+          <button 
+            onClick={reloadApplicationData}
+            className="btn btn-ghost btn-sm"
+            title="Refresh application data"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </button>
           <span className="text-sm text-base-content/60">Reviewing as: {officer.name}</span>
         </div>
       </div>
@@ -704,7 +761,7 @@ export default function ApplicationReview({
                                           AI
                                         </span>
                                       )}
-                                      {currentFlaggedDocId === req.uploaded?.id && (
+                                      {flaggedDocumentIds.has(req.uploaded?.id || '') && (
                                         <span className="badge badge-warning badge-xs flex-shrink-0">
                                           <Flag className="w-3 h-3 mr-1" />
                                           Flagged
@@ -875,7 +932,7 @@ export default function ApplicationReview({
                                     {selectedReq.mandatory && (
                                       <span className="badge badge-error badge-xs">REQUIRED</span>
                                     )}
-                                    {currentFlaggedDocId === selectedReq.uploaded?.id && (
+                                    {flaggedDocumentIds.has(selectedReq.uploaded?.id || '') && (
                                       <span className="badge badge-warning badge-xs">
                                         <Flag className="w-3 h-3 mr-1" />
                                         FLAGGED
@@ -968,11 +1025,11 @@ export default function ApplicationReview({
                                     <button
                                       onClick={() => handleFlagDocument(selectedReq.uploaded!)}
                                       className={`btn ${
-                                        currentFlaggedDocId === selectedReq.uploaded.id 
+                                        flaggedDocumentIds.has(selectedReq.uploaded.id) 
                                           ? 'btn-warning' 
                                           : 'btn-outline'
                                       } btn-sm`}
-                                      title={currentFlaggedDocId === selectedReq.uploaded.id 
+                                      title={flaggedDocumentIds.has(selectedReq.uploaded.id) 
                                         ? "Currently flagged document" 
                                         : "Flag for applicant attention"}
                                     >
@@ -1000,28 +1057,36 @@ export default function ApplicationReview({
                                   </div>
 
                                   {/* Currently Flagged Info */}
-                                  {currentFlaggedDocId === selectedReq.uploaded.id && (
+                                  {selectedReq.uploaded && flaggedDocumentIds.has(selectedReq.uploaded.id) && 
+                                   application.flaggedDocuments?.find(flag => flag.documentId === selectedReq.uploaded?.id) && (
                                     <div className="bg-warning/10 border border-warning/20 rounded-md p-3">
                                       <div className="flex items-start gap-2">
                                         <Flag className="w-4 h-4 text-warning mt-0.5" />
                                         <div className="flex-1">
                                           <p className="text-sm font-medium text-warning">Document Flagged</p>
-                                          {application.flaggedDocumentReason && (
-                                            <p className="text-xs text-warning mt-1">
-                                              Reason: {application.flaggedDocumentReason}
-                                            </p>
-                                          )}
-                                          {application.flaggedAt && (
-                                            <p className="text-xs text-warning mt-1">
-                                              Flagged on: {new Date(application.flaggedAt).toLocaleDateString()}
-                                            </p>
-                                          )}
-                                          <button
-                                            onClick={handleUnflagDocument}
-                                            className="text-xs text-warning underline hover:no-underline mt-2"
-                                          >
-                                            Remove flag
-                                          </button>
+                                          {(() => {
+                                            const flag = application.flaggedDocuments?.find(f => f.documentId === selectedReq.uploaded?.id)
+                                            return (
+                                              <>
+                                                {flag?.reason && (
+                                                  <p className="text-xs text-warning mt-1">
+                                                    Reason: {flag.reason}
+                                                  </p>
+                                                )}
+                                                {flag?.flaggedAt && (
+                                                  <p className="text-xs text-warning mt-1">
+                                                    Flagged on: {new Date(flag.flaggedAt).toLocaleDateString()}
+                                                  </p>
+                                                )}
+                                                <button
+                                                  onClick={() => handleUnflagDocument(flag?.id || '', selectedReq.uploaded?.id || '')}
+                                                  className="text-xs text-warning underline hover:no-underline mt-2"
+                                                >
+                                                  Remove flag
+                                                </button>
+                                              </>
+                                            )
+                                          })()}
                                         </div>
                                       </div>
                                     </div>
@@ -1094,20 +1159,26 @@ export default function ApplicationReview({
                     </div>
                   )}
 
-                  {/* Currently Flagged Document Warning */}
-                  {currentFlaggedDocId && (
+                  {/* Currently Flagged Documents Warning */}
+                  {flaggedDocumentIds.size > 0 && (
                     <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
                       <div className="flex items-start gap-3">
                         <Flag className="w-5 h-5 text-warning mt-0.5" />
                         <div>
-                          <h4 className="font-semibold text-warning text-sm">Document Flagged</h4>
+                          <h4 className="font-semibold text-warning text-sm">
+                            {flaggedDocumentIds.size === 1 ? 'Document Flagged' : `${flaggedDocumentIds.size} Documents Flagged`}
+                          </h4>
                           <p className="text-warning text-sm mt-1">
-                            You have flagged a document for applicant attention
+                            You have flagged {flaggedDocumentIds.size === 1 ? 'a document' : 'documents'} for applicant attention
                           </p>
-                          {application.flaggedDocumentReason && (
-                            <p className="text-warning text-xs mt-2">
-                              Reason: {application.flaggedDocumentReason}
-                            </p>
+                          {application.flaggedDocuments && application.flaggedDocuments.length > 0 && (
+                            <div className="mt-2 space-y-1">
+                              {application.flaggedDocuments.map(flag => (
+                                <p key={flag.id} className="text-warning text-xs">
+                                  • {flag.document?.name || 'Unknown document'}: {flag.reason}
+                                </p>
+                              ))}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1242,10 +1313,23 @@ export default function ApplicationReview({
         document={flaggingDocument}
         applicationId={application.id}
         officer={officer}
-        currentFlaggedDocId={currentFlaggedDocId}
+        flaggedDocumentIds={flaggedDocumentIds}
+        flaggedDocuments={application.flaggedDocuments}
         onClose={() => setShowFlagModal(false)}
-        onFlagSuccess={(flaggedDocId) => setCurrentFlaggedDocId(flaggedDocId)}
-        onUnflagSuccess={() => setCurrentFlaggedDocId(null)}
+        onFlagSuccess={async (flaggedDocId) => {
+          setFlaggedDocumentIds(prev => new Set([...prev, flaggedDocId]))
+          // Reload application data to get fresh flagged documents
+          await reloadApplicationData()
+        }}
+        onUnflagSuccess={async (documentId) => {
+          setFlaggedDocumentIds(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(documentId)
+            return newSet
+          })
+          // Reload application data to ensure sync
+          await reloadApplicationData()
+        }}
         onReloadDocuments={loadDocuments}
       />
     </div>

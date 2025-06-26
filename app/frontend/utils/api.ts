@@ -32,20 +32,36 @@ class APIClient {
     }
   }
 
-  // Flag/unflag a document
+  // Flag a document (new endpoint)
   async flagDocument(
     applicationId: string, 
-    flagData: {
-      document_id?: string
-      reason?: string
-      officer_id: string
-    }
-  ): Promise<any> {
+    documentId: string,
+    reason: string,
+    officerId?: string
+  ): Promise<{ message: string; flag_id: string; document_id: string; reason: string }> {
     return await this.request(`/applications/${applicationId}/flag-document`, {
       method: 'POST',
-      body: JSON.stringify(flagData),
+      body: JSON.stringify({
+        document_id: documentId,
+        reason: reason,
+        officer_id: officerId
+      }),
     })
   }
+
+  // Unflag a document (new endpoint)
+  async unflagDocument(
+    applicationId: string,
+    flagId: string
+  ): Promise<{ message: string; flag_id: string }> {
+    return await this.request(`/applications/${applicationId}/unflag-document`, {
+      method: 'POST',
+      body: JSON.stringify({
+        flag_id: flagId
+      }),
+    })
+  }
+
 
   // Upload documents to existing application - REAL IMPLEMENTATION
   async uploadDocumentsToApplication(
@@ -286,12 +302,19 @@ class APIClient {
       estimatedDays: backendApp.estimated_days,
       lastActivity: backendApp.last_activity ? new Date(backendApp.last_activity) : new Date(backendApp.updated_at),
       
-      // Flagged document fields
-      flaggedDocumentId: backendApp.flagged_document_id,
-      flaggedDocumentReason: backendApp.flagged_document_reason,
-      flaggedByOfficer: backendApp.flagged_by_officer,
-      flaggedAt: backendApp.flagged_at ? new Date(backendApp.flagged_at) : undefined,
-      flaggedDocument: backendApp.flagged_document
+      // Flagged documents (supports multiple)
+      flaggedDocuments: backendApp.flagged_documents?.map((flag: any) => ({
+        id: flag.id,
+        userId: flag.user_id,
+        documentId: flag.document_id,
+        applicationId: flag.application_id,
+        reason: flag.reason,
+        flaggedByOfficerId: flag.flagged_by_officer_id,
+        flaggedAt: new Date(flag.flagged_at),
+        resolved: flag.resolved,
+        resolvedAt: flag.resolved_at ? new Date(flag.resolved_at) : undefined,
+        document: flag.document
+      })) || []
     }
   }
 }

@@ -52,12 +52,8 @@ export interface VisaApplication {
   estimatedDays?: number
   lastActivity?: Date
   
-  // Flagged document fields
-  flaggedDocumentId?: string
-  flaggedDocumentReason?: string
-  flaggedByOfficer?: string
-  flaggedAt?: Date
-  flaggedDocument?: Document
+  // Flagged documents (new: supports multiple)
+  flaggedDocuments?: FlaggedDocument[]
 }
 
 export interface Document {
@@ -68,6 +64,19 @@ export interface Document {
   uploadedAt: Date
   verified: boolean
   url?: string
+}
+
+export interface FlaggedDocument {
+  id: string
+  userId: string
+  documentId: string
+  applicationId: string
+  reason: string
+  flaggedByOfficerId?: string
+  flaggedAt: Date
+  resolved: boolean
+  resolvedAt?: Date
+  document?: Document
 }
 
 export type ApplicationStatus = 

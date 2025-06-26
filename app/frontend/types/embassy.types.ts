@@ -32,6 +32,20 @@ export interface EmbassyApplication {
   riskScore: number
   estimatedDays: number
   lastActivity: Date
+  flaggedDocuments?: FlaggedDocument[]
+}
+
+export interface FlaggedDocument {
+  id: string
+  userId: string
+  documentId: string
+  applicationId: string
+  reason: string
+  flaggedByOfficerId?: string
+  flaggedAt: Date
+  resolved: boolean
+  resolvedAt?: Date
+  document?: EmbassyDocument
 }
 
 export interface EmbassyDocument {
