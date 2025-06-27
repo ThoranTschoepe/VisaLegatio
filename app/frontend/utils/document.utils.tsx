@@ -63,11 +63,10 @@ export const processDocumentUrl = (baseUrl: string, viewUrl: string): string => 
     let urlToUse = viewUrl
     
     if (viewUrl.startsWith('http://') || viewUrl.startsWith('https://')) {
-      const url = new URL(viewUrl)
-      if (url.port !== '8000' && !viewUrl.includes('localhost:8000')) {
-        urlToUse = viewUrl.replace(/localhost:\d+/, 'localhost:8000')
-      }
+      // If it's already a full URL, use it as-is
+      urlToUse = viewUrl
     } else {
+      // If it's a relative URL, prepend the base URL
       urlToUse = `${baseUrl}${viewUrl.startsWith('/') ? '' : '/'}${viewUrl}`
     }
     
