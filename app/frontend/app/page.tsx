@@ -10,7 +10,7 @@ import StatusLogin from '@/components/StatusLogin'
 import ApplicationSubmitted from '@/components/ApplicationSubmitted'
 import AlertContainer from '@/components/Alert/AlertContainer'
 import DemoWarningPopup from '@/components/DemoWarningPopup'
-import { Card, Button, Stats, Stat, Badge } from '@/components/UI'
+import { Button, Stats, Stat, Badge } from '@/components/UI'
 import { VisaType, Document } from '@/types'
 import { api } from '@/utils/api'
 import { useAlertStore } from '@/lib/stores/alert.store'
@@ -263,9 +263,9 @@ export default function HomePage() {
               </Badge>
             </div>
 
-            <Card className="h-[600px]">
+            <div className="h-[600px]">
               <ChatInterface onVisaTypeSelected={handleVisaTypeSelected} />
-            </Card>
+            </div>
 
             <div className="text-center mt-6">
               <Button 

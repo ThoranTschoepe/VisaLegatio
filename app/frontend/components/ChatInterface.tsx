@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Sparkles } from 'lucide-react'
+import { Send, Bot, User } from 'lucide-react'
 import { Message, VisaType } from '@/types'
 import { api, apiUtils } from '@/utils/api'
-import { Button, Badge } from '@/components/UI'
+import { Button } from '@/components/UI'
 import { useAlertStore } from '@/lib/stores/alert.store'
 
 interface ChatInterfaceProps {
@@ -147,32 +147,16 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
   }
 
   return (
-    <div className="flex flex-col h-full bg-base-100 rounded-lg shadow-lg overflow-hidden border border-base-300">
+    <div className="flex flex-col h-full bg-base-100 rounded-lg shadow-lg overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary to-secondary text-white p-4">
+      <div className="bg-base-200 border-b border-base-300 p-4">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="avatar">
-              <div className="w-10 rounded-full bg-base-100">
-                <Bot className="w-6 h-6 text-primary m-2" />
-              </div>
+          <div className="avatar">
+            <div className="w-8 rounded-full bg-primary">
+              <Bot className="w-5 h-5 text-white m-1.5" />
             </div>
-            <div className={`absolute -top-1 -right-1 w-3 h-3 rounded-full animate-pulse ${
-              isBackendAvailable ? 'bg-success' : 'bg-warning'
-            }`} />
           </div>
-          <div>
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              AVA - AI Visa Assistant
-              <Badge variant="ghost" className="text-xs bg-white/20 text-white border-white/30">
-                <Sparkles className="w-3 h-3 mr-1" />
-                {isBackendAvailable ? 'AI' : 'Demo'}
-              </Badge>
-            </h3>
-            <p className="text-primary-content/70 text-sm">
-              {isBackendAvailable ? 'Online • Ready to help' : 'Demo mode • Limited functionality'}
-            </p>
-          </div>
+          <h3 className="font-semibold text-lg">AVA</h3>
         </div>
       </div>
 
@@ -184,14 +168,14 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
             className={`chat ${message.sender === 'user' ? 'chat-end' : 'chat-start'} chat-message`}
           >
             <div className="chat-image avatar">
-              <div className="w-8 rounded-full">
+              <div className="w-6 rounded-full">
                 {message.sender === 'ava' ? (
-                  <div className="bg-primary text-white rounded-full flex items-center justify-center w-8 h-8">
-                    <Bot className="w-5 h-5" />
+                  <div className="bg-primary text-white rounded-full flex items-center justify-center w-6 h-6">
+                    <Bot className="w-3 h-3" />
                   </div>
                 ) : (
-                  <div className="bg-neutral text-white rounded-full flex items-center justify-center w-8 h-8">
-                    <User className="w-5 h-5" />
+                  <div className="bg-base-300 text-base-content rounded-full flex items-center justify-center w-6 h-6">
+                    <User className="w-3 h-3" />
                   </div>
                 )}
               </div>
@@ -204,15 +188,6 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
             }`}>
               <p className="whitespace-pre-wrap leading-relaxed">{message.text}</p>
               
-              {/* Show confidence for AVA messages */}
-              {message.sender === 'ava' && message.metadata?.confidence && (
-                <div className="mt-2 pt-2 border-t border-white/20">
-                  <Badge variant="ghost" size="xs" className="bg-white/20 text-white border-white/30">
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    {Math.round(message.metadata.confidence * 100)}% confident
-                  </Badge>
-                </div>
-              )}
             </div>
             
             <div className="chat-footer opacity-50 text-xs">
@@ -225,24 +200,14 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
         {isLoading && (
           <div className="chat chat-start">
             <div className="chat-image avatar">
-              <div className="w-8 rounded-full">
-                <div className="bg-primary text-white rounded-full flex items-center justify-center w-8 h-8">
-                  <Bot className="w-5 h-5" />
+              <div className="w-6 rounded-full">
+                <div className="bg-primary text-white rounded-full flex items-center justify-center w-6 h-6">
+                  <Bot className="w-3 h-3" />
                 </div>
               </div>
             </div>
             <div className="chat-bubble chat-bubble-secondary">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-current rounded-full animate-bounce" />
-                <div 
-                  className="w-2 h-2 bg-current rounded-full animate-bounce" 
-                  style={{ animationDelay: '0.1s' }} 
-                />
-                <div 
-                  className="w-2 h-2 bg-current rounded-full animate-bounce" 
-                  style={{ animationDelay: '0.2s' }} 
-                />
-              </div>
+              <div className="animate-pulse">AVA is typing...</div>
             </div>
           </div>
         )}
@@ -294,8 +259,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
           </Button>
         </div>
         <p className="text-xs opacity-50 mt-2 text-center">
-          AVA can make mistakes. Please verify important information.
-          {!isBackendAvailable && ' • Currently in demo mode'}
+          Please verify important information
         </p>
       </div>
     </div>
