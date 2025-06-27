@@ -11,9 +11,8 @@ import DocumentViewer from './DocumentViewer'
 import DocumentAnalysisPanel from './DocumentAnalysisPanel'
 import DocumentFlagging from './DocumentFlagging'
 
-// CONSISTENT backend URL - always use port 8000 for documents
-const BACKEND_BASE = 'http://localhost:8000'
-
+// Use the configured API URL from environment
+const BACKEND_BASE = process.env.NEXT_PUBLIC_API_URL
 
 interface ApplicationReviewProps {
   application: EmbassyApplication
@@ -136,7 +135,7 @@ export default function ApplicationReview({
         console.log('🏥 Backend health check:', healthResponse.ok ? 'OK' : 'FAILED')
       } catch (healthError) {
         console.error('❌ Backend not accessible:', healthError)
-        setDocumentError('Backend server not accessible. Please check if the backend is running on http://localhost:8000')
+        setDocumentError(`Backend server not accessible. Please check if the backend is running on ${BACKEND_BASE}`)
         return
       }
       
@@ -504,11 +503,10 @@ export default function ApplicationReview({
       let urlToUse = document.view_url
       
       if (document.view_url.startsWith('http://') || document.view_url.startsWith('https://')) {
-        const url = new URL(document.view_url)
-        if (url.port !== '8000' && !document.view_url.includes('localhost:8000')) {
-          urlToUse = document.view_url.replace(/localhost:\d+/, 'localhost:8000')
-        }
+        // If it's already a full URL, use it as-is
+        urlToUse = document.view_url
       } else {
+        // If it's a relative URL, prepend the backend base URL
         urlToUse = `${BACKEND_BASE}${document.view_url.startsWith('/') ? '' : '/'}${document.view_url}`
       }
       
@@ -552,11 +550,10 @@ export default function ApplicationReview({
       let urlToOpen = document.view_url
       
       if (document.view_url.startsWith('http://') || document.view_url.startsWith('https://')) {
-        const url = new URL(document.view_url)
-        if (url.port !== '8000' && !document.view_url.includes('localhost:8000')) {
-          urlToOpen = document.view_url.replace(/localhost:\d+/, 'localhost:8000')
-        }
+        // If it's already a full URL, use it as-is
+        urlToOpen = document.view_url
       } else {
+        // If it's a relative URL, prepend the backend base URL
         urlToOpen = `${BACKEND_BASE}${document.view_url.startsWith('/') ? '' : '/'}${document.view_url}`
       }
       
