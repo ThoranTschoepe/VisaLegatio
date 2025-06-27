@@ -26,7 +26,7 @@ export default function DemoWarningPopup() {
 
   return (
     <div className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-      <div className="bg-base-100 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-slideUp">
+      <div className="bg-base-100 rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col animate-slideUp">
         {/* Header with gradient */}
         <div className="bg-gradient-to-r from-error to-warning p-6 text-error-content">
           <div className="flex items-start justify-between">
@@ -50,16 +50,16 @@ export default function DemoWarningPopup() {
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 overflow-y-auto flex-1">
           {/* Main Warning */}
           <div className="bg-error/10 border-2 border-error/20 rounded-lg p-5">
             <div className="flex gap-3">
               <Shield className="w-6 h-6 text-error flex-shrink-0 mt-0.5" />
               <div>
-                <h3 className="font-semibold text-error-content text-lg mb-2">
+                <h3 className="font-semibold text-sm text-lg mb-2">
                   Do Not Enter Personal or Sensitive Information
                 </h3>
-                <p className="text-error-content/90">
+                <p className="text-sm">
                   This is a public demonstration of the VisaLegatio system. All data entered, including application forms, documents, and messages, may be visible to other users and is not secure.
                 </p>
               </div>
@@ -68,11 +68,11 @@ export default function DemoWarningPopup() {
 
           {/* What NOT to enter */}
           <div className="bg-warning/10 border border-warning/20 rounded-lg p-5">
-            <h4 className="font-semibold text-warning-content mb-3 flex items-center gap-2">
+            <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
               <Database className="w-5 h-5" />
               Do NOT Enter the Following:
             </h4>
-            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-warning-content/90">
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
               <li className="flex items-start gap-2">
                 <span className="text-warning mt-0.5">•</span>
                 <span>Real passport or ID numbers</span>
@@ -110,15 +110,15 @@ export default function DemoWarningPopup() {
 
           {/* Demo Purpose */}
           <div className="bg-info/10 border border-info/20 rounded-lg p-5">
-            <h4 className="font-semibold text-info-content mb-2 flex items-center gap-2">
+            <h4 className="font-semibold text-sm mb-2 flex items-center gap-2">
               <Eye className="w-5 h-5" />
               Demonstration Purpose Only
             </h4>
-            <p className="text-info-content/90 mb-3">
+            <p className="text-sm mb-3">
               This platform is designed to showcase the capabilities of the VisaLegatio digital embassy system. 
               Please use fictional data for testing purposes.
             </p>
-            <div className="text-sm text-info-content/80">
+            <div className="text-sm text-sm">
               <p className="font-medium mb-1">Demo Credentials Available:</p>
               <ul className="space-y-1 ml-4">
                 <li>• Pre-configured test applications</li>
@@ -132,7 +132,7 @@ export default function DemoWarningPopup() {
           <div className="bg-base-200 border border-base-300 rounded-lg p-4">
             <div className="flex items-start gap-3">
               <Lock className="w-5 h-5 text-base-content/60 mt-0.5" />
-              <div className="text-sm text-base-content/70">
+              <div className="text-sm text-sm">
                 <p className="font-medium mb-1">Data Visibility Notice:</p>
                 <p>
                   All information entered into this demonstration may be stored temporarily and could be accessed by other demo users. 
@@ -151,7 +151,7 @@ export default function DemoWarningPopup() {
                 onChange={(e) => setDontShowAgain(e.target.checked)}
                 className="checkbox checkbox-primary mt-0.5"
               />
-              <span className="text-sm text-base-content/70 group-hover:text-base-content">
+              <span className="text-sm text-sm group-hover:text-base-content">
                 I understand this is a public demo and will not enter any personal or sensitive information
               </span>
             </label>

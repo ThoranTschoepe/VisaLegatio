@@ -364,7 +364,7 @@ export default function HomePage() {
       <DemoWarningPopup />
       
       {/* Hero Section */}
-      <div className="hero min-h-screen bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10">
+      <div className="hero h-screen bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 overflow-hidden">
         <div className="hero-content text-center">
           <div className="max-w-4xl">
             <div className="mb-8">
