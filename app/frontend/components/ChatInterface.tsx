@@ -188,6 +188,14 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
             }`}>
               <p className="whitespace-pre-wrap leading-relaxed">{message.text}</p>
               
+              {/* Show confidence for AVA messages */}
+              {message.sender === 'ava' && message.metadata?.confidence !== undefined && (
+                <div className="mt-2 pt-2 border-t border-base-content/10">
+                  <span className="text-xs opacity-60">
+                    Confidence: {Math.round(message.metadata.confidence * 100)}%
+                  </span>
+                </div>
+              )}
             </div>
             
             <div className="chat-footer opacity-50 text-xs">
