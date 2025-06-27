@@ -1,0 +1,208 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+/* Tailwind v4 theme configuration */
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Consolas", "Monaco", "Courier New", monospace;
+  
+  /* Custom spacing */
+  --spacing-18: 4.5rem;
+  --spacing-88: 22rem;
+  --spacing-128: 32rem;
+  
+  /* Custom border radius */
+  --radius-4xl: 2rem;
+  --radius-5xl: 2.5rem;
+  
+  /* Custom shadows */
+  --shadow-soft: 0 2px 15px rgba(0, 0, 0, 0.08);
+  --shadow-medium: 0 4px 25px rgba(0, 0, 0, 0.1);
+  --shadow-strong: 0 8px 40px rgba(0, 0, 0, 0.12);
+  --shadow-colored: 0 8px 30px color-mix(in srgb, var(--primary) 15%, transparent);
+  --shadow-colored-lg: 0 12px 50px color-mix(in srgb, var(--primary) 20%, transparent);
+  
+  /* Custom animations */
+  --animate-fade-in: fadeIn 0.5s ease-in-out;
+  --animate-slide-up: slideUp 0.5s ease-out;
+  --animate-visa-pulse: visaPulse 2s infinite;
+  
+  /* Container settings */
+  --container-center: true;
+  --container-padding: 1rem;
+  --container-padding-sm: 1rem;
+  --container-padding-lg: 4rem;
+  --container-padding-xl: 8rem;
+  --container-padding-2xl: 12rem;
+}
+
+/* DaisyUI v5 configuration */
+@plugin "daisyui" {
+  themes: cupcake, dracula;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes visaPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Global styles */
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+  
+  body {
+    @apply min-h-screen bg-base-100;
+  }
+}
+
+/* Component styles */
+@layer components {
+  /* Typography improvements */
+  h1 {
+    @apply text-2xl font-bold mb-5;
+  }
+
+  h2 {
+    @apply text-xl font-bold mb-3;
+  }
+
+  h3 {
+    @apply text-lg font-bold mb-1;
+  }
+
+  /* Logo styling */
+  .logo {
+    @apply font-bold;
+    font-family: 'JetBrains Mono', 'Consolas', 'Monaco', 'Courier New', monospace;
+  }
+
+  /* Chat interface styles */
+  .chat-message {
+    @apply transition-all duration-300 ease-in-out;
+  }
+
+  .chat-message:hover {
+    @apply transform scale-[1.02];
+  }
+
+  /* Status tracker styles */
+  .status-step {
+    @apply transition-all duration-500 ease-in-out;
+  }
+
+  .status-step.completed {
+    @apply text-success;
+  }
+
+  .status-step.current {
+    @apply text-primary animate-pulse;
+  }
+
+  /* Document upload styles */
+  .document-upload-area {
+    @apply border-2 border-dashed border-base-300 rounded-lg p-6 transition-all duration-300;
+  }
+
+  .document-upload-area:hover {
+    @apply border-primary bg-primary/5;
+  }
+
+  .document-upload-area.dragging {
+    @apply border-primary bg-primary/10;
+  }
+
+  /* Loading overlay */
+  .loading-overlay {
+    @apply absolute inset-0 bg-base-100/80 backdrop-blur-sm flex flex-col justify-center items-center z-50;
+  }
+}
+
+/* Utilities */
+@layer utilities {
+  .visa-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  .visa-slide-up {
+    animation: slideUp 0.5s ease-out;
+  }
+
+  .visa-pulse {
+    animation: visaPulse 2s infinite;
+  }
+  
+  .animate-fadeIn {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slideUp {
+    animation: slideUp 0.4s ease-out;
+  }
+}
+
+/* Remove number input spinners */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Responsive improvements */
+@media (max-width: 640px) {
+  .container {
+    @apply px-4;
+  }
+  
+  h1 {
+    @apply text-xl;
+  }
+  
+  h2 {
+    @apply text-lg;
+  }
+}
+
+/* Enhanced focus styles for accessibility */
+:focus-visible {
+  @apply ring-2 ring-primary ring-offset-2 ring-offset-base-100;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

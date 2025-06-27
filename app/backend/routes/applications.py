@@ -7,8 +7,8 @@ import json
 import hashlib
 from datetime import datetime, timedelta
 
-from database import get_db, User, Application, Document, StatusUpdate
-from models import ApplicationCreate, ApplicationResponse, ApplicationUpdate, FormQuestionsResponse, Question
+from database import get_db, User, Application, Document, StatusUpdate, FlaggedDocument
+from models import ApplicationCreate, ApplicationResponse, ApplicationUpdate, FormQuestionsResponse, Question, FlagDocumentRequest, UnflagDocumentRequest, FlaggedDocumentResponse
 from utils import generate_id, calculate_risk_score, calculate_approval_probability, get_form_questions as get_visa_form_questions
 
 router = APIRouter()
@@ -129,6 +129,37 @@ async def get_applications(
         # Determine actual status considering document requirements
         actual_status = determine_application_status(app.id, app.visa_type, db)
         
+        # Get flagged documents for this application
+        flagged_docs = db.query(FlaggedDocument).filter(
+            FlaggedDocument.application_id == app.id,
+            FlaggedDocument.resolved == False
+        ).all()
+        
+        flagged_documents = []
+        for flag in flagged_docs:
+            doc = db.query(Document).filter(Document.id == flag.document_id).first()
+            if doc:
+                flagged_documents.append(FlaggedDocumentResponse(
+                    id=flag.id,
+                    user_id=flag.user_id,
+                    document_id=flag.document_id,
+                    application_id=flag.application_id,
+                    reason=flag.reason,
+                    flagged_by_officer_id=flag.flagged_by_officer_id,
+                    flagged_at=flag.flagged_at,
+                    resolved=flag.resolved,
+                    resolved_at=flag.resolved_at,
+                    document={
+                        "id": doc.id,
+                        "name": doc.name,
+                        "type": doc.type,
+                        "size": doc.size,
+                        "verified": doc.verified,
+                        "uploaded_at": doc.uploaded_at,
+                        "file_path": doc.file_path
+                    }
+                ))
+        
         app_data = ApplicationResponse(
             id=app.id,
             user_id=app.user_id,
@@ -151,7 +182,10 @@ async def get_applications(
             last_activity=app.updated_at,
             
             # Document status
-            document_requirements=doc_status
+            document_requirements=doc_status,
+            
+            # Flagged documents
+            flagged_documents=flagged_documents
         )
         
         # Apply search filter
@@ -183,6 +217,37 @@ async def get_application(application_id: str, db: Session = Depends(get_db)):
     doc_status = check_document_requirements(application_id, app.visa_type, db)
     actual_status = determine_application_status(application_id, app.visa_type, db)
     
+    # Get flagged documents for this application
+    flagged_docs = db.query(FlaggedDocument).filter(
+        FlaggedDocument.application_id == application_id,
+        FlaggedDocument.resolved == False
+    ).all()
+    
+    flagged_documents = []
+    for flag in flagged_docs:
+        doc = db.query(Document).filter(Document.id == flag.document_id).first()
+        if doc:
+            flagged_documents.append(FlaggedDocumentResponse(
+                id=flag.id,
+                user_id=flag.user_id,
+                document_id=flag.document_id,
+                application_id=flag.application_id,
+                reason=flag.reason,
+                flagged_by_officer_id=flag.flagged_by_officer_id,
+                flagged_at=flag.flagged_at,
+                resolved=flag.resolved,
+                resolved_at=flag.resolved_at,
+                document={
+                    "id": doc.id,
+                    "name": doc.name,
+                    "type": doc.type,
+                    "size": doc.size,
+                    "verified": doc.verified,
+                    "uploaded_at": doc.uploaded_at,
+                    "file_path": doc.file_path
+                }
+            ))
+    
     return ApplicationResponse(
         id=app.id,
         user_id=app.user_id,
@@ -206,6 +271,9 @@ async def get_application(application_id: str, db: Session = Depends(get_db)):
         
         # Document status
         document_requirements=doc_status,
+        
+        # Flagged documents
+        flagged_documents=flagged_documents,
         
         # Relationships
         documents=[{
@@ -489,7 +557,7 @@ async def add_documents_to_application(
 @router.post("/{application_id}/flag-document")
 async def flag_document(
     application_id: str,
-    flag_data: dict,
+    flag_request: FlagDocumentRequest,
     db: Session = Depends(get_db)
 ):
     """Flag a document that needs applicant attention"""
@@ -498,50 +566,103 @@ async def flag_document(
     if not app:
         raise HTTPException(status_code=404, detail="Application not found")
     
-    document_id = flag_data.get("document_id")
-    reason = flag_data.get("reason", "")
-    officer_id = flag_data.get("officer_id")
+    # Verify document exists
+    doc = db.query(Document).filter(
+        Document.id == flag_request.document_id,
+        Document.application_id == application_id
+    ).first()
     
-    if document_id:
-        # Verify document exists
-        doc = db.query(Document).filter(
-            Document.id == document_id,
-            Document.application_id == application_id
-        ).first()
-        
-        if not doc:
-            raise HTTPException(status_code=404, detail="Document not found")
-        
-        # Flag the document
-        app.flagged_document_id = document_id
-        app.flagged_document_reason = reason
-        app.flagged_by_officer_id = officer_id
-        app.flagged_at = datetime.utcnow()
-        
-        # Create status update
-        status_update = StatusUpdate(
-            id=generate_id("status"),
-            application_id=application_id,
-            status=app.status,
-            notes=f"Document flagged for review: {doc.name} - {reason}",
-            officer_id=officer_id,
-            timestamp=datetime.utcnow()
-        )
-        db.add(status_update)
-    else:
-        # Unflag if no document_id provided
-        app.flagged_document_id = None
-        app.flagged_document_reason = None
-        app.flagged_by_officer_id = None
-        app.flagged_at = None
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    # Check if this document is already flagged
+    existing_flag = db.query(FlaggedDocument).filter(
+        FlaggedDocument.document_id == flag_request.document_id,
+        FlaggedDocument.application_id == application_id,
+        FlaggedDocument.resolved == False
+    ).first()
+    
+    if existing_flag:
+        raise HTTPException(status_code=400, detail="Document is already flagged")
+    
+    # Create new flag
+    flag = FlaggedDocument(
+        id=generate_id("flag"),
+        user_id=app.user_id,
+        document_id=flag_request.document_id,
+        application_id=application_id,
+        reason=flag_request.reason,
+        flagged_by_officer_id=flag_request.officer_id,
+        flagged_at=datetime.utcnow()
+    )
+    db.add(flag)
+    
+    # Create status update
+    status_update = StatusUpdate(
+        id=generate_id("status"),
+        application_id=application_id,
+        status=app.status,
+        notes=f"Document flagged for review: {doc.name} - {flag_request.reason}",
+        officer_id=flag_request.officer_id,
+        timestamp=datetime.utcnow()
+    )
+    db.add(status_update)
+    
+    db.commit()
+    db.refresh(flag)
+    
+    return {
+        "message": "Document flagged successfully",
+        "flag_id": flag.id,
+        "document_id": flag.document_id,
+        "reason": flag.reason
+    }
+
+@router.post("/{application_id}/unflag-document")
+async def unflag_document(
+    application_id: str,
+    unflag_request: UnflagDocumentRequest,
+    db: Session = Depends(get_db)
+):
+    """Unflag a document"""
+    
+    app = db.query(Application).filter(Application.id == application_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+    
+    # Find the flag
+    flag = db.query(FlaggedDocument).filter(
+        FlaggedDocument.id == unflag_request.flag_id,
+        FlaggedDocument.application_id == application_id
+    ).first()
+    
+    if not flag:
+        raise HTTPException(status_code=404, detail="Flag not found")
+    
+    # Get document details for status update
+    doc = db.query(Document).filter(Document.id == flag.document_id).first()
+    
+    # Mark as resolved
+    flag.resolved = True
+    flag.resolved_at = datetime.utcnow()
+    
+    # Create status update
+    status_update = StatusUpdate(
+        id=generate_id("status"),
+        application_id=application_id,
+        status=app.status,
+        notes=f"Document flag resolved: {doc.name if doc else 'Unknown document'}",
+        timestamp=datetime.utcnow()
+    )
+    db.add(status_update)
     
     db.commit()
     
     return {
-        "message": "Document flagged successfully" if document_id else "Document unflagged",
-        "flagged_document_id": app.flagged_document_id,
-        "flagged_document_reason": app.flagged_document_reason
+        "message": "Document unflagged successfully",
+        "flag_id": flag.id
     }
+
 
 # Utility functions
 def get_estimated_days(status: str, visa_type: str, requirements_met: bool = True) -> int:
