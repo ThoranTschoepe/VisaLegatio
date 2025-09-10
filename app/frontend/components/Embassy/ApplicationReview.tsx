@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { debug, error as logError, warn as logWarn } from '@/lib/log'
 import { CheckCircle2, AlertTriangle, Eye, Maximize2, ExternalLink, AlertCircle, Brain, FileWarning, Flag } from 'lucide-react'
 import { EmbassyApplication, Officer, EmbassyDocument } from '@/types/embassy.types'
 import { api } from '@/utils/api'
@@ -80,22 +81,22 @@ export default function ApplicationReview({
 
   // Load current flagged documents
   useEffect(() => {
-    console.log('📋 Application data changed, updating flagged documents:', application.flaggedDocuments)
+  debug('📋 Application data changed, updating flagged documents:', application.flaggedDocuments)
     if (application.flaggedDocuments && application.flaggedDocuments.length > 0) {
       const flaggedIds = new Set(application.flaggedDocuments.map(f => f.documentId))
       setFlaggedDocumentIds(flaggedIds)
-      console.log('✅ Set flagged document IDs:', flaggedIds)
+  debug('✅ Set flagged document IDs:', flaggedIds)
     } else {
       // If no flagged documents in application data, clear the state
       setFlaggedDocumentIds(new Set())
-      console.log('🧹 Cleared flagged document IDs')
+  debug('🧹 Cleared flagged document IDs')
     }
   }, [application])
 
   // Function to reload fresh application data including flagged documents
   const reloadApplicationData = async () => {
     try {
-      console.log('🔄 Reloading fresh application data...')
+  debug('🔄 Reloading fresh application data...')
       
       // Try to use parent callback first (to update the parent's application state)
       if (onRefreshApplication) {
@@ -109,16 +110,16 @@ export default function ApplicationReview({
       if (freshAppData.flaggedDocuments && freshAppData.flaggedDocuments.length > 0) {
         const flaggedIds = new Set(freshAppData.flaggedDocuments.map(f => f.documentId))
         setFlaggedDocumentIds(flaggedIds)
-        console.log('✅ Updated flagged documents:', flaggedIds)
+  debug('✅ Updated flagged documents:', flaggedIds)
       } else {
         setFlaggedDocumentIds(new Set())
-        console.log('✅ No flagged documents found')
+  debug('✅ No flagged documents found')
       }
       
       // Also reload documents to ensure everything is in sync
       await loadDocuments()
     } catch (error) {
-      console.error('❌ Failed to reload application data:', error)
+  logError('❌ Failed to reload application data:', error)
     }
   }
 
@@ -127,21 +128,21 @@ export default function ApplicationReview({
       setIsLoadingDocuments(true)
       setDocumentError('')
       
-      console.log(`🔍 Loading documents for application: ${application.id}`)
+  debug(`🔍 Loading documents for application: ${application.id}`)
       
       // Check backend connectivity first
       try {
         const healthResponse = await fetch(`${BACKEND_BASE}/api/health`)
-        console.log('🏥 Backend health check:', healthResponse.ok ? 'OK' : 'FAILED')
+  debug('🏥 Backend health check:', healthResponse.ok ? 'OK' : 'FAILED')
       } catch (healthError) {
-        console.error('❌ Backend not accessible:', healthError)
+  logError('❌ Backend not accessible:', healthError)
         setDocumentError(`Backend server not accessible. Please check if the backend is running on ${BACKEND_BASE}`)
         return
       }
       
       // Load document requirements first
       const requirements = await api.getDocumentRequirements(application.visaType as any)
-      console.log('📋 Document requirements loaded:', requirements)
+  debug('📋 Document requirements loaded:', requirements)
       
       // Get documents with view URLs from backend - use the proper API client
       let uploadedDocs: any[] = []
@@ -152,28 +153,28 @@ export default function ApplicationReview({
         
         if (response.ok) {
           uploadedDocs = await response.json()
-          console.log('📄 Loaded documents from backend (list endpoint):', uploadedDocs)
+          debug('📄 Loaded documents from backend (list endpoint):', uploadedDocs)
         } else {
-          console.warn(`List endpoint failed (${response.status}), trying application endpoint...`)
+          logWarn(`List endpoint failed (${response.status}), trying application endpoint...`)
           // Fallback to application documents endpoint
           uploadedDocs = await api.getApplicationDocuments(application.id)
-          console.log('📄 Loaded documents from backend (app endpoint):', uploadedDocs)
+          debug('📄 Loaded documents from backend (app endpoint):', uploadedDocs)
         }
       } catch (fetchError) {
-        console.warn('Document fetch error:', fetchError)
+  logWarn('Document fetch error:', fetchError)
         // Fallback to application documents endpoint
         try {
           uploadedDocs = await api.getApplicationDocuments(application.id)
-          console.log('📄 Loaded documents from fallback endpoint:', uploadedDocs)
+          debug('📄 Loaded documents from fallback endpoint:', uploadedDocs)
         } catch (fallbackError) {
-          console.error('Both document endpoints failed:', fallbackError)
+          logError('Both document endpoints failed:', fallbackError)
           uploadedDocs = []
         }
       }
       
       if (uploadedDocs.length === 0) {
-        console.warn(`⚠️  No documents found for application ${application.id}`)
-        console.log('📊 Debug info:', {
+  logWarn(`⚠️  No documents found for application ${application.id}`)
+  debug('📊 Debug info:', {
           applicationId: application.id,
           backendBase: BACKEND_BASE,
           visaType: application.visaType,
@@ -192,13 +193,13 @@ export default function ApplicationReview({
           let aiAnalysis = undefined
           if (isJohnDoe) {
             if (doc.type === 'passport') {
-              aiAnalysis = JOHN_DOE_ANALYSIS.passport
+              aiAnalysis = { ...JOHN_DOE_ANALYSIS.passport, concerns: [...JOHN_DOE_ANALYSIS.passport.concerns] }
             } else if (doc.type === 'bank_statement') {
-              aiAnalysis = JOHN_DOE_ANALYSIS.bank_statement
+              aiAnalysis = { ...JOHN_DOE_ANALYSIS.bank_statement, concerns: [...JOHN_DOE_ANALYSIS.bank_statement.concerns] }
             } else if (doc.type === 'invitation_letter') {
-              aiAnalysis = JOHN_DOE_ANALYSIS.invitation_letter
+              aiAnalysis = { ...JOHN_DOE_ANALYSIS.invitation_letter, concerns: [...JOHN_DOE_ANALYSIS.invitation_letter.concerns] }
             } else if (doc.type === 'flight_itinerary') {
-              aiAnalysis = JOHN_DOE_ANALYSIS.flight_itinerary
+              aiAnalysis = { ...JOHN_DOE_ANALYSIS.flight_itinerary, concerns: [...JOHN_DOE_ANALYSIS.flight_itinerary.concerns] }
             }
           }
           

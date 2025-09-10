@@ -2,6 +2,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { debug, error as logError } from '@/lib/log'
 import { Upload, FileText, CheckCircle2, AlertCircle, X, Camera, Trash2, ArrowRight, Clock, AlertTriangle, Shield, Loader2 } from 'lucide-react'
 import { Document, DocumentType, VisaType } from '@/types'
 import { api, apiUtils } from '@/utils/api'
@@ -121,7 +122,7 @@ export default function DocumentUpload({
     setUploadingDocs(prev => new Set([...prev, uploadId]))
 
     try {
-      console.log(`🚀 Starting upload: ${file.name} (${file.size} bytes) as ${docType}`)
+  debug(`🚀 Starting upload: ${file.name} (${file.size} bytes) as ${docType}`)
       
       // Upload to backend using real API
       const uploadResults = await api.uploadDocumentsToApplication(applicationId, [
@@ -152,7 +153,7 @@ export default function DocumentUpload({
       showSuccess(`${file.name} uploaded and ${uploadedDoc.verified ? 'verified' : 'pending verification'}!`)
       
     } catch (error) {
-      console.error('Error uploading document:', error)
+  logError('Error uploading document:', error)
       const errorMessage = apiUtils.formatErrorMessage(error)
       showError(`Failed to upload ${file.name}: ${errorMessage}`)
       
@@ -212,7 +213,7 @@ export default function DocumentUpload({
       
       showSuccess('Document removed successfully')
     } catch (error) {
-      console.error('Error removing document:', error)
+  logError('Error removing document:', error)
       showError(`Failed to remove document: ${apiUtils.formatErrorMessage(error)}`)
     }
   }
@@ -321,7 +322,7 @@ export default function DocumentUpload({
         onDrop={(e) => handleDrop(e, docType)}
       >
         <input
-          ref={el => fileInputRefs.current[docType] = el}
+          ref={el => { fileInputRefs.current[docType] = el }}
           type="file"
           accept="image/*,.pdf"
           onChange={(e) => handleFileInput(e, docType)}

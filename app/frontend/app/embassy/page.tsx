@@ -37,7 +37,7 @@ export default function EmbassyPage() {
       <div className="min-h-screen bg-base-200 flex items-center justify-center">
         <div className="text-center">
           <div className="loading loading-spinner loading-lg text-primary"></div>
-          <p className="mt-4 text-gray-600">Loading Embassy Portal...</p>
+          <p className="mt-4 text-base-content/70">Loading Embassy Portal...</p>
         </div>
       </div>
     )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import ProgressBar from './UI/ProgressBar'
 import { ChevronLeft, ChevronRight, Save, Send, AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Shield } from 'lucide-react'
 import { Question, VisaType } from '@/types'
 import { api } from '@/utils/api'
@@ -205,7 +206,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
     return (
       <div className="max-w-2xl mx-auto card bg-base-100 shadow-xl overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-success to-primary text-white p-6">
+  <div className="bg-gradient-to-r from-success to-primary text-white p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold">Secure Your Application</h2>
@@ -221,13 +222,14 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
 
           {/* Progress bar */}
           <div className="mt-4">
-            <div className="flex justify-between text-sm text-success-content/80 mb-2">
-              <span>Ready to Submit</span>
-              <span>100% complete</span>
-            </div>
-            <div className="w-full bg-success/30 rounded-full h-2">
-              <div className="bg-white h-2 rounded-full w-full" />
-            </div>
+            <ProgressBar
+              value={100}
+              backgroundClassName="bg-success/30"
+              barClassName="bg-base-100"
+              labelLeft="Ready to Submit"
+              labelRight="100% complete"
+              srLabel="Form completion progress"
+            />
           </div>
         </div>
 
@@ -357,16 +359,14 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
 
         {/* Progress bar */}
         <div className="mt-4">
-          <div className="flex justify-between text-sm text-primary-content/80 mb-2">
-            <span>Progress</span>
-            <span>{Math.round(progress)}% complete</span>
-          </div>
-          <div className="w-full bg-primary/30 rounded-full h-2">
-            <div 
-              className="bg-white h-2 rounded-full transition-all duration-500 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+          <ProgressBar
+            value={progress}
+            backgroundClassName="bg-primary/30"
+            barClassName="bg-base-100"
+            labelLeft="Progress"
+            labelRight={`${Math.round(progress)}% complete`}
+            srLabel="Question progress"
+          />
         </div>
       </div>
 

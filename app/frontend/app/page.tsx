@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Globe, Zap, Shield, Users, ArrowRight, Sparkles, QrCode, Download, Copy, Lock, Eye, EyeOff, CheckCircle2, Upload } from 'lucide-react'
+import { ArrowRight, Sparkles, Zap, Shield, Users, QrCode, Download, Copy, Lock, Eye, EyeOff, CheckCircle2, Upload } from 'lucide-react'
 import ChatInterface from '@/components/ChatInterface'
 import DynamicForm from '@/components/DynamicForm'
 import DocumentUpload from '@/components/DocumentUpload'
@@ -76,6 +76,18 @@ export default function HomePage() {
       }
     }
   }, [showSuccess])
+
+  // Lock scroll on landing hero only
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    const original = document.body.style.overflow
+    if (currentStep === 'landing') {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = original || ''
+    }
+    return () => { document.body.style.overflow = original }
+  }, [currentStep])
 
   const handleVisaTypeSelected = (visaType: VisaType) => {
     setSelectedVisaType(visaType)
@@ -250,24 +262,12 @@ export default function HomePage() {
         {/* Demo Warning Popup */}
         <DemoWarningPopup />
         
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-4">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center mb-8">
-              <h1 className="text-4xl font-bold mb-4">Chat with AVA</h1>
-              <p className="text-lg opacity-70">
-                Your AI visa assistant is ready to help you find the right visa
-              </p>
-              <Badge variant="primary" className="mt-2">
-                <Sparkles className="w-4 h-4 mr-1" />
-                AI-Powered
-              </Badge>
-            </div>
-
-            <div className="h-[600px]">
+            <div className="h-[calc(100vh-160px)]">
               <ChatInterface onVisaTypeSelected={handleVisaTypeSelected} />
             </div>
-
-            <div className="text-center mt-6">
+            <div className="text-center mt-4">
               <Button 
                 variant="ghost" 
                 onClick={() => setCurrentStep('landing')}
@@ -363,42 +363,24 @@ export default function HomePage() {
       {/* Demo Warning Popup - Shows on first visit */}
       <DemoWarningPopup />
       
-      {/* Hero Section */}
-      <div className="hero h-screen bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 overflow-hidden">
-        <div className="hero-content text-center">
-          <div className="max-w-4xl">
-            <div className="mb-8">
-              <div className="flex items-center justify-center gap-3 mb-6">
-                <Globe className="w-12 h-12 text-primary" />
-                <h1 className="text-6xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  VisaLegatio
-                </h1>
-              </div>
-              
-              <p className="text-xl mb-8 opacity-80 max-w-3xl mx-auto leading-relaxed">
-                The future of visa applications. Smart, transparent, and designed for the digital age.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={startChatDirectly}
-                >
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Start New Application
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  size="lg"
-                  onClick={showStatusLogin}
-                >
-                  Check Application Status
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </div>
+      {/* Hero Section (light modern tweak) */}
+  <div className="relative h-screen flex items-center justify-center radial-spot">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-base-100 to-secondary/10" />
+        <div className="relative z-10 px-6 w-full max-w-5xl mx-auto text-center">
+          <div className="mb-10">
+                <h1 className="mb-6 text-5xl md:text-6xl font-bold tracking-tight text-gradient leading-tight">VisaLegatio</h1>
+            <p className="text-lg md:text-xl mb-10 text-base-content/70 max-w-3xl mx-auto leading-relaxed">
+              Smart, transparent & AI‑assisted visa applications.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button variant="primary" size="lg" onClick={startChatDirectly}>
+                <Sparkles className="w-5 h-5 mr-2" /> Start New Application
+              </Button>
+              <Button variant="outline" size="lg" onClick={showStatusLogin}>
+                Check Application Status <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
             </div>
+            {/* Stats grid removed as requested */}
           </div>
         </div>
       </div>

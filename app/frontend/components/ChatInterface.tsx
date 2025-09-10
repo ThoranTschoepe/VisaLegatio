@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User } from 'lucide-react'
+import { Send, Bot, User, Wifi, WifiOff } from 'lucide-react'
 import { Message, VisaType } from '@/types'
 import { api, apiUtils } from '@/utils/api'
 import { Button } from '@/components/UI'
@@ -26,6 +26,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { showError, showSuccess } = useAlertStore()
   const [isBackendAvailable, setIsBackendAvailable] = useState(true)
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -127,12 +128,20 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       sendMessage()
     }
   }
+
+  // Auto resize textarea
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto'
+      inputRef.current.style.height = inputRef.current.scrollHeight + 'px'
+    }
+  }, [input])
 
   const quickReplies = [
     "I need a tourist visa",
@@ -147,21 +156,33 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
   }
 
   return (
-    <div className="flex flex-col h-full bg-base-100 rounded-lg shadow-lg overflow-hidden">
+    <div className="flex flex-col h-full bg-base-100 rounded-xl shadow-soft border border-base-300/60 overflow-hidden">
       {/* Header */}
-      <div className="bg-base-200 border-b border-base-300 p-4">
+      <div className="bg-base-200/70 backdrop-blur border-b border-base-300/70 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="avatar">
-            <div className="w-8 rounded-full bg-primary">
-              <Bot className="w-5 h-5 text-white m-1.5" />
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-md">
+            <Bot className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="font-semibold leading-tight">AVA Assistant</h3>
+            <div className="flex items-center gap-1 text-xs opacity-70">
+              {isBackendAvailable ? (
+                <>
+                  <Wifi className="w-3 h-3 text-success" /> <span>Online</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="w-3 h-3 text-warning" /> <span>Demo mode</span>
+                </>
+              )}
             </div>
           </div>
-          <h3 className="font-semibold text-lg">AVA</h3>
         </div>
+        <div className="text-[10px] uppercase tracking-wide opacity-60">Session {sessionId.slice(-6)}</div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-base-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-base-100">
         {messages.map(message => (
           <div
             key={message.id}
@@ -181,12 +202,12 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
               </div>
             </div>
             
-            <div className={`chat-bubble ${
-              message.sender === 'user' 
-                ? 'chat-bubble-primary' 
-                : 'chat-bubble-secondary'
-            }`}>
-              <p className="whitespace-pre-wrap leading-relaxed">{message.text}</p>
+            <div className={`chat-bubble max-w-[75%] ${
+              message.sender === 'user'
+                ? 'chat-bubble-primary'
+                : 'bg-base-200 text-base-content'
+            } shadow-sm`}>
+              <p className="whitespace-pre-wrap leading-relaxed text-sm md:text-[15px]">{message.text}</p>
               
               {/* Show confidence for AVA messages */}
               {message.sender === 'ava' && message.metadata?.confidence !== undefined && (
@@ -206,7 +227,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
 
         {/* Loading indicator */}
         {isLoading && (
-          <div className="chat chat-start">
+          <div className="chat chat-start animate-fadeIn">
             <div className="chat-image avatar">
               <div className="w-6 rounded-full">
                 <div className="bg-primary text-white rounded-full flex items-center justify-center w-6 h-6">
@@ -214,8 +235,12 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
                 </div>
               </div>
             </div>
-            <div className="chat-bubble chat-bubble-secondary">
-              <div className="animate-pulse">AVA is typing...</div>
+            <div className="chat-bubble bg-base-200 text-base-content">
+              <div className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse [animation-delay:150ms]" />
+                <span className="w-2 h-2 rounded-full bg-primary animate-pulse [animation-delay:300ms]" />
+              </div>
             </div>
           </div>
         )}
@@ -225,34 +250,33 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
 
       {/* Quick Replies */}
       {messages.length === 1 && (
-        <div className="px-4 py-3 bg-base-200 border-t border-base-300">
-          <p className="text-xs opacity-60 mb-2">Quick options:</p>
-          <div className="flex flex-wrap gap-2">
+        <div className="px-4 py-3 bg-base-200/60 backdrop-blur border-t border-base-300/70">
+          <p className="text-xs opacity-60 mb-2">Try one of these:</p>
+          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
             {quickReplies.map((reply, index) => (
-              <Button
+              <button
                 key={index}
-                variant="ghost"
-                size="xs"
                 onClick={() => handleQuickReply(reply)}
-                className="text-xs"
+                className="px-3 py-1.5 rounded-full bg-base-100 border border-base-300 text-xs hover:border-primary hover:text-primary transition-colors whitespace-nowrap"
               >
                 {reply}
-              </Button>
+              </button>
             ))}
           </div>
         </div>
       )}
 
       {/* Input Area */}
-      <div className="p-4 bg-base-100 border-t border-base-300">
-        <div className="flex gap-2">
-          <div className="flex-1">
+      <div className="p-4 bg-base-100/90 backdrop-blur border-t border-base-300/70">
+        <div className="flex items-end gap-2">
+          <div className="flex-1 relative">
             <textarea
+              ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               placeholder="Ask AVA anything about visas..."
-              className="textarea textarea-bordered w-full resize-none"
+              className="w-full resize-none rounded-xl border border-base-300 bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/40 px-4 py-3 text-sm leading-relaxed shadow-inner min-h-[48px]"
               rows={1}
               disabled={isLoading}
             />
@@ -261,13 +285,13 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
             onClick={sendMessage}
             disabled={!input.trim() || isLoading}
             loading={isLoading}
-            className="btn-circle"
+            className="h-[48px] w-[48px] rounded-xl"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <p className="text-xs opacity-50 mt-2 text-center">
-          Please verify important information
+        <p className="text-[10px] opacity-50 mt-2 text-center tracking-wide uppercase">
+          AI assistance − verify important information
         </p>
       </div>
     </div>

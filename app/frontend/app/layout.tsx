@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import Script from 'next/script'
@@ -11,7 +11,6 @@ export const metadata: Metadata = {
   description: 'The future of visa applications. Smart, transparent, and designed for the digital age.',
   keywords: ['visa', 'application', 'AI', 'embassy', 'travel', 'immigration'],
   authors: [{ name: 'VisaLegatio Team' }],
-  viewport: 'width=device-width, initial-scale=1',
   robots: 'index, follow',
   openGraph: {
     title: 'VisaLegatio - AI-Powered Visa Applications',
@@ -41,35 +40,29 @@ export default function RootLayout({
           {`
             (function() {
               try {
-                const theme = localStorage.getItem('theme');
-                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                
-                let appliedTheme = 'winter'; // default light theme
-                
-                if (theme === 'dark') {
-                  appliedTheme = 'dracula';
-                } else if (theme === 'light') {
-                  appliedTheme = 'cupcake';
-                } else if (!theme || theme === 'default') {
-                  // Always default to light theme, ignore system preference
-                  appliedTheme = 'cupcake';
-                }
-                
-                document.documentElement.setAttribute('data-theme', appliedTheme);
-                document.body.setAttribute('data-theme', appliedTheme);
+                const STORAGE_KEY = 'theme';
+                const LIGHT = 'cupcake';
+                const DARK = 'dracula';
+                const saved = localStorage.getItem(STORAGE_KEY);
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                let applied = LIGHT;
+                if (saved === DARK || (saved === 'default' && prefersDark)) applied = DARK;
+                if (saved === LIGHT) applied = LIGHT;
+                document.documentElement.dataset.theme = applied;
+                document.body.dataset.theme = applied;
               } catch (e) {
-                // Fallback to light theme
-                document.documentElement.setAttribute('data-theme', 'cupcake');
-                document.body.setAttribute('data-theme', 'cupcake');
+                document.documentElement.dataset.theme = 'cupcake';
+                document.body.dataset.theme = 'cupcake';
               }
             })();
           `}
         </Script>
       </head>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
-        <div className="min-h-screen bg-base-200">
+        <div className="min-h-screen bg-base-100 relative overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-40" style={{background:'radial-gradient(circle at 30% 20%, rgba(120,150,255,0.25), transparent 60%), radial-gradient(circle at 70% 60%, rgba(255,150,200,0.18), transparent 65%)'}} />
           <Header />
-          {children}
+          <main className="relative z-10">{children}</main>
         </div>
       </body>
     </html>

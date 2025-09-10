@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { debug, error as logError } from '@/lib/log'
 import { 
   Shield, 
   AlertTriangle, 
@@ -19,6 +20,7 @@ import {
   Clock
 } from 'lucide-react'
 import { Officer, EmbassyApplication } from '@/types/embassy.types'
+import Modal from '@/components/UI/Modal'
 import { api } from '@/utils/api'
 
 interface BiasReviewProps {
@@ -178,7 +180,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
       setCases(mockCases)
       setStatistics(mockStats)
     } catch (error) {
-      console.error('Error loading bias review data:', error)
+      logError('Error loading bias review data:', error)
     } finally {
       setIsLoading(false)
     }
@@ -211,117 +213,33 @@ export default function BiasReview({ officer }: BiasReviewProps) {
           ...statistics,
           reviewed_count: newReviewedCount,
           bias_detected_count: newBiasCount,
-          bias_rate: (newBiasCount / newReviewedCount) * 100
+          bias_rate: newReviewedCount > 0 ? Math.round((newBiasCount / newReviewedCount) * 100) : 0
         })
       }
-      
-      // Reset form
+
+      // Close modal after submit
+      setShowDetailModal(false)
       setSelectedCase(null)
       setReviewNotes('')
-      setShowDetailModal(false)
-      
-      // Show success message
-      alert(`Review submitted: Application ${result === 'biased' ? 'shows potential bias' : 'rejection justified'}`)
-      
-      if (result === 'biased') {
-        // In real implementation, this would trigger a review process
-        console.log('Bias detected - triggering review process for application:', caseItem.application.id)
-      }
-    } catch (error) {
-      console.error('Error submitting review:', error)
-      alert('Failed to submit review')
+    } catch (err) {
+      logError('Error submitting review result', err)
     }
   }
 
-  const getReviewBadge = (result?: string) => {
+  const getReviewBadge = (result?: 'justified' | 'biased' | 'uncertain') => {
+    if (!result) return <span className="badge badge-neutral">Pending</span>
     switch (result) {
       case 'justified':
-        return <span className="badge badge-success gap-1"><CheckCircle2 className="w-3 h-3" />Justified</span>
+        return <span className="badge badge-success">Justified</span>
       case 'biased':
-        return <span className="badge badge-error gap-1"><AlertTriangle className="w-3 h-3" />Bias Detected</span>
+        return <span className="badge badge-error">Biased</span>
       case 'uncertain':
-        return <span className="badge badge-warning gap-1">Uncertain</span>
-      default:
-        return <span className="badge badge-ghost">Pending Review</span>
+        return <span className="badge badge-warning">Uncertain</span>
     }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="loading loading-spinner loading-lg text-primary"></div>
-          <p className="mt-4">Loading bias review cases...</p>
-        </div>
-      </div>
-    )
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      {/* Statistics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="card bg-base-100 shadow">
-          <div className="card-body">
-            <div className="flex items-center gap-3">
-              <Users className="w-8 h-8 text-primary" />
-              <div>
-                <p className="text-2xl font-bold">{statistics?.total_rejected || 0}</p>
-                <p className="text-sm text-base-content/70">Total Rejections</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card bg-base-100 shadow">
-          <div className="card-body">
-            <div className="flex items-center gap-3">
-              <Scale className="w-8 h-8 text-info" />
-              <div>
-                <p className="text-2xl font-bold">{statistics?.sample_size || 0}</p>
-                <p className="text-sm text-base-content/70">Sample Size (10%)</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card bg-base-100 shadow">
-          <div className="card-body">
-            <div className="flex items-center gap-3">
-              <Brain className="w-8 h-8 text-warning" />
-              <div>
-                <p className="text-2xl font-bold">{statistics?.reviewed_count || 0}/{statistics?.sample_size || 0}</p>
-                <p className="text-sm text-base-content/70">Reviewed</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card bg-base-100 shadow">
-          <div className="card-body">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-8 h-8 text-error" />
-              <div>
-                <p className="text-2xl font-bold">{statistics?.bias_rate.toFixed(1) || 0}%</p>
-                <p className="text-sm text-base-content/70">Bias Rate</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Bias Patterns Alert */}
-      {statistics && statistics.bias_rate > 30 && (
-        <div className="alert alert-warning shadow-lg mb-6">
-          <AlertTriangle className="w-6 h-6" />
-          <div>
-            <h3 className="font-bold">High Bias Rate Detected</h3>
-            <p>The system shows a {statistics.bias_rate.toFixed(1)}% bias rate in rejections. Consider retraining the model.</p>
-          </div>
-          <button className="btn btn-sm">View Report</button>
-        </div>
-      )}
-
+    <div className="space-y-6">
       {/* Common Bias Patterns */}
       {statistics && statistics.common_bias_patterns.length > 0 && (
         <div className="card bg-base-100 shadow mb-6">
@@ -366,7 +284,7 @@ export default function BiasReview({ officer }: BiasReviewProps) {
                   <th>Country</th>
                   <th>Risk Score</th>
                   <th>Status</th>
-                  <th>Status</th>
+                  <th>Review</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -423,134 +341,105 @@ export default function BiasReview({ officer }: BiasReviewProps) {
         </div>
       </div>
 
-      {/* Detail Review Modal */}
       {showDetailModal && selectedCase && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold mb-2">Bias Review: {selectedCase.application.id}</h2>
-                  <p className="text-base-content/70">Review this rejection for potential bias</p>
-                </div>
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false)
-                    setSelectedCase(null)
-                    setReviewNotes('')
-                  }}
-                  className="btn btn-ghost btn-sm btn-circle"
-                >
-                  ✕
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Application Details */}
-                <div className="space-y-4">
-                  <div className="card bg-base-200">
-                    <div className="card-body">
-                      <h3 className="card-title text-lg">Application Details</h3>
-                      <div className="space-y-2">
-                        <p><strong>Applicant:</strong> {selectedCase.application.applicantName}</p>
-                        <p><strong>Country:</strong> {selectedCase.application.country}</p>
-                        <p><strong>Visa Type:</strong> {selectedCase.application.visaType}</p>
-                        <p><strong>Risk Score:</strong> <span className="text-error font-bold">{selectedCase.application.riskScore}%</span></p>
-                        <p><strong>Documents:</strong> {selectedCase.application.documentsCount} submitted</p>
-                      </div>
-                    </div>
+        <Modal
+          open={showDetailModal}
+          onClose={() => {
+            setShowDetailModal(false)
+            setSelectedCase(null)
+            setReviewNotes('')
+          }}
+          title={`Bias Review: ${selectedCase.application.id}`}
+          size="xl"
+        >
+          <p className="text-base-content/70 mb-6">Review this rejection for potential bias</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="space-y-4">
+              <div className="card bg-base-200">
+                <div className="card-body">
+                  <h3 className="card-title text-lg">Application Details</h3>
+                  <div className="space-y-2 text-sm">
+                    <p><strong>Applicant:</strong> {selectedCase.application.applicantName}</p>
+                    <p><strong>Country:</strong> {selectedCase.application.country}</p>
+                    <p><strong>Visa Type:</strong> {selectedCase.application.visaType}</p>
+                    <p><strong>Risk Score:</strong> <span className="text-error font-bold">{selectedCase.application.riskScore}%</span></p>
+                    <p><strong>Documents:</strong> {selectedCase.application.documentsCount} submitted</p>
                   </div>
-
-                </div>
-
-                {/* Review Form */}
-                <div className="space-y-4">
-                  <div className="card bg-base-200">
-                    <div className="card-body">
-                      <h3 className="card-title text-lg">Your Review</h3>
-                      
-                      <div className="form-control">
-                        <label className="label">
-                          <span className="label-text">Review Notes</span>
-                        </label>
-                        <textarea
-                          className="textarea textarea-bordered h-32"
-                          placeholder="Explain your assessment of potential bias..."
-                          value={reviewNotes}
-                          onChange={(e) => setReviewNotes(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="divider">Decision</div>
-
-                      <div className="space-y-3">
-                        <button
-                          className="btn btn-success w-full"
-                          onClick={() => handleReviewSubmit(selectedCase, 'justified')}
-                          disabled={!reviewNotes.trim()}
-                        >
-                          <ThumbsUp className="w-5 h-5 mr-2" />
-                          Rejection Justified
-                        </button>
-                        
-                        <button
-                          className="btn btn-error w-full"
-                          onClick={() => handleReviewSubmit(selectedCase, 'biased')}
-                          disabled={!reviewNotes.trim()}
-                        >
-                          <ThumbsDown className="w-5 h-5 mr-2" />
-                          Bias Detected
-                        </button>
-                        
-                        <button
-                          className="btn btn-warning w-full"
-                          onClick={() => handleReviewSubmit(selectedCase, 'uncertain')}
-                          disabled={!reviewNotes.trim()}
-                        >
-                          <Clock className="w-5 h-5 mr-2" />
-                          Uncertain - Need More Review
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Previous Reviews */}
-                  {selectedCase.reviewed && (
-                    <div className="card bg-info/10 border border-info/20">
-                      <div className="card-body">
-                        <h4 className="font-semibold text-info">Previous Review</h4>
-                        <p className="text-sm text-info">
-                          <strong>Result:</strong> {selectedCase.review_result}
-                        </p>
-                        <p className="text-sm text-info">
-                          <strong>Notes:</strong> {selectedCase.review_notes}
-                        </p>
-                        <p className="text-xs text-info mt-2">
-                          Reviewed by {selectedCase.reviewed_by} on {selectedCase.reviewed_at}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Bias Indicators */}
-              <div className="alert alert-info">
-                <Brain className="w-5 h-5" />
-                <div>
-                  <h4 className="font-semibold">Common Bias Indicators to Check:</h4>
-                  <ul className="text-sm mt-2 space-y-1">
-                    <li>• Country-based generalizations without individual assessment</li>
-                    <li>• Name-based assumptions or false positives</li>
-                    <li>• Penalties for family members' actions</li>
-                    <li>• Incorrect application of financial requirements</li>
-                    <li>• Cultural or religious bias in risk assessment</li>
-                  </ul>
                 </div>
               </div>
             </div>
+            <div className="space-y-4">
+              <div className="card bg-base-200">
+                <div className="card-body">
+                  <h3 className="card-title text-lg">Your Review</h3>
+                  <div className="form-control">
+                    <label className="label">
+                      <span className="label-text">Review Notes</span>
+                    </label>
+                    <textarea
+                      className="textarea textarea-bordered h-32"
+                      placeholder="Explain your assessment of potential bias..."
+                      value={reviewNotes}
+                      onChange={(e) => setReviewNotes(e.target.value)}
+                    />
+                  </div>
+                  <div className="divider">Decision</div>
+                  <div className="space-y-3">
+                    <button
+                      className="btn btn-success w-full"
+                      onClick={() => handleReviewSubmit(selectedCase, 'justified')}
+                      disabled={!reviewNotes.trim()}
+                    >
+                      <ThumbsUp className="w-5 h-5 mr-2" />
+                      Rejection Justified
+                    </button>
+                    <button
+                      className="btn btn-error w-full"
+                      onClick={() => handleReviewSubmit(selectedCase, 'biased')}
+                      disabled={!reviewNotes.trim()}
+                    >
+                      <ThumbsDown className="w-5 h-5 mr-2" />
+                      Bias Detected
+                    </button>
+                    <button
+                      className="btn btn-warning w-full"
+                      onClick={() => handleReviewSubmit(selectedCase, 'uncertain')}
+                      disabled={!reviewNotes.trim()}
+                    >
+                      <Clock className="w-5 h-5 mr-2" />
+                      Uncertain - Need More Review
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {selectedCase.reviewed && (
+                <div className="card bg-info/10 border border-info/20">
+                  <div className="card-body">
+                    <h4 className="font-semibold mb-2 flex items-center gap-2">
+                      <BarChart3 className="w-4 h-4" /> Previous Review
+                    </h4>
+                    <p className="text-sm text-base-content/70 mb-2">Reviewed by {selectedCase.reviewed_by} on {selectedCase.reviewed_at}</p>
+                    <p className="text-sm mb-2"><strong>Result:</strong> {selectedCase.review_result}</p>
+                    <p className="text-sm whitespace-pre-line">{selectedCase.review_notes}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+          <div className="alert alert-info mt-4">
+            <Brain className="w-5 h-5" />
+            <div>
+              <h4 className="font-semibold">Common Bias Indicators to Check:</h4>
+              <ul className="text-sm mt-2 space-y-1">
+                <li>• Country-based generalizations without individual assessment</li>
+                <li>• Name-based assumptions or false positives</li>
+                <li>• Penalties for family members' actions</li>
+                <li>• Incorrect application of financial requirements</li>
+                <li>• Cultural or religious bias in risk assessment</li>
+              </ul>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   )

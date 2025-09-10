@@ -101,9 +101,7 @@
     @apply transition-all duration-300 ease-in-out;
   }
 
-  .chat-message:hover {
-    @apply transform scale-[1.02];
-  }
+  /* Hover scale effect removed (rule deleted to avoid empty ruleset) */
 
   /* Status tracker styles */
   .status-step {
@@ -157,6 +155,32 @@
 
   .animate-slideUp {
     animation: slideUp 0.4s ease-out;
+  }
+
+  /* Minimal modern additions (pure CSS to avoid processor mismatch) */
+  .text-gradient {
+    background: linear-gradient(90deg, var(--fallback-p, oklch(62% 0.2 250)), var(--fallback-s, oklch(70% 0.2 330)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .glass-panel {
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(0,0,0,0.05);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+    border-radius: 1rem;
+  }
+  .soft-border {
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .radial-spot { position: relative; }
+  .radial-spot::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 40% 30%, rgba(0,140,255,0.15), transparent 70%);
+    pointer-events: none;
   }
 }
 

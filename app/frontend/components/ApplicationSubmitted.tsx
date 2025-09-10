@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CheckCircle2, Copy, Download, Upload, ArrowRight, QrCode, Lock, Eye, EyeOff, AlertTriangle, Clock, Shield, FileText } from 'lucide-react'
+import GradientHeader from './UI/GradientHeader'
 
 interface ApplicationSubmittedProps {
   applicationId: string
@@ -54,23 +55,18 @@ export default function ApplicationSubmitted({
   return (
     <div className="max-w-4xl mx-auto card bg-base-100 shadow-xl overflow-hidden">
       {/* Success Header */}
-      <div className="bg-gradient-to-r from-success to-success text-white p-8 text-center">
-        <div className="flex justify-center mb-4">
-          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-            <CheckCircle2 className="w-10 h-10 text-success" />
-          </div>
-        </div>
-        
-        <h1 className="text-3xl font-bold mb-2">Application Submitted Successfully!</h1>
-        <p className="text-success-content/80 text-lg">
-          Your visa application has been received and is in our system
-        </p>
-        
-        <div className="mt-4 bg-white/20 rounded-lg p-4 inline-block">
+      <GradientHeader
+        icon={CheckCircle2}
+        title="Application Submitted Successfully!"
+        subtitle="Your visa application has been received and is in our system"
+        gradient="from-success to-success"
+        iconWrapperClassName="bg-base-100"
+      >
+        <div className="bg-base-100/20 rounded-lg p-4">
           <p className="text-sm text-success-content/80 mb-1">Application ID</p>
           <p className="text-2xl font-mono font-bold">{applicationId}</p>
         </div>
-      </div>
+      </GradientHeader>
 
       {/* Processing Status Alert */}
       <div className="bg-warning/10 border-b-4 border-warning/20 p-6">
