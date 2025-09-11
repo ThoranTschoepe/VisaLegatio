@@ -115,6 +115,36 @@ class FlaggedDocument(Base):
     application = relationship("Application", back_populates="flagged_documents")
     flagged_by_officer = relationship("Officer", back_populates="flagged_documents")
 
+class DocumentAnalysis(Base):
+    __tablename__ = "document_analyses"
+    
+    id = Column(String, primary_key=True, index=True)
+    document_id = Column(String, ForeignKey("documents.id"), nullable=False)
+    
+    # Classification results
+    detected_document_type = Column(String)
+    classification_confidence = Column(Float)
+    is_correct_type = Column(Boolean)
+    
+    # Extracted data (stored as JSON)
+    extracted_text = Column(Text)  # Full text content
+    detected_dates = Column(Text)  # JSON array of dates
+    detected_amounts = Column(Text)  # JSON array of amounts
+    detected_names = Column(Text)  # JSON array of names
+    
+    # Analysis results
+    problems_detected = Column(Text)  # JSON array of problems
+    overall_confidence = Column(Float)
+    is_authentic = Column(Boolean)
+    processing_time_ms = Column(Integer)
+    
+    # Metadata
+    analyzed_at = Column(DateTime, default=datetime.utcnow)
+    ai_model_version = Column(String, default="gemini-2.0-flash-exp")
+    
+    # Relationship
+    document = relationship("Document", backref="ai_analysis")
+
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
     

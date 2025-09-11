@@ -1,17 +1,81 @@
-# app/backend/routes/documents.py - Real document upload implementation
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form
-from fastapi.responses import FileResponse, Response
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Form, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-import os
-import mimetypes
-import shutil
+import hashlib
+import uuid
 from typing import List
 from pathlib import Path
-from database import get_db, Document as DocumentDB, Application
-from models import DocumentResponse
+from datetime import datetime
+import aiofiles
+import json
+from database import get_db, Document as DocumentDB, Application, DocumentAnalysis
+from models import DocumentResponse, DocumentAnalysisResponse, DocumentClassificationResponse, ExtractedDataResponse, DetectedProblemResponse, ProblemSeverity
+from services.document_ai_service import document_ai_service
 from utils import generate_id
 
 router = APIRouter()
+
+async def process_ai_analysis_background(
+    file_path: Path, 
+    document_type: str, 
+    document_id: str,
+    application_context: dict
+):
+    """Background task to perform AI analysis for officer review only"""
+    if not document_ai_service.enabled:
+        print("ℹ️ AI analysis disabled - skipping background processing")
+        return
+        
+    try:
+        print(f"🤖 [Background] Starting AI analysis for {document_type} (doc_id: {document_id})...")
+        
+        ai_analysis = await document_ai_service.analyze_document(
+            file_path,
+            document_type,
+            application_context
+        )
+        
+        if ai_analysis:
+            print(f"✅ [Background] AI analysis completed in {ai_analysis.processing_time_ms}ms")
+            
+            # Store AI analysis in database for officer review
+            from database import SessionLocal
+            db = SessionLocal()
+            try:
+                analysis_record = DocumentAnalysis(
+                    id=generate_id("analysis"),
+                    document_id=document_id,
+                    detected_document_type=ai_analysis.classification.document_type,
+                    classification_confidence=ai_analysis.classification.confidence,
+                    is_correct_type=ai_analysis.classification.is_correct_type,
+                    extracted_text=ai_analysis.extracted_data.text_content,
+                    detected_dates=json.dumps(ai_analysis.extracted_data.dates),
+                    detected_amounts=json.dumps(ai_analysis.extracted_data.amounts),
+                    detected_names=json.dumps(ai_analysis.extracted_data.names),
+                    problems_detected=json.dumps([{
+                        "problem_type": p.problem_type,
+                        "severity": p.severity,
+                        "description": p.description,
+                        "suggestion": p.suggestion
+                    } for p in ai_analysis.problems]),
+                    overall_confidence=ai_analysis.overall_confidence,
+                    is_authentic=ai_analysis.is_authentic,
+                    processing_time_ms=ai_analysis.processing_time_ms,
+                    ai_model_version="gemini-2.0-flash-exp"
+                )
+                
+                db.add(analysis_record)
+                db.commit()
+                print(f"💾 [Background] AI analysis stored for officer review")
+                print(f"📊 [Background] Confidence: {ai_analysis.overall_confidence:.2f}, Issues: {len(ai_analysis.problems)}")
+                
+            finally:
+                db.close()
+        else:
+            print("⚠️ [Background] AI analysis failed")
+            
+    except Exception as e:
+        print(f"❌ [Background] AI analysis failed: {e}")
 
 # Document requirements by visa type
 DOCUMENT_REQUIREMENTS = {
@@ -41,12 +105,56 @@ DOCUMENT_REQUIREMENTS = {
     }
 }
 
-# Maximum file size (10MB)
-MAX_FILE_SIZE = 10 * 1024 * 1024
+# File upload configuration
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+CHUNK_SIZE = 1024 * 1024  # 1MB chunks for streaming
 ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png'}
+ALLOWED_MIME_TYPES = {
+    'application/pdf',
+    'image/jpeg',
+    'image/jpg',
+    'image/png'
+}
 
-def validate_file(file: UploadFile) -> None:
-    """Validate uploaded file"""
+# Magic library is optional - will use basic validation if not available
+mime_detector = None
+
+async def validate_file_headers(file_content: bytes, filename: str) -> tuple[bool, str]:
+    """Validate file headers to ensure file type matches extension"""
+    file_ext = Path(filename).suffix.lower()
+    
+    # Check magic bytes for common file types
+    if len(file_content) < 8:
+        return False, "File too small to be valid"
+    
+    # PDF magic bytes
+    if file_ext == '.pdf':
+        if not file_content.startswith(b'%PDF'):
+            return False, "Invalid PDF file"
+    
+    # JPEG magic bytes
+    elif file_ext in ['.jpg', '.jpeg']:
+        if not (file_content.startswith(b'\xff\xd8\xff')):
+            return False, "Invalid JPEG file"
+    
+    # PNG magic bytes
+    elif file_ext == '.png':
+        if not file_content.startswith(b'\x89PNG\r\n\x1a\n'):
+            return False, "Invalid PNG file"
+    
+    # Use python-magic if available for additional validation
+    if mime_detector:
+        try:
+            detected_mime = mime_detector.from_buffer(file_content[:2048])
+            if detected_mime not in ALLOWED_MIME_TYPES:
+                return False, f"File content type {detected_mime} not allowed"
+        except Exception as e:
+            print(f"Warning: Could not detect MIME type: {e}")
+    
+    return True, "Valid"
+
+def validate_file_metadata(file: UploadFile) -> None:
+    """Validate uploaded file metadata"""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
     
@@ -58,28 +166,35 @@ def validate_file(file: UploadFile) -> None:
             detail=f"File type {file_ext} not allowed. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
         )
     
-    # Check file size (we'll check this when reading)
-    # Note: file.size might not be available, so we'll check during read
+    # Validate content type if provided
+    if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
+        # Don't fail on content_type mismatch as browsers can be unreliable
+        print(f"⚠️ Warning: Unexpected content type {file.content_type} for {file.filename}")
 
-def sanitize_filename(filename: str) -> str:
-    """Sanitize filename to prevent directory traversal"""
-    # Remove any path components and keep only the filename
-    clean_name = os.path.basename(filename)
-    # Replace any remaining problematic characters
-    clean_name = "".join(c for c in clean_name if c.isalnum() or c in ".-_")
-    return clean_name
+def generate_safe_filename(original_filename: str, document_type: str) -> str:
+    """Generate a safe, unique filename"""
+    file_ext = Path(original_filename).suffix.lower()
+    # Use UUID to ensure uniqueness
+    unique_id = str(uuid.uuid4())[:8]
+    safe_filename = f"{document_type}_{unique_id}{file_ext}"
+    return safe_filename
+
+def calculate_file_hash(content: bytes) -> str:
+    """Calculate SHA256 hash of file content"""
+    return hashlib.sha256(content).hexdigest()
 
 @router.post("/upload")
 async def upload_document(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     application_id: str = Form(...),
     document_type: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Upload a document file for an application"""
+    """Upload a document file with enhanced validation and error handling"""
     
-    # Validate file
-    validate_file(file)
+    # Validate file metadata
+    validate_file_metadata(file)
     
     # Verify application exists
     application = db.query(Application).filter(Application.id == application_id).first()
@@ -90,28 +205,53 @@ async def upload_document(
     app_uploads_dir = Path("uploads") / application_id
     app_uploads_dir.mkdir(parents=True, exist_ok=True)
     
-    # Generate safe filename
-    original_filename = file.filename
-    file_ext = Path(original_filename).suffix.lower()
-    safe_filename = f"{document_type}{file_ext}"
-    
+    # Generate safe, unique filename
+    safe_filename = generate_safe_filename(file.filename, document_type)
     file_path = app_uploads_dir / safe_filename
+    temp_file_path = file_path.with_suffix('.tmp')
     
     try:
-        # Read and validate file size
-        content = await file.read()
-        if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB"
-            )
+        # Stream file to disk to handle large files efficiently
+        total_size = 0
+        file_hash = hashlib.sha256()
         
-        # Write file to disk
-        with open(file_path, 'wb') as f:
-            f.write(content)
+        # First pass: write to temp file and validate
+        async with aiofiles.open(temp_file_path, 'wb') as f:
+            while chunk := await file.read(CHUNK_SIZE):
+                total_size += len(chunk)
+                
+                # Check size limit
+                if total_size > MAX_FILE_SIZE:
+                    await f.close()
+                    temp_file_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB"
+                    )
+                
+                file_hash.update(chunk)
+                await f.write(chunk)
         
-        # Simple document verification (in real app, this would be more sophisticated)
-        verified = verify_document_content(content, document_type, file_ext)
+        # Read first chunk for content validation
+        async with aiofiles.open(temp_file_path, 'rb') as f:
+            first_chunk = await f.read(8192)
+        
+        # Validate file content matches extension
+        is_valid, validation_message = await validate_file_headers(first_chunk, file.filename)
+        if not is_valid:
+            temp_file_path.unlink(missing_ok=True)
+            raise HTTPException(status_code=400, detail=validation_message)
+        
+        # Move temp file to final location
+        temp_file_path.rename(file_path)
+        
+        # Calculate file hash for integrity
+        file_hash_hex = file_hash.hexdigest()
+        
+        # Use basic verification only - AI analysis will run in background for officers
+        verified = verify_document_content(first_chunk, document_type, Path(file.filename).suffix.lower())
+        
+        print(f"📊 Basic verification completed - AI analysis will be performed in background for officer review")
         
         # Check if document already exists for this application and type
         existing_doc = db.query(DocumentDB).filter(
@@ -119,12 +259,18 @@ async def upload_document(
             DocumentDB.type == document_type
         ).first()
         
+        # If exists, delete old file
+        if existing_doc and existing_doc.file_path:
+            old_file = Path(existing_doc.file_path)
+            if old_file.exists() and old_file != file_path:
+                old_file.unlink(missing_ok=True)
+        
         if existing_doc:
             # Update existing document
             existing_doc.name = safe_filename
-            existing_doc.size = len(content)
+            existing_doc.size = total_size
             existing_doc.verified = verified
-            existing_doc.file_path = f"uploads/{application_id}/{safe_filename}"
+            existing_doc.file_path = str(file_path)
             document = existing_doc
         else:
             # Create new document record
@@ -133,40 +279,107 @@ async def upload_document(
                 application_id=application_id,
                 name=safe_filename,
                 type=document_type,
-                size=len(content),
+                size=total_size,
                 verified=verified,
-                file_path=f"uploads/{application_id}/{safe_filename}"
+                file_path=str(file_path)
             )
             db.add(document)
         
         db.commit()
         db.refresh(document)
         
-        print(f"✅ Uploaded document: {file_path} ({len(content)} bytes, verified: {verified})")
+        # Schedule AI analysis as background task for officer review only
+        # Extract application context for AI analysis
+        applicant_name = "Unknown"
+        destination_country = "Germany"  # Default
+        purpose_of_travel = application.visa_type
         
-        return DocumentResponse(
-            id=document.id,
-            name=document.name,
-            type=document.type,
-            size=document.size,
-            verified=document.verified,
-            uploaded_at=document.uploaded_at,
-            file_path=document.file_path
+        try:
+            import json
+            if application.answers:
+                answers = json.loads(application.answers) if isinstance(application.answers, str) else application.answers
+                applicant_name = answers.get('applicant_name') or answers.get('full_name') or "Unknown"
+                destination_country = answers.get('destination_country') or answers.get('country') or "Germany"
+                purpose_of_travel = answers.get('purpose_of_travel') or answers.get('travel_purpose') or application.visa_type
+        except Exception as e:
+            print(f"⚠️ Could not extract application context from answers: {e}")
+        
+        background_tasks.add_task(
+            process_ai_analysis_background,
+            file_path,
+            document_type, 
+            document.id,
+            {
+                "application_id": application_id, 
+                "visa_type": application.visa_type,
+                "applicant_name": applicant_name,
+                "destination_country": destination_country,
+                "purpose_of_travel": purpose_of_travel
+            }
         )
         
+        print(f"✅ Uploaded: {safe_filename} ({total_size:,} bytes, hash: {file_hash_hex[:8]}..., verified: {verified})")
+        print(f"🔄 AI analysis scheduled for background processing (officer review only)")
+        
+        # Create response without AI analysis (not visible to applicants)
+        response_data = {
+            "id": document.id,
+            "name": document.name,
+            "type": document.type,
+            "size": document.size,
+            "verified": document.verified,
+            "uploaded_at": document.uploaded_at,
+            "file_path": document.file_path
+        }
+        
+        return response_data
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
-        # Clean up file if database operation failed
-        if file_path.exists():
-            file_path.unlink()
+        # Clean up files on error
+        temp_file_path.unlink(missing_ok=True)
+        file_path.unlink(missing_ok=True)
         
-        if isinstance(e, HTTPException):
-            raise e
+        print(f"❌ Upload error: {type(e).__name__}: {e}")
         
-        print(f"❌ Error uploading document: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to upload document: {str(e)}")
+        # Provide user-friendly error messages
+        if "No space left" in str(e):
+            raise HTTPException(status_code=507, detail="Server storage full. Please try again later.")
+        elif "Permission denied" in str(e):
+            raise HTTPException(status_code=500, detail="Server configuration error. Please contact support.")
+        else:
+            raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 def verify_document_content(content: bytes, doc_type: str, file_ext: str) -> bool:
-    """Placeholder verification always returns True (simplified cleanup)."""
+    """Enhanced document verification with basic content checks"""
+    
+    # Check if file has minimum content
+    if len(content) < 100:
+        return False
+    
+    # PDF specific checks
+    if file_ext == '.pdf':
+        # Check for PDF structure markers
+        if b'%PDF' not in content[:10]:
+            return False
+        # Could add more PDF validation here
+    
+    # Image specific checks
+    elif file_ext in ['.jpg', '.jpeg', '.png']:
+        # Basic image validation already done in validate_file_headers
+        # Could add dimension checks, etc.
+        pass
+    
+    # Document type specific validation
+    if doc_type == 'passport':
+        # In production, could use OCR to verify passport fields
+        pass
+    elif doc_type == 'bank_statement':
+        # Could check for bank-related keywords in PDFs
+        pass
+    
     return True
 
 @router.get("/{visa_type}/requirements")
@@ -297,6 +510,35 @@ async def list_application_documents(application_id: str, db: Session = Depends(
         organized_file_path = Path("uploads") / application_id / doc.name
         file_exists = organized_file_path.exists()
         
+        # Get AI analysis if available (for officer review)
+        ai_analysis = db.query(DocumentAnalysis).filter(DocumentAnalysis.document_id == doc.id).first()
+        ai_analysis_data = None
+        
+        if ai_analysis:
+            try:
+                problems = json.loads(ai_analysis.problems_detected) if ai_analysis.problems_detected else []
+                ai_analysis_data = {
+                    "classification": {
+                        "document_type": ai_analysis.detected_document_type,
+                        "confidence": ai_analysis.classification_confidence,
+                        "is_correct_type": ai_analysis.is_correct_type
+                    },
+                    "extracted_data": {
+                        "text_content": ai_analysis.extracted_text[:500] if ai_analysis.extracted_text else "",
+                        "dates": json.loads(ai_analysis.detected_dates) if ai_analysis.detected_dates else [],
+                        "amounts": json.loads(ai_analysis.detected_amounts) if ai_analysis.detected_amounts else [],
+                        "names": json.loads(ai_analysis.detected_names) if ai_analysis.detected_names else []
+                    },
+                    "problems": problems,
+                    "overall_confidence": ai_analysis.overall_confidence,
+                    "is_authentic": ai_analysis.is_authentic,
+                    "processing_time_ms": ai_analysis.processing_time_ms,
+                    "analyzed_at": ai_analysis.analyzed_at.isoformat() if ai_analysis.analyzed_at else None,
+                    "ai_model_version": ai_analysis.ai_model_version
+                }
+            except Exception as e:
+                print(f"⚠️ Error parsing AI analysis for document {doc.id}: {e}")
+        
         result.append({
             "id": doc.id,
             "name": doc.name,
@@ -307,7 +549,8 @@ async def list_application_documents(application_id: str, db: Session = Depends(
             "view_url": f"/api/documents/view/{application_id}/{doc.name}" if file_exists else None,
             "download_url": f"/api/documents/download/{application_id}/{doc.name}" if file_exists else None,
             "file_exists": file_exists,
-            "file_path": f"uploads/{application_id}/{doc.name}" if file_exists else None
+            "file_path": f"uploads/{application_id}/{doc.name}" if file_exists else None,
+            "ai_analysis": ai_analysis_data  # Only visible to officers
         })
     
     return result
@@ -390,6 +633,12 @@ async def delete_document(application_id: str, document_type: str, db: Session =
     file_path = Path("uploads") / application_id / document.name
     if file_path.exists():
         file_path.unlink()
+    
+    # Delete associated AI analysis records first to avoid foreign key constraint issues
+    ai_analysis = db.query(DocumentAnalysis).filter(DocumentAnalysis.document_id == document.id).first()
+    if ai_analysis:
+        db.delete(ai_analysis)
+        print(f"🗑️ Deleted AI analysis for document: {document.name}")
     
     # Delete database record
     db.delete(document)

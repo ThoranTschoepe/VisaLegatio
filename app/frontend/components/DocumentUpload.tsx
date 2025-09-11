@@ -1,12 +1,14 @@
-// app/frontend/visaverge-user/components/DocumentUpload.tsx - Real upload implementation
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { useDropzone } from 'react-dropzone'
 import { debug, error as logError } from '@/lib/log'
-import { Upload, FileText, CheckCircle2, AlertCircle, X, Camera, Trash2, ArrowRight, Clock, AlertTriangle, Shield, Loader2 } from 'lucide-react'
-import { Document, DocumentType, VisaType } from '@/types'
+import { Upload, FileText, CheckCircle2, AlertCircle, X, Trash2, ArrowRight, Clock, AlertTriangle, Shield, Loader2, RefreshCw, FileX, Camera } from 'lucide-react'
+import { Document, DocumentType, VisaType, DocumentAIAnalysis, DocumentProblem } from '@/types'
 import { api, apiUtils } from '@/utils/api'
+import { uploadService, UploadProgress } from '@/utils/uploadService'
 import { useAlertStore } from '@/lib/stores/alert.store'
+import { useUploadStore } from '@/lib/stores/upload.store'
 
 interface DocumentUploadProps {
   visaType: VisaType
@@ -42,21 +44,30 @@ export default function DocumentUpload({
   onSkip 
 }: DocumentUploadProps) {
   const [documents, setDocuments] = useState<Document[]>([])
+  const [uploadProgress, setUploadProgress] = useState<Record<string, UploadProgress>>({})
   const [uploadingDocs, setUploadingDocs] = useState<Set<string>>(new Set())
-  const [draggedOver, setDraggedOver] = useState<string | null>(null)
   const [requirements, setRequirements] = useState<{
     mandatory: string[]
     optional: string[]
   }>({ mandatory: [], optional: [] })
   const [isLoading, setIsLoading] = useState(true)
   const [backendAvailable, setBackendAvailable] = useState(true)
-  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const { showSuccess, showError, showWarning } = useAlertStore()
+  const uploadStore = useUploadStore()
+  const prevDocumentsRef = useRef<Document[]>([])
 
   // Load document requirements and existing documents
   useEffect(() => {
     loadDocumentData()
   }, [visaType, applicationId])
+
+  // Call onDocumentsChange when documents change
+  useEffect(() => {
+    if (documents !== prevDocumentsRef.current) {
+      prevDocumentsRef.current = documents
+      onDocumentsChange?.(documents)
+    }
+  }, [documents, onDocumentsChange])
 
   const loadDocumentData = async () => {
     try {
@@ -94,7 +105,6 @@ export default function DocumentUpload({
       }))
       
       setDocuments(transformedDocs)
-      onDocumentsChange?.(transformedDocs)
       
     } catch (error) {
       console.error('Error loading document data:', error)
@@ -111,8 +121,8 @@ export default function DocumentUpload({
       return
     }
 
-    // Validate file before upload
-    const validation = apiUtils.validateFile(file)
+    // Validate file with preview generation
+    const validation = await uploadService.validateFileWithPreview(file)
     if (!validation.valid) {
       showError(validation.error!)
       return
@@ -120,16 +130,30 @@ export default function DocumentUpload({
 
     const uploadId = `${docType}_${Date.now()}`
     setUploadingDocs(prev => new Set([...prev, uploadId]))
+    setUploadProgress(prev => ({ ...prev, [uploadId]: { loaded: 0, total: file.size, percentage: 0 } }))
 
     try {
-  debug(`🚀 Starting upload: ${file.name} (${file.size} bytes) as ${docType}`)
+      debug(`🚀 Starting upload: ${file.name} (${uploadService.formatFileSize(file.size)}) as ${docType}`)
       
-      // Upload to backend using real API
-      const uploadResults = await api.uploadDocumentsToApplication(applicationId, [
-        { file, type: docType }
-      ])
-      
-      const uploadedDoc = uploadResults[0]
+      // Use the new upload service with progress tracking
+      const uploadedDoc = await uploadService.uploadDocument(
+        applicationId,
+        file,
+        docType,
+        {
+          onProgress: (progress) => {
+            setUploadProgress(prev => ({ ...prev, [uploadId]: progress }))
+          },
+          onSuccess: (result) => {
+            debug(`✅ Upload successful: ${result.name}`)
+          },
+          onError: (error) => {
+            logError('Upload error:', error)
+          },
+          maxRetries: 3,
+          retryDelay: 1000
+        }
+      )
       
       const newDocument: Document = {
         id: uploadedDoc.id,
@@ -138,27 +162,27 @@ export default function DocumentUpload({
         size: uploadedDoc.size,
         uploadedAt: new Date(uploadedDoc.uploaded_at),
         verified: uploadedDoc.verified,
-        url: `http://localhost:8000/api/documents/view/${applicationId}/${uploadedDoc.name}`
+        url: `http://localhost:8000/api/documents/view/${applicationId}/${uploadedDoc.name}`,
+        ai_analysis: uploadedDoc.ai_analysis ? {
+          ...uploadedDoc.ai_analysis,
+          analyzed_at: new Date(uploadedDoc.ai_analysis.analyzed_at)
+        } : undefined
       }
 
       setDocuments(prev => {
-        // Remove any existing document of the same type
         const filtered = prev.filter(doc => doc.type !== docType)
-        const updated = [...filtered, newDocument]
-        
-        onDocumentsChange?.(updated)
-        return updated
+        return [...filtered, newDocument]
       })
       
-      showSuccess(`${file.name} uploaded and ${uploadedDoc.verified ? 'verified' : 'pending verification'}!`)
+      showSuccess(`${file.name} uploaded successfully!`)
       
     } catch (error) {
-  logError('Error uploading document:', error)
-      const errorMessage = apiUtils.formatErrorMessage(error)
+      logError('Error uploading document:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Upload failed'
       showError(`Failed to upload ${file.name}: ${errorMessage}`)
       
-      // If it's a server error, check backend availability
-      if (errorMessage.includes('fetch') || errorMessage.includes('network') || errorMessage.includes('500')) {
+      // Check backend availability on network errors
+      if (errorMessage.includes('Network') || errorMessage.includes('connection')) {
         const available = await apiUtils.isBackendAvailable()
         setBackendAvailable(available)
         if (!available) {
@@ -171,35 +195,32 @@ export default function DocumentUpload({
         newSet.delete(uploadId)
         return newSet
       })
+      setUploadProgress(prev => {
+        const newProgress = { ...prev }
+        delete newProgress[uploadId]
+        return newProgress
+      })
     }
   }, [applicationId, onDocumentsChange, showSuccess, showError, backendAvailable])
 
-  const handleDrop = useCallback((e: React.DragEvent, docType: string) => {
-    e.preventDefault()
-    setDraggedOver(null)
-    
-    if (!backendAvailable) {
-      showWarning('Backend not available. Cannot upload documents.')
+  // Handle file drop (without using hooks)
+  const handleFileDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[], docType: string) => {
+    if (rejectedFiles.length > 0) {
+      const error = rejectedFiles[0].errors[0]
+      if (error.code === 'file-too-large') {
+        showError('File too large. Maximum size is 10MB')
+      } else if (error.code === 'file-invalid-type') {
+        showError('Invalid file type. Please upload PDF, JPG, or PNG files')
+      } else {
+        showError(error.message)
+      }
       return
     }
     
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) {
-      handleFileUpload(files[0], docType)
+    if (acceptedFiles.length > 0) {
+      handleFileUpload(acceptedFiles[0], docType)
     }
-  }, [handleFileUpload, backendAvailable, showWarning])
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
-    const files = e.target.files
-    if (files && files.length > 0) {
-      debug(`📁 Selected file for ${docType}: ${files[0].name} (${files[0].size} bytes)`)
-      handleFileUpload(files[0], docType)
-      // Reset value so selecting same file again triggers onChange
-      e.target.value = ''
-    } else {
-      debug(`⚠️ No file selected for ${docType}`)
-    }
-  }
+  }, [handleFileUpload, showError])
 
   const removeDocument = async (docType: string) => {
     if (!backendAvailable) {
@@ -210,11 +231,7 @@ export default function DocumentUpload({
     try {
       await api.deleteDocument(applicationId, docType)
       
-      setDocuments(prev => {
-        const updated = prev.filter(doc => doc.type !== docType)
-        onDocumentsChange?.(updated)
-        return updated
-      })
+      setDocuments(prev => prev.filter(doc => doc.type !== docType))
       
       showSuccess('Document removed successfully')
     } catch (error) {
@@ -305,12 +322,28 @@ export default function DocumentUpload({
   const DocumentUploadCard = ({ docType, isMandatory }: { docType: string, isMandatory: boolean }) => {
     const document = getDocumentForType(docType)
     const uploading = isUploading(docType)
+    const currentUploadId = Array.from(uploadingDocs).find(id => id.startsWith(docType))
+    const progress = currentUploadId ? uploadProgress[currentUploadId] : null
+    
+    // Use dropzone hook properly at component level
+    const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+      accept: {
+        'application/pdf': ['.pdf'],
+        'image/jpeg': ['.jpg', '.jpeg'],
+        'image/png': ['.png']
+      },
+      maxSize: 10 * 1024 * 1024, // 10MB
+      multiple: false,
+      disabled: !backendAvailable || uploading,
+      onDrop: (acceptedFiles, rejectedFiles) => handleFileDrop(acceptedFiles, rejectedFiles, docType)
+    })
     
     return (
       <div
-        className={`border-2 border-dashed rounded-lg p-6 transition-all ${
-          draggedOver === docType
-            ? 'border-primary bg-primary/10'
+        {...getRootProps()}
+        className={`border-2 border-dashed rounded-lg p-6 transition-all cursor-pointer ${
+          isDragActive
+            ? 'border-primary bg-primary/10 scale-105'
             : document?.verified
             ? 'border-success bg-success/10'
             : document && !document.verified
@@ -319,20 +352,14 @@ export default function DocumentUpload({
             ? 'border-error/50 bg-error/10 hover:border-error'
             : 'border-base-300 hover:border-primary'
         }`}
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDraggedOver(docType)
+        onClick={(e) => {
+          // Prevent dropzone click when clicking buttons
+          if ((e.target as HTMLElement).tagName === 'BUTTON') {
+            e.stopPropagation()
+          }
         }}
-        onDragLeave={() => setDraggedOver(null)}
-        onDrop={(e) => handleDrop(e, docType)}
       >
-        <input
-          ref={el => { fileInputRefs.current[docType] = el }}
-          type="file"
-          accept="image/*,.pdf"
-          onChange={(e) => handleFileInput(e, docType)}
-          className="hidden"
-        />
+        <input {...getInputProps()} />
 
         {/* Header with mandatory/optional indicator */}
         <div className="flex items-center justify-between mb-3">
@@ -351,7 +378,27 @@ export default function DocumentUpload({
             <div className="space-y-3">
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto" />
               <p className="text-primary font-medium">Uploading & Verifying...</p>
-              <p className="text-sm text-base-content/60">Please wait while we process your document</p>
+              
+              {/* Progress bar */}
+              {progress && (
+                <div className="space-y-2">
+                  <div className="w-full bg-base-300 rounded-full h-2">
+                    <div 
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${progress.percentage}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-base-content/60">
+                    <span>{progress.percentage}%</span>
+                    {progress.speed && (
+                      <span>{uploadService.formatSpeed(progress.speed)}</span>
+                    )}
+                    {progress.timeRemaining && (
+                      <span>{uploadService.formatTimeRemaining(progress.timeRemaining)}</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           ) : document ? (
             <div className="space-y-3">
@@ -373,16 +420,24 @@ export default function DocumentUpload({
                 </p>
               </div>
 
-              <div className="flex gap-2 justify-center">
+              {/* AI Analysis removed - only visible to officers */}
+
+              <div className="flex gap-2 justify-center mt-3">
                 <button
-                  onClick={() => fileInputRefs.current[docType]?.click()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    open()
+                  }}
                   className="btn btn-primary btn-sm"
                   disabled={!backendAvailable}
                 >
                   Replace
                 </button>
                 <button
-                  onClick={() => removeDocument(docType)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeDocument(docType)
+                  }}
                   className="btn btn-error btn-sm"
                   disabled={!backendAvailable}
                 >
@@ -390,7 +445,10 @@ export default function DocumentUpload({
                 </button>
                 {document.url && (
                   <button
-                    onClick={() => window.open(document.url, '_blank')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      window.open(document.url, '_blank')
+                    }}
                     className="btn btn-neutral btn-sm"
                   >
                     View
@@ -400,41 +458,56 @@ export default function DocumentUpload({
             </div>
           ) : (
             <div className="space-y-3">
-              <Upload className="w-12 h-12 text-base-content/40 mx-auto" />
-              <div>
-                <p className="text-sm text-base-content/60 mb-3">
-                  {DOCUMENT_DESCRIPTIONS[docType] || `Upload your ${docType.replace('_', ' ')}`}
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <button
-                  onClick={() => fileInputRefs.current[docType]?.click()}
-                  disabled={!backendAvailable}
-                  className={`btn w-full disabled:opacity-50 disabled:cursor-not-allowed ${
-                    isMandatory 
-                      ? 'btn-error' 
-                      : 'btn-primary'
-                  }`}
-                >
-                  <FileText className="w-4 h-4 inline mr-2" />
-                  Choose File
-                </button>
-                
-                <button
-                  onClick={() => fileInputRefs.current[docType]?.click()}
-                  disabled={!backendAvailable}
-                  className="btn btn-outline w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Camera className="w-4 h-4 inline mr-2" />
-                  Take Photo
-                </button>
-              </div>
-              
-              <p className="text-xs text-base-content/50">
-                Drag & drop or click to upload<br />
-                Supports: JPG, PNG, PDF (max 10MB)
-              </p>
+              {isDragActive ? (
+                <div className="animate-pulse">
+                  <Upload className="w-16 h-16 text-primary mx-auto" />
+                  <p className="text-primary font-medium mt-2">Drop file here...</p>
+                </div>
+              ) : (
+                <>
+                  <Upload className="w-12 h-12 text-base-content/40 mx-auto" />
+                  <div>
+                    <p className="text-sm text-base-content/60 mb-3">
+                      {DOCUMENT_DESCRIPTIONS[docType] || `Upload your ${docType.replace('_', ' ')}`}
+                    </p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        open()
+                      }}
+                      disabled={!backendAvailable}
+                      className={`btn w-full disabled:opacity-50 disabled:cursor-not-allowed ${
+                        isMandatory 
+                          ? 'btn-error' 
+                          : 'btn-primary'
+                      }`}
+                    >
+                      <FileText className="w-4 h-4 inline mr-2" />
+                      Choose File
+                    </button>
+                    
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        open()
+                      }}
+                      disabled={!backendAvailable}
+                      className="btn btn-outline w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Camera className="w-4 h-4 inline mr-2" />
+                      Take Photo
+                    </button>
+                  </div>
+                  
+                  <p className="text-xs text-base-content/50">
+                    Drag & drop or click to upload<br />
+                    Supports: JPG, PNG, PDF (max 10MB)
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

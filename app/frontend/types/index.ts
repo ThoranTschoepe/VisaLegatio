@@ -64,6 +64,34 @@ export interface Document {
   uploadedAt: Date
   verified: boolean
   url?: string
+  ai_analysis?: DocumentAIAnalysis
+}
+
+export interface DocumentAIAnalysis {
+  classification: {
+    document_type: string
+    confidence: number
+    is_correct_type: boolean
+  }
+  extracted_data: {
+    text_content: string
+    key_fields: Record<string, any>
+    dates: string[]
+    amounts: string[]
+    names: string[]
+  }
+  problems: DocumentProblem[]
+  overall_confidence: number
+  is_authentic: boolean
+  processing_time_ms: number
+  analyzed_at: Date
+}
+
+export interface DocumentProblem {
+  problem_type: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  description: string
+  suggestion: string
 }
 
 export interface FlaggedDocument {

@@ -201,3 +201,54 @@ class FlagDocumentRequest(BaseModel):
 
 class UnflagDocumentRequest(BaseModel):
     flag_id: str
+
+# AI Document Analysis Models
+class ProblemSeverity(str, Enum):
+    LOW = "low"
+    MEDIUM = "medium" 
+    HIGH = "high"
+    CRITICAL = "critical"
+
+class DocumentClassificationResponse(BaseModel):
+    """Document type classification result"""
+    document_type: str = Field(description="Detected document type")
+    confidence: float = Field(description="Confidence score 0.0-1.0", ge=0.0, le=1.0)
+    is_correct_type: bool = Field(description="Whether document matches expected type")
+
+class ExtractedDataResponse(BaseModel):
+    """Key data extracted from document"""
+    text_content: str = Field(description="Main text content")
+    dates: List[str] = Field(description="All dates found in document")
+    amounts: List[str] = Field(description="Financial amounts found")
+    names: List[str] = Field(description="Person/entity names found")
+
+class DetectedProblemResponse(BaseModel):
+    """Problems found in document"""
+    problem_type: str = Field(description="Type of problem detected")
+    severity: ProblemSeverity = Field(description="Problem severity level")
+    description: str = Field(description="Human-readable problem description")
+    suggestion: str = Field(description="How to fix the problem")
+
+class DocumentAnalysisResponse(BaseModel):
+    """Complete AI analysis of document"""
+    classification: DocumentClassificationResponse
+    extracted_data: ExtractedDataResponse
+    problems: List[DetectedProblemResponse]
+    overall_confidence: float = Field(ge=0.0, le=1.0)
+    is_authentic: bool = Field(description="Whether document appears authentic")
+    processing_time_ms: int
+    analyzed_at: datetime
+
+class DocumentWithAnalysis(BaseModel):
+    """Extended document response with AI analysis"""
+    id: str
+    name: str
+    type: str
+    size: int
+    verified: bool
+    uploaded_at: datetime
+    file_path: str
+    ai_analysis: Optional[DocumentAnalysisResponse] = None
+
+    class Config:
+        from_attributes = True

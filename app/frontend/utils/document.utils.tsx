@@ -25,6 +25,7 @@ export const getDocumentIcon = (type: string): string => {
 export const getAIStatusIcon = (status: string) => {
   switch (status) {
     case 'verified':
+    case 'success':
       return <CheckCircle2 className="w-4 h-4 text-success" />
     case 'warning':
       return <AlertTriangle className="w-4 h-4 text-warning" />

@@ -27,9 +27,28 @@ interface DocumentWithUrls extends EmbassyDocument {
   view_url?: string
   file_exists?: boolean
   ai_analysis?: {
-    summary: string
-    status: string
-    concerns: string[]
+    classification: {
+      document_type: string
+      confidence: number
+      is_correct_type: boolean
+    }
+    extracted_data: {
+      text_content: string
+      dates: string[]
+      amounts: string[]
+      names: string[]
+    }
+    problems: Array<{
+      problem_type: string
+      severity: string
+      description: string
+      suggestion: string
+    }>
+    overall_confidence: number
+    is_authentic: boolean
+    processing_time_ms: number
+    analyzed_at: string
+    ai_model_version?: string
   }
 }
 
@@ -529,6 +548,32 @@ export default function ApplicationReview({
     }
   }
 
+  // Utility functions to derive status and summary from detailed AI analysis
+  const getAIAnalysisStatus = (analysis: DocumentWithUrls['ai_analysis']): 'critical' | 'warning' | 'success' => {
+    if (!analysis) return 'success'
+    
+    const criticalProblems = analysis.problems?.filter(p => p.severity === 'critical').length || 0
+    const highProblems = analysis.problems?.filter(p => p.severity === 'high').length || 0
+    
+    if (criticalProblems > 0 || !analysis.is_authentic) return 'critical'
+    if (highProblems > 0 || (analysis.overall_confidence || 0) < 0.7) return 'warning'
+    return 'success'
+  }
+
+  const getAIAnalysisSummary = (analysis: DocumentWithUrls['ai_analysis']): string => {
+    if (!analysis) return 'No AI analysis available'
+    
+    const confidence = Math.round((analysis.overall_confidence || 0) * 100)
+    const documentType = analysis.classification?.document_type || 'document'
+    const isCorrectType = analysis.classification?.is_correct_type
+    
+    let summary = `${confidence}% confidence for ${documentType}`
+    if (isCorrectType === false) summary += ' (incorrect document type)'
+    if (!analysis.is_authentic) summary += ' - Document authenticity questionable'
+    
+    return summary
+  }
+
   const toggleDocumentExpanded = (docType: string) => {
     setExpandedDocuments(prev => {
       const newSet = new Set(prev)
@@ -775,7 +820,7 @@ export default function ApplicationReview({
                                 </div>
                                 <div className="flex items-center gap-2 ml-2">
                                   {req.uploaded?.ai_analysis ? (
-                                    getAIStatusIcon(req.uploaded.ai_analysis.status)
+                                    getAIStatusIcon(getAIAnalysisStatus(req.uploaded.ai_analysis))
                                   ) : req.missing ? (
                                     <AlertTriangle className={`w-5 h-5 ${req.mandatory ? 'text-error' : 'text-warning'}`} />
                                   ) : req.uploaded?.verified ? (
@@ -813,9 +858,9 @@ export default function ApplicationReview({
                                   <div className="text-sm">
                                     <h5 className="font-medium text-base-content/70 mb-2">Document Summary</h5>
                                     <div className={`p-3 rounded-md ${
-                                      req.uploaded.ai_analysis?.status === 'critical' 
+                                      getAIAnalysisStatus(req.uploaded.ai_analysis) === 'critical' 
                                         ? 'bg-error/10 border border-error/20' 
-                                        : req.uploaded.ai_analysis?.status === 'warning'
+                                        : getAIAnalysisStatus(req.uploaded.ai_analysis) === 'warning'
                                         ? 'bg-warning/10 border border-warning/20'
                                         : 'bg-base-200 border border-base-300'
                                     }`}>
@@ -837,7 +882,7 @@ export default function ApplicationReview({
                                             }
                                           }
                                           // For non-John Doe applications, use the default or AI analysis if available
-                                          return req.uploaded.ai_analysis?.summary || 
+                                          return getAIAnalysisSummary(req.uploaded.ai_analysis) || 
                                                  `This is a verified ${req.name} document for ${application.applicantName}. The document has been successfully uploaded and verified by the system.`;
                                         })()}
                                       </p>
@@ -877,12 +922,19 @@ export default function ApplicationReview({
                                         </div>
                                       )}
                                       {/* For non-John Doe applications with AI analysis */}
-                                      {!isJohnDoe && req.uploaded.ai_analysis?.concerns && req.uploaded.ai_analysis.concerns.length > 0 && (
+                                      {!isJohnDoe && req.uploaded.ai_analysis?.problems && req.uploaded.ai_analysis.problems.length > 0 && (
                                         <div className="mt-2">
-                                          <p className="font-medium text-error text-xs mb-1">Concerns:</p>
+                                          <p className="font-medium text-error text-xs mb-1">AI Concerns:</p>
                                           <ul className="list-disc list-inside text-xs text-error/80">
-                                            {req.uploaded.ai_analysis.concerns.map((concern, idx) => (
-                                              <li key={idx}>{concern}</li>
+                                            {req.uploaded.ai_analysis.problems.map((problem, idx) => (
+                                              <li key={idx}>
+                                                <span className={`inline-block w-2 h-2 rounded mr-1 ${
+                                                  problem.severity === 'critical' ? 'bg-red-500' :
+                                                  problem.severity === 'high' ? 'bg-orange-500' :
+                                                  problem.severity === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'
+                                                }`}></span>
+                                                {problem.description}
+                                              </li>
                                             ))}
                                           </ul>
                                         </div>
@@ -909,9 +961,9 @@ export default function ApplicationReview({
                             <div className={`rounded-lg p-5 border-2 ${
                               selectedReq.missing 
                                 ? 'bg-error/10 border-error/20' 
-                                : selectedReq.uploaded?.ai_analysis?.status === 'critical'
+                                : getAIAnalysisStatus(selectedReq.uploaded?.ai_analysis) === 'critical'
                                 ? 'bg-error/10 border-error/20'
-                                : selectedReq.uploaded?.ai_analysis?.status === 'warning'
+                                : getAIAnalysisStatus(selectedReq.uploaded?.ai_analysis) === 'warning'
                                 ? 'bg-warning/10 border-warning/20'
                                 : 'bg-info/10 border-info/20'
                             }`}>
@@ -921,8 +973,8 @@ export default function ApplicationReview({
                                   <div className="flex items-center gap-2 mb-2">
                                     <h5 className={`font-semibold ${
                                       selectedReq.missing ? 'text-error' : 
-                                      selectedReq.uploaded?.ai_analysis?.status === 'critical' ? 'text-error' :
-                                      selectedReq.uploaded?.ai_analysis?.status === 'warning' ? 'text-warning' :
+                                      getAIAnalysisStatus(selectedReq.uploaded?.ai_analysis) === 'critical' ? 'text-error' :
+                                      getAIAnalysisStatus(selectedReq.uploaded?.ai_analysis) === 'warning' ? 'text-warning' :
                                       'text-info'
                                     }`}>
                                       {selectedReq.name}
@@ -977,29 +1029,36 @@ export default function ApplicationReview({
                                   {/* AI Analysis Summary if available */}
                                   {selectedReq.uploaded.ai_analysis && (
                                     <div className={`p-3 rounded-md border ${
-                                      selectedReq.uploaded.ai_analysis.status === 'critical' 
+                                      getAIAnalysisStatus(selectedReq.uploaded.ai_analysis) === 'critical' 
                                         ? 'bg-error/10 border-error/20' 
-                                        : selectedReq.uploaded.ai_analysis.status === 'warning'
+                                        : getAIAnalysisStatus(selectedReq.uploaded.ai_analysis) === 'warning'
                                         ? 'bg-warning/10 border-warning/20'
                                         : 'bg-success/10 border-success/20'
                                     }`}>
                                       <div className="flex items-start gap-2">
                                         <Brain className={`w-4 h-4 mt-0.5 ${
-                                          selectedReq.uploaded.ai_analysis.status === 'critical' 
+                                          getAIAnalysisStatus(selectedReq.uploaded.ai_analysis) === 'critical' 
                                             ? 'text-error' 
-                                            : selectedReq.uploaded.ai_analysis.status === 'warning'
+                                            : getAIAnalysisStatus(selectedReq.uploaded.ai_analysis) === 'warning'
                                             ? 'text-warning'
                                             : 'text-success'
                                         }`} />
                                         <div className="flex-1">
                                           <p className="text-sm font-medium mb-1">AI Analysis</p>
-                                          <p className="text-xs">{selectedReq.uploaded.ai_analysis.summary}</p>
-                                          {selectedReq.uploaded.ai_analysis.concerns.length > 0 && (
+                                          <p className="text-xs">{getAIAnalysisSummary(selectedReq.uploaded.ai_analysis)}</p>
+                                          {selectedReq.uploaded.ai_analysis.problems && selectedReq.uploaded.ai_analysis.problems.length > 0 && (
                                             <div className="mt-2">
-                                              <p className="text-xs font-medium">Concerns:</p>
-                                              <ul className="text-xs list-disc list-inside">
-                                                {selectedReq.uploaded.ai_analysis.concerns.map((concern, idx) => (
-                                                  <li key={idx}>{concern}</li>
+                                              <p className="text-xs font-medium">Problems Found:</p>
+                                              <ul className="text-xs list-disc list-inside space-y-1">
+                                                {selectedReq.uploaded.ai_analysis.problems.map((problem, idx) => (
+                                                  <li key={idx} className="flex items-start gap-2">
+                                                    <span className={`inline-block w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                                      problem.severity === 'critical' ? 'bg-red-500' :
+                                                      problem.severity === 'high' ? 'bg-orange-500' :
+                                                      problem.severity === 'medium' ? 'bg-yellow-500' : 'bg-blue-500'
+                                                    }`}></span>
+                                                    <span>{problem.description}</span>
+                                                  </li>
                                                 ))}
                                               </ul>
                                             </div>
