@@ -47,7 +47,7 @@ class DocumentAIService:
         self.api_key = os.getenv("GEMINI_API_KEY")
         if self.api_key:
             self.client = genai.Client(api_key=self.api_key)
-            self.model = "gemini-2.0-flash-exp"
+            self.model = "gemini-2.5-flash"
             self.enabled = True
             print("🤖 Document AI Service initialized with Gemini Vision")
         else:

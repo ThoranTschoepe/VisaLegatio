@@ -19,15 +19,17 @@ async def process_ai_analysis_background(
     file_path: Path, 
     document_type: str, 
     document_id: str,
-    application_context: dict
+    application_context: dict,
+    retry_count: int = 0,
+    max_retries: int = 3
 ):
-    """Background task to perform AI analysis for officer review only"""
+    """Background task to perform AI analysis for officer review only with retry logic"""
     if not document_ai_service.enabled:
         print("ℹ️ AI analysis disabled - skipping background processing")
         return
         
     try:
-        print(f"🤖 [Background] Starting AI analysis for {document_type} (doc_id: {document_id})...")
+        print(f"🤖 [Background] Starting AI analysis for {document_type} (doc_id: {document_id}, attempt: {retry_count + 1}/{max_retries + 1})...")
         
         ai_analysis = await document_ai_service.analyze_document(
             file_path,
@@ -61,7 +63,7 @@ async def process_ai_analysis_background(
                     overall_confidence=ai_analysis.overall_confidence,
                     is_authentic=ai_analysis.is_authentic,
                     processing_time_ms=ai_analysis.processing_time_ms,
-                    ai_model_version="gemini-2.0-flash-exp"
+                    ai_model_version="gemini-2.5-flash"
                 )
                 
                 db.add(analysis_record)
@@ -72,10 +74,39 @@ async def process_ai_analysis_background(
             finally:
                 db.close()
         else:
-            print("⚠️ [Background] AI analysis failed")
+            print("⚠️ [Background] AI analysis failed - no result returned")
             
     except Exception as e:
-        print(f"❌ [Background] AI analysis failed: {e}")
+        error_message = str(e)
+        print(f"❌ [Background] AI analysis failed: {error_message}")
+        
+        # Check if it's a retryable error (503 overload, network issues, etc.)
+        should_retry = (
+            "503" in error_message or 
+            "overloaded" in error_message.lower() or
+            "unavailable" in error_message.lower() or
+            "timeout" in error_message.lower() or
+            "network" in error_message.lower()
+        )
+        
+        if should_retry and retry_count < max_retries:
+            # Exponential backoff: 2^retry_count * 5 seconds (5s, 10s, 20s)
+            delay = (2 ** retry_count) * 5
+            print(f"🔄 [Background] Retrying AI analysis in {delay} seconds (attempt {retry_count + 2}/{max_retries + 1})...")
+            
+            # Schedule retry as a background task with delay
+            import asyncio
+            from fastapi import BackgroundTasks
+            await asyncio.sleep(delay)
+            await process_ai_analysis_background(
+                file_path, document_type, document_id, application_context, 
+                retry_count + 1, max_retries
+            )
+        else:
+            if retry_count >= max_retries:
+                print(f"💀 [Background] AI analysis failed after {max_retries + 1} attempts - giving up")
+            else:
+                print(f"💀 [Background] AI analysis failed with non-retryable error - giving up")
 
 # Document requirements by visa type
 DOCUMENT_REQUIREMENTS = {
@@ -320,6 +351,7 @@ async def upload_document(
         
         print(f"✅ Uploaded: {safe_filename} ({total_size:,} bytes, hash: {file_hash_hex[:8]}..., verified: {verified})")
         print(f"🔄 AI analysis scheduled for background processing (officer review only)")
+        print(f"📤 Upload response sent immediately to frontend - AI analysis runs separately")
         
         # Create response without AI analysis (not visible to applicants)
         response_data = {
