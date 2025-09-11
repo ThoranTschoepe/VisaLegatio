@@ -192,7 +192,12 @@ export default function DocumentUpload({
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>, docType: string) => {
     const files = e.target.files
     if (files && files.length > 0) {
+      debug(`📁 Selected file for ${docType}: ${files[0].name} (${files[0].size} bytes)`)
       handleFileUpload(files[0], docType)
+      // Reset value so selecting same file again triggers onChange
+      e.target.value = ''
+    } else {
+      debug(`⚠️ No file selected for ${docType}`)
     }
   }
 

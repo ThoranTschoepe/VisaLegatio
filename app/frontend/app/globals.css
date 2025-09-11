@@ -137,6 +137,18 @@
 
 /* Utilities */
 @layer utilities {
+  /* Prevent layout shift on focus for inputs (no ring, consistent border) */
+  .no-focus-jump {
+    outline: none !important;
+  box-shadow: none !important;
+  transition: none !important;
+  border-width: 1px !important;
+  }
+  .no-focus-jump:focus, .no-focus-jump:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  border-width: 1px !important;
+  }
   .visa-fade-in {
     animation: fadeIn 0.5s ease-in-out;
   }

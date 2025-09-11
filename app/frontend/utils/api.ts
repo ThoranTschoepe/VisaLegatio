@@ -75,15 +75,32 @@ class APIClient {
       formData.append('document_type', type)
 
       // Use fetch directly for file upload (no JSON content-type)
-      const response = await fetch(`${API_BASE}/documents/upload`, {
+      // Correct endpoint includes /api prefix (router mounted at /api/documents)
+      let response = await fetch(`${API_BASE}/api/documents/upload`, {
         method: 'POST',
         body: formData,
-        // Don't set Content-Type header - let browser set it with boundary for multipart
       })
 
+      // Fallback retry in case backend already proxied /api (defensive)
+      if (response.status === 404 || response.status === 405) {
+        try {
+          const alt = await fetch(`${API_BASE}/documents/upload`, {
+            method: 'POST',
+            body: formData,
+          })
+          if (alt.ok) {
+            response = alt
+          }
+        } catch {}
+      }
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.detail || `Upload failed for ${file.name}: ${response.statusText}`)
+        let errorDetail = ''
+        try {
+          const errorData = await response.json()
+          errorDetail = errorData.detail
+        } catch {}
+        throw new Error(errorDetail || `Upload failed for ${file.name}: ${response.status} ${response.statusText}`)
       }
 
       const result = await response.json()

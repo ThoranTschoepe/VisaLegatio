@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Wifi, WifiOff } from 'lucide-react'
+import { Bot, User } from 'lucide-react'
 import { Message, VisaType } from '@/types'
 import { api, apiUtils } from '@/utils/api'
-import { Button } from '@/components/UI'
+// Removed send Button; using Enter key to submit
 import { useAlertStore } from '@/lib/stores/alert.store'
 
 interface ChatInterfaceProps {
@@ -25,7 +25,6 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
   const [sessionId] = useState(() => apiUtils.generateSessionId())
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { showError, showSuccess } = useAlertStore()
-  const [isBackendAvailable, setIsBackendAvailable] = useState(true)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
 
   const scrollToBottom = () => {
@@ -36,19 +35,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
     scrollToBottom()
   }, [messages])
 
-  // Check backend availability on component mount
-  useEffect(() => {
-    checkBackendHealth()
-  }, [])
-
-  const checkBackendHealth = async () => {
-    const available = await apiUtils.isBackendAvailable()
-    setIsBackendAvailable(available)
-    
-    if (!available) {
-      showError('Backend not available - using demo mode')
-    }
-  }
+  // Removed backend availability + mock fallback
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return
@@ -65,53 +52,25 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
     setIsLoading(true)
 
     try {
-      if (!isBackendAvailable) {
-        // Fallback to mock response
-        const mockResponse = getMockChatResponse(input.trim())
-        const avaMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: mockResponse.response,
-          sender: 'ava',
-          timestamp: new Date(),
-          metadata: {
-            suggestedVisaType: mockResponse.suggestedVisaType,
-            nextAction: mockResponse.nextAction,
-            confidence: mockResponse.confidence
-          }
+      // Always use real backend now
+      const response = await api.chat(input.trim(), sessionId)
+      const avaMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: response.response,
+        sender: 'ava',
+        timestamp: new Date(),
+        metadata: {
+          suggestedVisaType: response.suggestedVisaType,
+          nextAction: response.nextAction,
+          confidence: response.confidence
         }
-        setMessages(prev => [...prev, avaMessage])
-        
-        // Trigger visa type selection if needed
-        if (mockResponse.nextAction === 'start_form' && mockResponse.suggestedVisaType && onVisaTypeSelected) {
-          setTimeout(() => {
-            onVisaTypeSelected(mockResponse.suggestedVisaType!)
-          }, 1000)
-        }
-      } else {
-        // Use real backend
-        const response = await api.chat(input.trim(), sessionId)
-        
-        const avaMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: response.response,
-          sender: 'ava',
-          timestamp: new Date(),
-          metadata: {
-            suggestedVisaType: response.suggestedVisaType,
-            nextAction: response.nextAction,
-            confidence: response.confidence
-          }
-        }
-
-        setMessages(prev => [...prev, avaMessage])
-
-        // If AVA suggests starting a form, trigger the callback
-        if (response.nextAction === 'start_form' && response.suggestedVisaType && onVisaTypeSelected) {
-          showSuccess(`Starting ${response.suggestedVisaType} visa application!`)
-          setTimeout(() => {
-            onVisaTypeSelected(response.suggestedVisaType!)
-          }, 5000)
-        }
+      }
+      setMessages(prev => [...prev, avaMessage])
+      if (response.nextAction === 'start_form' && response.suggestedVisaType && onVisaTypeSelected) {
+        showSuccess(`Starting ${response.suggestedVisaType} visa application!`)
+        setTimeout(() => {
+          onVisaTypeSelected(response.suggestedVisaType!)
+        }, 5000)
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -152,7 +111,18 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
 
   const handleQuickReply = (reply: string) => {
     setInput(reply)
-    setTimeout(() => sendMessage(), 100)
+    // Focus the textarea so user can immediately press Enter to send
+    // Use a microtask to ensure state has propagated before manipulating selection
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus()
+        // Place cursor at end
+        const len = inputRef.current.value.length
+        try {
+          inputRef.current.setSelectionRange(len, len)
+        } catch {}
+      }
+    }, 0)
   }
 
   return (
@@ -166,15 +136,7 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
           <div>
             <h3 className="font-semibold leading-tight">AVA Assistant</h3>
             <div className="flex items-center gap-1 text-xs opacity-70">
-              {isBackendAvailable ? (
-                <>
-                  <Wifi className="w-3 h-3 text-success" /> <span>Online</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-3 h-3 text-warning" /> <span>Demo mode</span>
-                </>
-              )}
+              <span>Online</span>
             </div>
           </div>
         </div>
@@ -266,31 +228,24 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
         </div>
       )}
 
-      {/* Input Area */}
+      {/* Input Area (reverted simpler layout) */}
       <div className="p-4 bg-base-100/90 backdrop-blur border-t border-base-300/70">
-        <div className="flex items-end gap-2">
-          <div className="flex-1 relative">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask AVA anything about visas..."
-              className="w-full resize-none rounded-xl border border-base-300 bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/40 px-4 py-3 text-sm leading-relaxed shadow-inner min-h-[48px]"
-              rows={1}
-              disabled={isLoading}
-            />
-          </div>
-          <Button
-            onClick={sendMessage}
-            disabled={!input.trim() || isLoading}
-            loading={isLoading}
-            className="h-[48px] w-[48px] rounded-xl"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+        <div className="relative">
+          <textarea
+            id="chat-input"
+            aria-describedby="chat-input-hint"
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask AVA anything about visas..."
+            className="w-full resize-none rounded-xl border border-base-300 bg-base-100 px-4 py-3 pr-16 text-sm leading-relaxed shadow-inner min-h-[48px] focus:outline-none no-focus-jump transition-none"
+            rows={1}
+            disabled={isLoading}
+          />
+          {/* Optional inline send icon (passive) */}
         </div>
-        <p className="text-[10px] opacity-50 mt-2 text-center tracking-wide uppercase">
+        <p className="text-[10px] opacity-40 mt-2 text-center tracking-wide uppercase">
           AI assistance − verify important information
         </p>
       </div>
@@ -298,31 +253,4 @@ export default function ChatInterface({ onVisaTypeSelected }: ChatInterfaceProps
   )
 }
 
-// Mock chat response for fallback
-function getMockChatResponse(message: string): any {
-  const lowerMessage = message.toLowerCase()
-  
-  if (lowerMessage.includes('tourist') || lowerMessage.includes('vacation') || lowerMessage.includes('holiday')) {
-    return {
-      response: "Perfect! For a tourist visa, you'll typically need a passport, bank statements, travel insurance, and a travel itinerary. The process usually takes 5-10 business days. Would you like me to start your application?",
-      suggestedVisaType: 'tourist',
-      nextAction: 'start_form',
-      confidence: 0.9
-    }
-  }
-  
-  if (lowerMessage.includes('business') || lowerMessage.includes('work') || lowerMessage.includes('conference')) {
-    return {
-      response: "Great! For a business visa, you'll need an invitation letter from the company, your employment details, and proof of business activities. This typically takes 7-15 business days. Shall we begin your application?",
-      suggestedVisaType: 'business',
-      nextAction: 'start_form',
-      confidence: 0.85
-    }
-  }
-  
-  return {
-    response: "I'm running in demo mode. I can help you with tourist, business, student, work, or family visit visas. What type of travel are you planning?",
-    nextAction: 'continue_chat',
-    confidence: 0.5
-  }
-}
+// Removed mock fallback logic

@@ -166,36 +166,8 @@ async def upload_document(
         raise HTTPException(status_code=500, detail=f"Failed to upload document: {str(e)}")
 
 def verify_document_content(content: bytes, doc_type: str, file_ext: str) -> bool:
-    """Basic document verification - in real app this would be more sophisticated"""
-
+    """Placeholder verification always returns True (simplified cleanup)."""
     return True
-    
-    # Basic file type verification
-    if file_ext == '.pdf':
-        # Check PDF magic bytes
-        if not content.startswith(b'%PDF'):
-            return False
-    elif file_ext in ['.jpg', '.jpeg']:
-        # Check JPEG magic bytes
-        if not content.startswith(b'\xff\xd8\xff'):
-            return False
-    elif file_ext == '.png':
-        # Check PNG magic bytes
-        if not content.startswith(b'\x89PNG\r\n\x1a\n'):
-            return False
-    
-    # Additional verification based on document type
-    if doc_type == 'passport' and file_ext not in ['.pdf', '.jpg', '.jpeg', '.png']:
-        # Passport should ideally be PDF or image
-        return False
-    
-    # File size checks
-    if len(content) < 1024:  # Less than 1KB is suspicious
-        return False
-    
-    # For demo purposes, we'll have a 95% success rate
-    import random
-    return random.random() > 0.05
 
 @router.get("/{visa_type}/requirements")
 async def get_document_requirements_for_visa_type(visa_type: str):
@@ -425,14 +397,4 @@ async def delete_document(application_id: str, document_type: str, db: Session =
     
     return {"message": f"Document {document_type} deleted successfully"}
 
-# Handle OPTIONS requests for CORS
-@router.options("/upload")
-@router.options("/view/{application_id}/{document_name}")
-@router.options("/download/{application_id}/{document_name}")
-async def handle_options():
-    """Handle CORS preflight requests"""
-    response = Response()
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "*"
-    return response
+# Removed explicit OPTIONS handlers; relying on global CORS middleware

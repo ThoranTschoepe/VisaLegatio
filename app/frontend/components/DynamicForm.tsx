@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import ProgressBar from './UI/ProgressBar'
 import { ChevronLeft, ChevronRight, Save, Send, AlertCircle, CheckCircle2, Eye, EyeOff, Lock, Shield } from 'lucide-react'
 import { Question, VisaType } from '@/types'
@@ -141,6 +141,23 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
   const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0
   const canProceed = currentQuestion && answers[currentQuestion.id] && !errors[currentQuestion.id]
   const isLastQuestion = currentQuestionIndex === questions.length - 1
+
+  // Country list (lightweight inline; could be externalized later)
+  const countries = useMemo(() => [
+    'Afghanistan','Albania','Algeria','Andorra','Angola','Argentina','Armenia','Australia','Austria','Azerbaijan','Bahamas','Bahrain','Bangladesh','Barbados','Belarus','Belgium','Belize','Benin','Bhutan','Bolivia','Bosnia and Herzegovina','Botswana','Brazil','Brunei','Bulgaria','Burkina Faso','Burundi','Cambodia','Cameroon','Canada','Cape Verde','Central African Republic','Chad','Chile','China','Colombia','Comoros','Congo','Costa Rica','Croatia','Cuba','Cyprus','Czech Republic','Denmark','Djibouti','Dominica','Dominican Republic','Ecuador','Egypt','El Salvador','Equatorial Guinea','Eritrea','Estonia','Eswatini','Ethiopia','Fiji','Finland','France','Gabon','Gambia','Georgia','Germany','Ghana','Greece','Grenada','Guatemala','Guinea','Guinea-Bissau','Guyana','Haiti','Honduras','Hungary','Iceland','India','Indonesia','Iran','Iraq','Ireland','Israel','Italy','Jamaica','Japan','Jordan','Kazakhstan','Kenya','Kiribati','Kuwait','Kyrgyzstan','Laos','Latvia','Lebanon','Lesotho','Liberia','Libya','Liechtenstein','Lithuania','Luxembourg','Madagascar','Malawi','Malaysia','Maldives','Mali','Malta','Marshall Islands','Mauritania','Mauritius','Mexico','Micronesia','Moldova','Monaco','Mongolia','Montenegro','Morocco','Mozambique','Myanmar','Namibia','Nauru','Nepal','Netherlands','New Zealand','Nicaragua','Niger','Nigeria','North Macedonia','Norway','Oman','Pakistan','Palau','Panama','Papua New Guinea','Paraguay','Peru','Philippines','Poland','Portugal','Qatar','Romania','Russia','Rwanda','Saint Kitts and Nevis','Saint Lucia','Saint Vincent and the Grenadines','Samoa','San Marino','Sao Tome and Principe','Saudi Arabia','Senegal','Serbia','Seychelles','Sierra Leone','Singapore','Slovakia','Slovenia','Solomon Islands','Somalia','South Africa','South Korea','Spain','Sri Lanka','Sudan','Suriname','Sweden','Switzerland','Syria','Taiwan','Tajikistan','Tanzania','Thailand','Timor-Leste','Togo','Tonga','Trinidad and Tobago','Tunisia','Turkey','Turkmenistan','Tuvalu','Uganda','Ukraine','United Arab Emirates','United Kingdom','United States','Uruguay','Uzbekistan','Vanuatu','Vatican City','Venezuela','Vietnam','Yemen','Zambia','Zimbabwe'
+  ], [])
+
+  const isCountryQuestion = currentQuestion && (
+    currentQuestion.id.toLowerCase().includes('country') || currentQuestion.text.toLowerCase().includes('country')
+  )
+
+  const countryInputValue = answers[currentQuestion?.id || ''] || ''
+  const filteredCountries = useMemo(() => {
+    if (!isCountryQuestion) return []
+    const q = countryInputValue.toString().toLowerCase().trim()
+    if (!q) return countries.slice(0, 15)
+    return countries.filter(c => c.toLowerCase().includes(q)).slice(0, 20)
+  }, [countries, countryInputValue, isCountryQuestion])
 
   const goToNext = () => {
     if (canProceed && !isLastQuestion) {
@@ -337,7 +354,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
   }
 
   return (
-    <div className="max-w-2xl mx-auto card bg-base-100 shadow-xl overflow-hidden">
+  <div className="max-w-2xl mx-auto card bg-base-100 shadow-xl overflow-hidden flex flex-col max-h-[80vh]">
       {/* Header */}
       <div className="bg-gradient-to-r from-primary to-secondary text-white p-6">
         <div className="flex items-center justify-between">
@@ -371,7 +388,7 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
       </div>
 
       {/* Question content */}
-      <div className="p-6">
+  <div className="p-6 flex-1 overflow-y-auto">
         <div className="mb-6">
           <h3 className="text-lg font-semibold text-base-content mb-4">
             {currentQuestion.text}
@@ -379,16 +396,25 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
 
           {/* Answer input based on question type */}
           <div className="space-y-4">
-            {currentQuestion.type === 'text' && (
+            {currentQuestion.type === 'text' && !isCountryQuestion && (
               <div>
                 <input
                   type="text"
                   value={answers[currentQuestion.id] || ''}
                   onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
-                  className={`input input-bordered w-full ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      if ((answers[currentQuestion.id] || '').toString().trim() !== '' && !errors[currentQuestion.id]) {
+                        e.preventDefault()
+                        goToNext()
+                      }
+                    }
+                  }}
+                  className={`input input-bordered w-full focus:outline-none no-focus-jump transition-none ${
                     errors[currentQuestion.id] ? 'input-error' : ''
                   }`}
                   placeholder="Enter your answer..."
+                  autoComplete="off"
                 />
                 {errors[currentQuestion.id] && (
                   <p className="text-error text-sm mt-2 flex items-center gap-2">
@@ -399,8 +425,62 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
               </div>
             )}
 
+            {currentQuestion.type === 'text' && isCountryQuestion && (
+              <div className="relative">
+                <input
+                  type="text"
+                  value={countryInputValue}
+                  onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && filteredCountries.length > 0) {
+                      e.preventDefault()
+                      handleAnswer(currentQuestion.id, filteredCountries[0])
+                      goToNext()
+                    }
+                  }}
+                  className={`input input-bordered w-full focus:outline-none no-focus-jump transition-none ${
+                    errors[currentQuestion.id] ? 'input-error' : ''
+                  }`}
+                  placeholder="Start typing a country..."
+                  autoComplete="off"
+                />
+                <div className="absolute z-20 mt-1 left-0 right-0 max-h-56 overflow-y-auto rounded-lg border border-base-300 bg-base-100 shadow-xl">
+                  {filteredCountries.length === 0 ? (
+                    <div className="px-3 py-2 text-sm opacity-60">No matches</div>
+                  ) : (
+                    filteredCountries.map(c => (
+                      <button
+                        key={c}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          handleAnswer(currentQuestion.id, c)
+                          goToNext()
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm hover:bg-primary/10 transition-colors ${
+                          countryInputValue === c ? 'bg-primary/10 text-primary' : ''
+                        }`}
+                      >
+                        {c}
+                      </button>
+                    ))
+                  )}
+                </div>
+                <p className="text-[10px] uppercase tracking-wide opacity-40 mt-2">Enter to select top match</p>
+              </div>
+            )}
+
             {currentQuestion.type === 'select' && (
-              <div className="grid gap-3">
+              <div
+                className="grid gap-3"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && canProceed) {
+                    e.preventDefault()
+                    goToNext()
+                  }
+                }}
+                aria-label="Select an option and press Enter to continue"
+              >
                 {currentQuestion.options?.map(option => (
                   <button
                     key={option}
@@ -428,9 +508,17 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
                   type="number"
                   value={answers[currentQuestion.id] || ''}
                   onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      if ((answers[currentQuestion.id] || '').toString().trim() !== '' && !errors[currentQuestion.id]) {
+                        e.preventDefault()
+                        goToNext()
+                      }
+                    }
+                  }}
                   min={currentQuestion.validation?.min}
                   max={currentQuestion.validation?.max}
-                  className={`input input-bordered w-full ${
+                  className={`input input-bordered w-full focus:outline-none no-focus-jump transition-none ${
                     errors[currentQuestion.id] ? 'input-error' : ''
                   }`}
                   placeholder="Enter number..."
@@ -462,7 +550,15 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
                   type="date"
                   value={answers[currentQuestion.id] || ''}
                   onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
-                  className={`input input-bordered w-full ${
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      if ((answers[currentQuestion.id] || '').toString().trim() !== '' && !errors[currentQuestion.id]) {
+                        e.preventDefault()
+                        goToNext()
+                      }
+                    }
+                  }}
+                  className={`input input-bordered w-full focus:outline-none no-focus-jump transition-none ${
                     errors[currentQuestion.id] ? 'input-error' : ''
                   }`}
                 />
@@ -477,26 +573,27 @@ export default function DynamicForm({ visaType, onSubmit, onBack }: DynamicFormP
           </div>
         </div>
 
-        {/* Navigation */}
-        <div className="flex justify-between items-center pt-6 border-t">
-          <button
-            onClick={onBack || goToPrevious}
-            className="btn btn-ghost"
-            disabled={currentQuestionIndex === 0 && !onBack}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            {currentQuestionIndex === 0 && onBack ? 'Back to Chat' : 'Previous'}
-          </button>
+        {/* Navigation moved below scroll container */}
+      </div>
 
-          <button
-            onClick={goToNext}
-            disabled={!canProceed}
-            className="btn btn-primary"
-          >
-            {isLastQuestion ? 'Continue to Security' : 'Next'}
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+    <div className="px-6 py-4 border-t bg-base-100 flex justify-between items-center">
+        <button
+      onClick={goToPrevious}
+          className="btn btn-ghost"
+      disabled={currentQuestionIndex === 0}
+        >
+          <ChevronLeft className="w-4 h-4" />
+      Previous
+        </button>
+
+        <button
+          onClick={goToNext}
+          disabled={!canProceed}
+          className="btn btn-primary"
+        >
+          {isLastQuestion ? 'Continue to Security' : 'Next'}
+          <ChevronRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Form summary sidebar (for larger screens) */}
