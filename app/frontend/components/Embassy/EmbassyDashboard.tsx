@@ -1,10 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { 
-  Users, 
   CheckCircle2, 
   Clock, 
-  AlertTriangle, 
   Filter, 
   Search,
   FileText,
@@ -236,23 +234,8 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
             🏛️ Embassy Portal
           </h1>
         </div>
+
         <div className="flex-none gap-2">
-          <button 
-            className="btn btn-outline btn-sm"
-            onClick={() => setCurrentView('analytics')}
-          >
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Analytics
-          </button>
-          {(officer.role === 'Senior Consular Officer' || officer.role === 'System Administrator') && (
-            <button 
-              className="btn btn-warning btn-sm"
-              onClick={() => router.push('/embassy/bias-review')}
-            >
-              <Shield className="w-4 h-4 mr-2" />
-              Bias Review
-            </button>
-          )}
           <div className="dropdown dropdown-end">
             <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar">
               <div className="w-10 rounded-full bg-primary text-white flex items-center justify-center">
@@ -274,6 +257,44 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
           <h2 className="text-3xl font-bold mb-2">Welcome back, {officer.name.split(' ')[1]}</h2>
           <p className="text-base-content/60">Manage visa applications and track processing status</p>
         </div>
+
+        {(officer.role === 'Senior Consular Officer' || officer.role === 'System Administrator') && (
+          <div className="card bg-base-100 shadow mb-6">
+            <div className="card-body">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-warning" />
+                    Governance Console
+                  </h3>
+                  <p className="text-sm text-base-content/60 max-w-xl">
+                    Access senior tools to monitor bias signals, audit reviewer escalations, and track high-level analytics.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="btn btn-sm btn-outline"
+                    onClick={() => setCurrentView('analytics')}
+                  >
+                    Open Analytics
+                  </button>
+                  <button
+                    className="btn btn-sm btn-primary"
+                    onClick={() => router.push('/embassy/bias-monitoring')}
+                  >
+                    Bias Monitoring
+                  </button>
+                  <button
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => router.push('/embassy/review-audit')}
+                  >
+                    Review Audits
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -324,22 +345,6 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
         </div>
         
         {/* Bias Review Alert for Senior Officers */}
-        {(officer.role === 'Senior Consular Officer' || officer.role === 'System Administrator') && (
-          <div className="alert alert-warning shadow-lg mb-6">
-            <Shield className="w-6 h-6" />
-            <div className="flex-1">
-              <h3 className="font-bold">Bias Review Available</h3>
-              <p className="text-sm">Review rejected applications for potential AI bias patterns</p>
-            </div>
-            <button 
-              className="btn btn-sm"
-              onClick={() => router.push('/embassy/bias-review')}
-            >
-              Review Now
-            </button>
-          </div>
-        )}
-
         {/* Search and Filters */}
         <div className="card bg-base-100 shadow mb-6">
           <div className="card-body">

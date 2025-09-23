@@ -165,6 +165,52 @@ class Metric(Base):
     date = Column(DateTime, nullable=False)
     embassy_id = Column(String)
 
+class BiasReview(Base):
+    __tablename__ = "bias_reviews"
+
+    id = Column(String, primary_key=True, index=True)
+    application_id = Column(String, ForeignKey("applications.id"), nullable=False)
+    officer_id = Column(String, ForeignKey("officers.id"), nullable=False)
+    result = Column(String, nullable=False)  # justified, biased, uncertain
+    notes = Column(Text)
+    ai_confidence = Column(Integer)
+    audit_status = Column(String, default="pending")  # pending, validated, escalated, overturned
+    reviewed_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    application = relationship("Application", backref="bias_reviews")
+    officer = relationship("Officer", backref="bias_reviews")
+    audits = relationship("BiasReviewAudit", back_populates="review", cascade="all, delete-orphan")
+
+
+class BiasReviewAudit(Base):
+    __tablename__ = "bias_review_audits"
+
+    id = Column(String, primary_key=True, index=True)
+    bias_review_id = Column(String, ForeignKey("bias_reviews.id"), nullable=False)
+    auditor_id = Column(String, ForeignKey("officers.id"), nullable=False)
+    decision = Column(String, nullable=False)  # validated, overturned, escalated, training_needed
+    notes = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    review = relationship("BiasReview", back_populates="audits")
+    auditor = relationship("Officer")
+
+
+class BiasMonitoringSnapshot(Base):
+    __tablename__ = "bias_monitoring_snapshots"
+
+    id = Column(String, primary_key=True, index=True)
+    generated_at = Column(DateTime, default=datetime.utcnow, index=True)
+    total_rejected = Column(Integer, default=0)
+    sampled_count = Column(Integer, default=0)
+    reviewed_count = Column(Integer, default=0)
+    bias_detected_count = Column(Integer, default=0)
+    bias_rate = Column(Float, default=0.0)
+    snapshot_data = Column(Text)  # JSON payload with patterns, breakdowns, alert flags
+
+
 # Database functions
 def create_tables():
     """Create all database tables"""

@@ -1,6 +1,12 @@
 // app/frontend/visaverge-user/utils/api.ts - Real document upload implementation
 
 import { ChatResponse, Question, VisaApplication, VisaType } from '@/types'
+import {
+  BiasReviewCase,
+  BiasReviewStatistics,
+  BiasMonitoringSnapshot,
+  BiasAuditItem,
+} from '@/types/embassy.types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -261,6 +267,82 @@ class APIClient {
     return this.transformApplicationResponse(response)
   }
 
+  async getBiasReviewSample(options: { sampleRate?: number; daysBack?: number } = {}): Promise<{
+    cases: BiasReviewCase[]
+    statistics: BiasReviewStatistics
+  }> {
+    const params = new URLSearchParams()
+    if (options.sampleRate !== undefined) params.append('sample_rate', String(options.sampleRate))
+    if (options.daysBack !== undefined) params.append('days_back', String(options.daysBack))
+
+    const query = params.toString() ? `?${params.toString()}` : ''
+    const response = await this.request<{ cases: any[]; statistics: any }>(`/bias-review/sample${query}`)
+
+    return {
+      cases: response.cases.map(caseItem => this.transformBiasReviewCase(caseItem)),
+      statistics: this.transformBiasReviewStatistics(response.statistics),
+    }
+  }
+
+  async submitBiasReview(
+    applicationId: string,
+    payload: { result: 'justified' | 'biased' | 'uncertain'; notes?: string; officer_id?: string; ai_confidence?: number }
+  ): Promise<any> {
+    return await this.request(`/bias-review/review/${applicationId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
+  async getBiasMonitoringOverview(daysBack?: number): Promise<BiasMonitoringSnapshot> {
+    const params = new URLSearchParams()
+    if (daysBack !== undefined) params.append('days_back', String(daysBack))
+    const query = params.toString() ? `?${params.toString()}` : ''
+    const response = await this.request<any>(`/bias-monitoring/overview${query}`)
+    return this.transformBiasMonitoringSnapshot(response)
+  }
+
+  async getBiasMonitoringHistory(limit?: number): Promise<BiasMonitoringSnapshot[]> {
+    const params = new URLSearchParams()
+    if (limit !== undefined) params.append('limit', String(limit))
+    const query = params.toString() ? `?${params.toString()}` : ''
+    const response = await this.request<{ history: any[] }>(`/bias-monitoring/history${query}`)
+    return response.history.map(item => this.transformBiasMonitoringSnapshot(item))
+  }
+
+  async triggerBiasMonitoringSnapshot(daysBack?: number): Promise<{ message: string }> {
+    const params = new URLSearchParams()
+    if (daysBack !== undefined) params.append('days_back', String(daysBack))
+    const query = params.toString() ? `?${params.toString()}` : ''
+    return await this.request(`/bias-monitoring/snapshot${query}`, {
+      method: 'POST',
+    })
+  }
+
+  async getReviewAuditQueue(options: { status?: string; limit?: number } = {}): Promise<BiasAuditItem[]> {
+    const params = new URLSearchParams()
+    if (options.status) params.append('status', options.status)
+    if (options.limit) params.append('limit', String(options.limit))
+    const query = params.toString() ? `?${params.toString()}` : ''
+    const response = await this.request<{ items: any[] }>(`/review-audit/queue${query}`)
+    return response.items.map(item => this.transformBiasAuditItem(item))
+  }
+
+  async getReviewAuditDetail(reviewId: string): Promise<BiasAuditItem> {
+    const response = await this.request<any>(`/review-audit/${reviewId}`)
+    return this.transformBiasAuditItem(response)
+  }
+
+  async submitReviewAuditDecision(
+    reviewId: string,
+    payload: { decision: 'validated' | 'overturned' | 'escalated' | 'training_needed'; notes?: string; auditor_id: string }
+  ): Promise<any> {
+    return await this.request(`/review-audit/${reviewId}/decision`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  }
+
   // Officer authentication
   async officerLogin(credentials: {
     officer_id: string
@@ -332,6 +414,91 @@ class APIClient {
         resolvedAt: flag.resolved_at ? new Date(flag.resolved_at) : undefined,
         document: flag.document
       })) || []
+    }
+  }
+
+  private transformBiasReviewCase(payload: any): BiasReviewCase {
+    const application = payload.application || {}
+    return {
+      application: {
+        id: application.id,
+        applicantName: application.applicant_name || 'Unknown',
+        visaType: application.visa_type || 'unknown',
+        status: application.status || 'rejected',
+        submittedAt: application.submitted_at || null,
+        country: application.country || 'Unknown',
+        riskScore: application.risk_score ?? 0,
+        documentsCount: application.documents_count ?? 0,
+      },
+      rejectionReason: payload.rejection_reason || 'No reason provided',
+      aiConfidence: payload.ai_confidence ?? 0,
+      reviewed: Boolean(payload.reviewed),
+      reviewResult: payload.review_result,
+      reviewNotes: payload.review_notes,
+      reviewedBy: payload.reviewed_by,
+      reviewedAt: payload.reviewed_at,
+      auditStatus: payload.audit_status || 'pending',
+    }
+  }
+
+  private transformBiasReviewStatistics(payload: any): BiasReviewStatistics {
+    return {
+      totalRejected: payload.total_rejected ?? 0,
+      sampleSize: payload.sample_size ?? 0,
+      reviewedCount: payload.reviewed_count ?? 0,
+      biasDetectedCount: payload.bias_detected_count ?? 0,
+      biasRate: payload.bias_rate ?? 0,
+      commonBiasPatterns: payload.common_bias_patterns || [],
+    }
+  }
+
+  private transformBiasMonitoringSnapshot(payload: any): BiasMonitoringSnapshot {
+    const metricsPayload = payload.metrics || payload
+    return {
+      snapshotId: payload.snapshot_id || payload.snapshotId || 'unknown',
+      generatedAt: payload.generated_at || payload.generatedAt || null,
+      metrics: {
+        totalRejected: metricsPayload.total_rejected ?? 0,
+        sampledCount: metricsPayload.sampled_count ?? 0,
+        reviewedCount: metricsPayload.reviewed_count ?? 0,
+        biasDetectedCount: metricsPayload.bias_detected_count ?? 0,
+        biasRate: metricsPayload.bias_rate ?? 0,
+        biasByCountry: metricsPayload.bias_by_country || {},
+        biasByVisaType: metricsPayload.bias_by_visa_type || {},
+        auditStatusBreakdown: metricsPayload.audit_status_breakdown || {},
+        commonBiasPatterns: metricsPayload.common_bias_patterns || [],
+        alerts: metricsPayload.alerts || [],
+        windowDays: metricsPayload.window_days ?? 30,
+      },
+    }
+  }
+
+  private transformBiasAuditItem(payload: any): BiasAuditItem {
+    return {
+      review: {
+        id: payload.review.id,
+        applicationId: payload.review.application_id,
+        officerId: payload.review.officer_id || null,
+        result: payload.review.result,
+        notes: payload.review.notes,
+        auditStatus: payload.review.audit_status,
+        reviewedAt: payload.review.reviewed_at,
+      },
+      application: {
+        id: payload.application.id,
+        visaType: payload.application.visa_type,
+        status: payload.application.status,
+        riskScore: payload.application.risk_score,
+        country: payload.application.country,
+        applicantName: payload.application.applicant_name,
+      },
+      audits: (payload.audits || []).map((audit: any) => ({
+        id: audit.id,
+        auditorId: audit.auditor_id,
+        decision: audit.decision,
+        notes: audit.notes,
+        createdAt: audit.created_at,
+      })),
     }
   }
 }

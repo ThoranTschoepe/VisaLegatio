@@ -12,7 +12,17 @@ from PIL import Image, ImageDraw, ImageFont
 import io
 import base64
 from pathlib import Path
-from database import get_db_session, User, Application, Document, Officer, StatusUpdate
+from database import (
+    get_db_session,
+    User,
+    Application,
+    Document,
+    Officer,
+    StatusUpdate,
+    BiasReview,
+    BiasReviewAudit,
+    BiasMonitoringSnapshot,
+)
 from models import Question, QuestionValidation
 
 def generate_id(prefix: str = "") -> str:
@@ -1179,7 +1189,223 @@ def seed_demo_data():
                         timestamp=datetime.utcnow() - timedelta(hours=random.randint(1, 24))
                     )
                     db.add(current_status)
-        
+
+        # Demo bias review cases for monitoring UI (legacy sample data)
+        demo_bias_cases = [
+            {
+                "application_id": "VSV-240201-BIAS1",
+                "user_id": "user-ahmed-hassan",
+                "applicant_name": "Ahmed Hassan",
+                "visa_type": "tourist",
+                "country": "Egypt",
+                "risk_score": 65,
+                "days_offset": 5,
+                "rejection_reason": "High risk score due to country of origin and limited travel history",
+                "review": None,
+            },
+            {
+                "application_id": "VSV-240202-BIAS2",
+                "user_id": "user-fatima-al-rashid",
+                "applicant_name": "Fatima Al-Rashid",
+                "visa_type": "student",
+                "country": "Syria",
+                "risk_score": 72,
+                "days_offset": 4,
+                "rejection_reason": "Insufficient financial documentation despite scholarship",
+                "review": {
+                    "officer_id": "john.davis",
+                    "result": "biased",
+                    "notes": "Applicant has a full scholarship. Financial requirements should be waived.",
+                    "ai_confidence": 74,
+                    "audit_status": "pending",
+                    "reviewed_days_ago": 2
+                }
+            },
+            {
+                "application_id": "VSV-240203-BIAS3",
+                "user_id": "user-vladimir-petrov",
+                "applicant_name": "Vladimir Petrov",
+                "visa_type": "business",
+                "country": "Russia",
+                "risk_score": 80,
+                "days_offset": 6,
+                "rejection_reason": "Geopolitical risk factors and incomplete documentation",
+                "review": {
+                    "officer_id": "maria.schmidt",
+                    "result": "justified",
+                    "notes": "Missing critical business documents. Rejection is warranted.",
+                    "ai_confidence": 82,
+                    "audit_status": "validated",
+                    "reviewed_days_ago": 3,
+                    "audit": {
+                        "auditor_id": "maria.schmidt",
+                        "decision": "validated",
+                        "notes": "Double-checked documents; decision stands.",
+                        "days_ago": 2
+                    }
+                }
+            },
+            {
+                "application_id": "VSV-240204-BIAS4",
+                "user_id": "user-chen-wei",
+                "applicant_name": "Chen Wei",
+                "visa_type": "family_visit",
+                "country": "China",
+                "risk_score": 45,
+                "days_offset": 7,
+                "rejection_reason": "Name similarity to watchlist entry (false positive)",
+                "review": None,
+            },
+            {
+                "application_id": "VSV-240205-BIAS5",
+                "user_id": "user-maria-gonzalez",
+                "applicant_name": "Maria Gonzalez",
+                "visa_type": "tourist",
+                "country": "Mexico",
+                "risk_score": 55,
+                "days_offset": 8,
+                "rejection_reason": "Previous overstay by family member",
+                "review": {
+                    "officer_id": "admin",
+                    "result": "biased",
+                    "notes": "Applicant should not be penalized for family member actions.",
+                    "ai_confidence": 69,
+                    "audit_status": "pending",
+                    "reviewed_days_ago": 4
+                }
+            },
+        ]
+
+        now = datetime.utcnow()
+
+        for index, case in enumerate(demo_bias_cases):
+            user_id = case["user_id"]
+            user = db.query(User).filter(User.id == user_id).first()
+            if not user:
+                user = User(
+                    id=user_id,
+                    email=f"{user_id.replace('user-', '').replace('_', '.')}@demo.visa",
+                    name=case["applicant_name"],
+                    phone=f"+10000000{index:02d}",
+                    nationality=case["country"]
+                )
+                db.add(user)
+
+            application = db.query(Application).filter(Application.id == case["application_id"]).first()
+            if not application:
+                answers = {
+                    "applicant_name": case["applicant_name"],
+                    "nationality": case["country"],
+                    "destination_country": "Germany"
+                }
+                application = Application(
+                    id=case["application_id"],
+                    user_id=user_id,
+                    visa_type=case["visa_type"],
+                    status="rejected",
+                    priority="normal",
+                    risk_score=case["risk_score"],
+                    answers=json.dumps(answers),
+                    submitted_at=now - timedelta(days=case["days_offset"] + 1),
+                    updated_at=now - timedelta(days=case["days_offset"])
+                )
+                db.add(application)
+
+                rejection_update = StatusUpdate(
+                    id=generate_id("status"),
+                    application_id=case["application_id"],
+                    status="rejected",
+                    notes=case["rejection_reason"],
+                    officer_id="maria.schmidt",
+                    timestamp=now - timedelta(days=case["days_offset"])
+                )
+                db.add(rejection_update)
+
+        # Seed bias reviews, audits, and an initial monitoring snapshot for demo purposes
+        if db.query(BiasReview).count() == 0:
+            bias_review_records = []
+
+            for case in demo_bias_cases:
+                review_data = case.get("review")
+                if not review_data:
+                    continue
+
+                record = BiasReview(
+                    id=generate_id("biasreview"),
+                    application_id=case["application_id"],
+                    officer_id=review_data["officer_id"],
+                    result=review_data["result"],
+                    notes=review_data["notes"],
+                    ai_confidence=review_data.get("ai_confidence"),
+                    audit_status=review_data.get("audit_status", "pending"),
+                    reviewed_at=now - timedelta(days=review_data.get("reviewed_days_ago", 1))
+                )
+                db.add(record)
+                bias_review_records.append((case, record, review_data))
+
+            db.flush()
+
+            # Optional audit follow-up for validated cases
+            for case, record, review_data in bias_review_records:
+                audit_meta = review_data.get("audit")
+                if not audit_meta:
+                    continue
+                audit_entry = BiasReviewAudit(
+                    id=generate_id("biasaudit"),
+                    bias_review_id=record.id,
+                    auditor_id=audit_meta["auditor_id"],
+                    decision=audit_meta.get("decision", "validated"),
+                    notes=audit_meta.get("notes"),
+                    created_at=now - timedelta(days=audit_meta.get("days_ago", 1))
+                )
+                db.add(audit_entry)
+
+            reviewed_bias_cases = [item for item in bias_review_records if item[2]["result"] == "biased"]
+            total_reviews = len(bias_review_records)
+
+            bias_by_country = {}
+            bias_by_visa_type = {}
+            for case, _, review_data in bias_review_records:
+                if review_data["result"] != "biased":
+                    continue
+                bias_by_country[case["country"]] = bias_by_country.get(case["country"], 0) + 1
+                bias_by_visa_type[case["visa_type"]] = bias_by_visa_type.get(case["visa_type"], 0) + 1
+
+            audit_breakdown = {}
+            for _, record, _ in bias_review_records:
+                audit_breakdown[record.audit_status] = audit_breakdown.get(record.audit_status, 0) + 1
+
+            snapshot_metrics = {
+                "total_rejected": db.query(Application).filter(Application.status == "rejected").count(),
+                "sampled_count": len(demo_bias_cases),
+                "reviewed_count": total_reviews,
+                "bias_detected_count": len(reviewed_bias_cases),
+                "bias_rate": round((len(reviewed_bias_cases) / total_reviews) * 100, 2) if total_reviews else 0,
+                "bias_by_country": bias_by_country,
+                "bias_by_visa_type": bias_by_visa_type,
+                "audit_status_breakdown": audit_breakdown,
+                "common_bias_patterns": [
+                    "Country of origin bias (35%)",
+                    "Name-based false positives (25%)",
+                    "Family association penalties (20%)",
+                    "Financial requirement misapplication (20%)",
+                ],
+                "alerts": ["Bias rate trending high — schedule focused audit"],
+                "window_days": 30,
+            }
+
+            snapshot = BiasMonitoringSnapshot(
+                id=generate_id("biasmon"),
+                generated_at=now,
+                total_rejected=snapshot_metrics["total_rejected"],
+                sampled_count=snapshot_metrics["sampled_count"],
+                reviewed_count=snapshot_metrics["reviewed_count"],
+                bias_detected_count=snapshot_metrics["bias_detected_count"],
+                bias_rate=snapshot_metrics["bias_rate"],
+                snapshot_data=json.dumps(snapshot_metrics)
+            )
+            db.add(snapshot)
+
         db.commit()
         print("\n✅ Demo data seeded successfully with organized document files!")
         print("📋 Demo Application Credentials:")

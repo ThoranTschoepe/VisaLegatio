@@ -6,11 +6,18 @@ from datetime import datetime
 import json
 
 # Document processing imports - using Gemini Vision instead of OCR
-import pypdfium2
+try:
+    import pypdfium2  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency for demo environment
+    pypdfium2 = None
 
 # Google Gemini AI
-from google import genai
-from google.genai import types
+try:
+    from google import genai  # type: ignore
+    from google.genai import types  # type: ignore
+except ImportError:  # pragma: no cover - optional dependency for demo environment
+    genai = None  # type: ignore
+    types = None  # type: ignore
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
@@ -45,7 +52,9 @@ class DocumentAnalysis(BaseModel):
 class DocumentAIService:
     def __init__(self):
         self.api_key = os.getenv("GEMINI_API_KEY")
-        if self.api_key:
+        dependencies_ready = self.api_key and genai is not None and types is not None and pypdfium2 is not None
+
+        if dependencies_ready:
             self.client = genai.Client(api_key=self.api_key)
             self.model = "gemini-2.5-flash"
             self.enabled = True
@@ -54,7 +63,10 @@ class DocumentAIService:
             self.client = None
             self.model = None
             self.enabled = False
-            print("⚠️ GEMINI_API_KEY not found. Document AI disabled.")
+            if not self.api_key:
+                print("⚠️ GEMINI_API_KEY not found. Document AI disabled.")
+            else:
+                print("⚠️ Gemini or PDF dependencies missing. Document AI disabled for this environment.")
 
     async def analyze_document(
         self, 
@@ -110,10 +122,12 @@ class DocumentAIService:
             print(f"📷 Preparing document for vision: {file_path} (type: {file_ext})")
             
             if file_ext == '.pdf':
+                if not pypdfium2:
+                    print("⚠️ pypdfium2 not available. Skipping PDF preview generation.")
+                    return None
                 # Convert first page of PDF to image using pypdfium2 (already available)
                 print("🔄 Converting PDF to image...")
-                import pypdfium2 as pdfium
-                pdf = pdfium.PdfDocument(file_path)
+                pdf = pypdfium2.PdfDocument(file_path)
                 if len(pdf) > 0:
                     page = pdf.get_page(0)
                     # Render page to image

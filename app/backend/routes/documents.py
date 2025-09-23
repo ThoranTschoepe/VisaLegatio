@@ -6,7 +6,11 @@ import uuid
 from typing import List
 from pathlib import Path
 from datetime import datetime
-import aiofiles
+
+try:
+    import aiofiles  # type: ignore
+except ImportError:  # pragma: no cover - fallback for test environments without aiofiles
+    aiofiles = None
 import json
 from database import get_db, Document as DocumentDB, Application, DocumentAnalysis
 from models import DocumentResponse, DocumentAnalysisResponse, DocumentClassificationResponse, ExtractedDataResponse, DetectedProblemResponse, ProblemSeverity
@@ -247,25 +251,42 @@ async def upload_document(
         file_hash = hashlib.sha256()
         
         # First pass: write to temp file and validate
-        async with aiofiles.open(temp_file_path, 'wb') as f:
+        if aiofiles:
+            async with aiofiles.open(temp_file_path, 'wb') as f:
+                while chunk := await file.read(CHUNK_SIZE):
+                    total_size += len(chunk)
+
+                    if total_size > MAX_FILE_SIZE:
+                        await f.close()
+                        temp_file_path.unlink(missing_ok=True)
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB"
+                        )
+
+                    file_hash.update(chunk)
+                    await f.write(chunk)
+            async with aiofiles.open(temp_file_path, 'rb') as f:
+                first_chunk = await f.read(8192)
+        else:
+            chunks: list[bytes] = []
             while chunk := await file.read(CHUNK_SIZE):
                 total_size += len(chunk)
-                
-                # Check size limit
                 if total_size > MAX_FILE_SIZE:
-                    await f.close()
                     temp_file_path.unlink(missing_ok=True)
                     raise HTTPException(
                         status_code=413,
                         detail=f"File too large. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB"
                     )
-                
                 file_hash.update(chunk)
-                await f.write(chunk)
-        
-        # Read first chunk for content validation
-        async with aiofiles.open(temp_file_path, 'rb') as f:
-            first_chunk = await f.read(8192)
+                chunks.append(chunk)
+
+            with open(temp_file_path, 'wb') as f:
+                for chunk in chunks:
+                    f.write(chunk)
+
+            with open(temp_file_path, 'rb') as f:
+                first_chunk = f.read(8192)
         
         # Validate file content matches extension
         is_valid, validation_message = await validate_file_headers(first_chunk, file.filename)

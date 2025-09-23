@@ -6,7 +6,6 @@ import {
   ArchiveRestore,
   ArrowRightCircle,
   CheckCircle2,
-  ChevronsRight,
   CircleDashed,
   ClipboardList,
   Loader2,
@@ -31,6 +30,21 @@ const DECISION_LABELS: Record<AuditDecision, string> = {
   training_needed: 'Training Needed',
 }
 
+type QueueFilter = 'requires_audit' | 'resolved'
+
+const FILTER_META: Record<QueueFilter, { label: string; description: string; predicate: (item: BiasAuditItem) => boolean }> = {
+  requires_audit: {
+    label: 'Needs attention',
+    description: 'Flagged or pending decisions requiring senior review.',
+    predicate: item => item.review.auditStatus === 'pending',
+  },
+  resolved: {
+    label: 'Resolved',
+    description: 'Reviews that have already been validated or closed.',
+    predicate: item => item.review.auditStatus !== 'pending',
+  },
+}
+
 export default function BiasAuditQueue({ officer }: BiasAuditQueueProps) {
   const [queue, setQueue] = useState<BiasAuditItem[]>([])
   const [selectedReview, setSelectedReview] = useState<BiasAuditItem | null>(null)
@@ -39,6 +53,7 @@ export default function BiasAuditQueue({ officer }: BiasAuditQueueProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>('requires_audit')
 
   const pendingCount = useMemo(
     () => queue.filter(item => item.review.auditStatus === 'pending').length,
@@ -53,7 +68,7 @@ export default function BiasAuditQueue({ officer }: BiasAuditQueueProps) {
     try {
       setIsLoading(true)
       setError(null)
-      const items = await api.getReviewAuditQueue({ status: 'pending', limit: 15 })
+      const items = await api.getReviewAuditQueue({ status: 'all', limit: 40 })
       setQueue(items)
       setSelectedReview(items[0] || null)
       setDecision('validated')
@@ -80,6 +95,12 @@ export default function BiasAuditQueue({ officer }: BiasAuditQueueProps) {
       setIsLoading(false)
     }
   }
+
+  const visibleQueue = useMemo(() => {
+    const filter = FILTER_META[queueFilter]
+    if (!filter) return queue
+    return queue.filter(filter.predicate)
+  }, [queue, queueFilter])
 
   const handleSubmitDecision = async () => {
     if (!selectedReview) return
@@ -109,7 +130,7 @@ export default function BiasAuditQueue({ officer }: BiasAuditQueueProps) {
             Review-of-Review Audit
           </h2>
           <p className="text-base-content/70">
-            Senior officers validate bias reviews before final disposition. {pendingCount} pending audits.
+            Senior officers validate flagged reviews before final disposition. {pendingCount} pending audits.
           </p>
         </div>
         <button className="btn btn-sm" onClick={loadAuditQueue} disabled={isLoading}>
@@ -134,15 +155,29 @@ export default function BiasAuditQueue({ officer }: BiasAuditQueueProps) {
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="card bg-base-100 shadow-sm lg:col-span-1">
             <div className="card-body space-y-3">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <ClipboardList className="w-5 h-5 text-primary" />
-                Pending Reviews
-              </h3>
-              {queue.length === 0 ? (
-                <p className="text-sm text-base-content/60">No bias reviews awaiting audit.</p>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-primary" />
+                  Queue
+                </h3>
+                <div className="btn-group">
+                  {(Object.keys(FILTER_META) as QueueFilter[]).map(option => (
+                    <button
+                      key={option}
+                      className={`btn btn-xs ${queueFilter === option ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={() => setQueueFilter(option)}
+                    >
+                      {FILTER_META[option].label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-base-content/60">{FILTER_META[queueFilter].description}</p>
+              {visibleQueue.length === 0 ? (
+                <p className="text-sm text-base-content/60">No reviews match this filter.</p>
               ) : (
                 <ul className="space-y-2">
-                  {queue.map(item => (
+                  {visibleQueue.map(item => (
                     <li key={item.review.id}>
                       <button
                         className={`w-full text-left btn btn-ghost btn-sm justify-start ${selectedReview?.review.id === item.review.id ? 'bg-base-200' : ''}`}
@@ -153,8 +188,20 @@ export default function BiasAuditQueue({ officer }: BiasAuditQueueProps) {
                           <span className="text-xs text-base-content/60">
                             {item.application.country} · {item.application.visaType}
                           </span>
+                          <span className="text-xs text-base-content/50">
+                            Flagged {formatRelativeTime(item.review.reviewedAt)} ago by {item.review.officerId ?? 'unknown'}
+                          </span>
                         </div>
-                        <ChevronsRight className="w-4 h-4 ml-auto" />
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`text-xs flex items-center gap-1 ${item.review.auditStatus === 'pending' ? 'text-warning' : 'text-success'}`}>
+                            {formatStatus(item.review.auditStatus)}
+                          </span>
+                          {item.review.reviewedAt && (
+                            <span className="text-[10px] text-base-content/40">
+                              {new Date(item.review.reviewedAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
                       </button>
                     </li>
                   ))}
@@ -293,4 +340,39 @@ function DecisionIcon({ decision }: { decision: AuditDecision }) {
     default:
       return null
   }
+}
+
+function formatStatus(status: string) {
+  if (status === 'pending') return 'Needs review'
+  if (status === 'validated') return 'Validated'
+  if (status === 'overturned') return 'Overturned'
+  if (status === 'training_needed') return 'Training needed'
+  if (status === 'escalated') return 'Escalated'
+  return status.replace('_', ' ')
+}
+
+function formatRelativeTime(timestamp?: string | null) {
+  if (!timestamp) return 'recently'
+  const now = new Date()
+  const then = new Date(timestamp)
+  const diffMs = now.getTime() - then.getTime()
+
+  const minutes = Math.floor(diffMs / (1000 * 60))
+  if (minutes < 1) return 'moments'
+  if (minutes < 60) return `${minutes} min`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hr`
+
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `${days} day${days === 1 ? '' : 's'}`
+
+  const weeks = Math.floor(days / 7)
+  if (weeks < 4) return `${weeks} wk`
+
+  const months = Math.floor(days / 30)
+  if (months < 12) return `${months} mo`
+
+  const years = Math.floor(days / 365)
+  return `${years} yr`
 }

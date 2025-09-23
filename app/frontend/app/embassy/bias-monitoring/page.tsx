@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, ShieldAlert, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import BiasMonitoringPanel from '@/components/Embassy/BiasMonitoringPanel'
 import { Officer } from '@/types/embassy.types'
 
@@ -59,11 +59,6 @@ export default function BiasMonitoringPage() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to dashboard
           </button>
-          <div className="divider divider-horizontal"></div>
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-error" />
-            <h1 className="text-lg font-semibold">Bias Monitoring</h1>
-          </div>
         </div>
         <div className="flex-none">
           <div className="badge badge-warning gap-2">

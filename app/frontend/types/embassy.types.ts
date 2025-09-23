@@ -101,6 +101,85 @@ export interface AnalyticsData {
   }[]
 }
 
+export interface BiasReviewCase {
+  application: {
+    id: string
+    applicantName: string
+    visaType: string
+    status: string
+    submittedAt?: string | null
+    country: string
+    riskScore: number
+    documentsCount: number
+  }
+  rejectionReason: string
+  aiConfidence: number
+  reviewed: boolean
+  reviewResult?: 'justified' | 'biased' | 'uncertain'
+  reviewNotes?: string
+  reviewedBy?: string
+  reviewedAt?: string
+  auditStatus: string
+}
+
+export interface BiasReviewStatistics {
+  totalRejected: number
+  sampleSize: number
+  reviewedCount: number
+  biasDetectedCount: number
+  biasRate: number
+  commonBiasPatterns: string[]
+}
+
+export interface BiasMonitoringMetrics {
+  totalRejected: number
+  sampledCount: number
+  reviewedCount: number
+  biasDetectedCount: number
+  biasRate: number
+  biasByCountry: Record<string, number>
+  biasByVisaType: Record<string, number>
+  auditStatusBreakdown: Record<string, number>
+  commonBiasPatterns: string[]
+  alerts: string[]
+  windowDays: number
+}
+
+export interface BiasMonitoringSnapshot {
+  snapshotId: string
+  generatedAt: string | null
+  metrics: BiasMonitoringMetrics
+}
+
+export interface BiasAuditDecision {
+  id: string
+  auditorId: string
+  decision: 'validated' | 'overturned' | 'escalated' | 'training_needed'
+  notes?: string
+  createdAt?: string
+}
+
+export interface BiasAuditItem {
+  review: {
+    id: string
+    applicationId: string
+    officerId: string | null
+    result: 'justified' | 'biased' | 'uncertain'
+    notes?: string
+    auditStatus: string
+    reviewedAt?: string
+  }
+  application: {
+    id: string
+    visaType: string | null
+    status: string | null
+    riskScore: number | null
+    country: string
+    applicantName: string
+  }
+  audits: BiasAuditDecision[]
+}
+
 // Mock data constants
 export const MOCK_EMBASSIES: Embassy[] = [
   { id: 'us_berlin', name: 'U.S. Embassy Berlin', country: 'Germany', location: 'Berlin, Germany' },

@@ -17,6 +17,7 @@ import {
   BiasMonitoringSnapshot,
 } from '@/types/embassy.types'
 import BiasInfluenceDemo from './BiasInfluenceDemo'
+import { biasAttributeCategories } from '@/data/biasInfluenceMock'
 
 interface BiasMonitoringPanelProps {
   officer: Officer
@@ -191,6 +192,33 @@ export default function BiasMonitoringPanel({ officer }: BiasMonitoringPanelProp
           </div>
 
           <BiasInfluenceDemo />
+
+          <div className="card bg-base-100 shadow">
+            <div className="card-body space-y-4">
+              <div className="flex flex-col gap-1">
+                <h3 className="text-lg font-semibold">Attribute catalog</h3>
+                <p className="text-xs text-base-content/60">
+                  Key attributes tracked in the bias influence model and how each signal is calculated before fitting the regression.
+                </p>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                {biasAttributeCategories.map(category => (
+                  <section key={category.id} className="p-4 rounded-lg bg-base-200/60 space-y-3">
+                    <h4 className="text-sm font-semibold uppercase tracking-wide">{category.title}</h4>
+                    <ul className="space-y-3 text-sm">
+                      {category.attributes.map(attribute => (
+                        <li key={attribute.id}>
+                          <p className="font-medium">{attribute.label}</p>
+                          <p className="text-xs text-base-content/70 leading-relaxed">{attribute.explanation}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            </div>
+          </div>
 
         </>
       )}

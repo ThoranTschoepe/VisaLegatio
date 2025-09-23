@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowLeft } from 'lucide-react'
-import BiasAuditQueue from '@/components/Embassy/BiasAuditQueue'
+import ReviewAuditListDemo from '@/components/Embassy/ReviewAuditListDemo'
+import ReviewAuditDemo from '@/components/Embassy/ReviewAuditDemo'
 import { Officer } from '@/types/embassy.types'
 
 const ALLOWED_ROLES = ['Senior Consular Officer', 'System Administrator']
@@ -68,7 +69,12 @@ export default function ReviewAuditPage() {
         </div>
       </div>
 
-      <BiasAuditQueue officer={officer} />
+      <div className="hidden lg:block">
+        <ReviewAuditListDemo />
+      </div>
+      <div className="lg:hidden">
+        <ReviewAuditDemo />
+      </div>
     </div>
   )
 }
