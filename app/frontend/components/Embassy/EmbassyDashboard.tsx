@@ -1,16 +1,14 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   CheckCircle2, 
   Clock, 
-  Filter, 
   Search,
   FileText,
   TrendingUp,
   Eye,
-  MoreVertical,
-  BarChart3,
-  Shield
+  Shield,
+  ArrowUpDown
 } from 'lucide-react'
 import { Officer, EmbassyApplication } from '@/types/embassy.types'
 import { api, apiUtils } from '@/utils/api'
@@ -83,7 +81,10 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
   const [applications, setApplications] = useState<EmbassyApplication[]>([])
   const [selectedApplication, setSelectedApplication] = useState<EmbassyApplication | null>(null)
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [filterVisaType, setFilterVisaType] = useState<string>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [sortOption, setSortOption] = useState<'none' | 'status' | 'priority' | 'submission'>('none')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [currentView, setCurrentView] = useState<'dashboard' | 'review' | 'analytics'>('dashboard')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
@@ -91,13 +92,14 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
   // Load applications from backend
   useEffect(() => {
     loadApplications()
-  }, [filterStatus, searchTerm])
+  }, [filterStatus, filterVisaType, searchTerm])
 
   const loadApplications = async () => {
     try {
       setIsLoading(true)
       const filters: any = {}
       if (filterStatus !== 'all') filters.status = filterStatus
+      if (filterVisaType !== 'all') filters.visaType = filterVisaType
       if (searchTerm) filters.search = searchTerm
 
       const response = await api.getApplications(filters)
@@ -131,12 +133,63 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
   }
 
   // Filter and search applications
-  const filteredApplications = applications.filter(app => {
-    const matchesFilter = filterStatus === 'all' || app.status === filterStatus
-    const matchesSearch = app.applicantName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         app.id.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesFilter && matchesSearch
-  })
+  const visaTypeOptions = useMemo(() => {
+    const types = new Set<string>()
+    applications.forEach(app => {
+      if (app.visaType) {
+        types.add(app.visaType)
+      }
+    })
+    return Array.from(types).sort()
+  }, [applications])
+
+  const displayedApplications = useMemo(() => {
+    const normalizedSearch = searchTerm.toLowerCase().trim()
+
+    const filtered = applications.filter(app => {
+      const matchesFilter = filterStatus === 'all' || app.status === filterStatus
+      const matchesVisa = filterVisaType === 'all' || app.visaType === filterVisaType
+      const matchesSearch = !normalizedSearch ||
+        app.applicantName.toLowerCase().includes(normalizedSearch) ||
+        app.id.toLowerCase().includes(normalizedSearch)
+      return matchesFilter && matchesVisa && matchesSearch
+    })
+
+    if (sortOption === 'none') {
+      return filtered
+    }
+
+    const statusOrder = ['submitted', 'document_review', 'background_check', 'officer_review', 'approved', 'rejected']
+    const priorityOrder = ['urgent', 'high', 'normal', 'low']
+    const directionMultiplier = sortDirection === 'asc' ? 1 : -1
+
+    return [...filtered].sort((a, b) => {
+      const getOrderIndex = (value: string, order: string[]) => {
+        const index = order.indexOf(value)
+        return index === -1 ? order.length : index
+      }
+
+      let comparison = 0
+
+      if (sortOption === 'status') {
+        comparison = getOrderIndex(a.status, statusOrder) - getOrderIndex(b.status, statusOrder)
+      } else if (sortOption === 'priority') {
+        comparison = getOrderIndex(a.priority, priorityOrder) - getOrderIndex(b.priority, priorityOrder)
+      } else if (sortOption === 'submission') {
+        comparison = a.submittedAt.getTime() - b.submittedAt.getTime()
+      }
+
+      if (comparison === 0) {
+        comparison = a.submittedAt.getTime() - b.submittedAt.getTime()
+
+        if (comparison === 0) {
+          comparison = a.applicantName.localeCompare(b.applicantName)
+        }
+      }
+
+      return comparison * directionMultiplier
+    })
+  }, [applications, filterStatus, searchTerm, sortOption, sortDirection])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -345,28 +398,63 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
         </div>
         
         {/* Bias Review Alert for Senior Officers */}
-        {/* Search and Filters */}
-        <div className="card bg-base-100 shadow mb-6">
-          <div className="card-body">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="form-control">
-                  <div className="input-group">
-                    <input 
-                      type="text" 
-                      placeholder="Search by name or application ID..." 
-                      className="input input-bordered flex-1"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <button className="btn btn-square">
-                      <Search className="w-5 h-5" />
-                    </button>
-                  </div>
+        {/* Applications Table */}
+        <div className="card bg-base-100 shadow">
+          <div className="card-body space-y-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-xl font-bold">Application Queue</h3>
+                  <span className="badge badge-outline">{displayedApplications.length} applications</span>
                 </div>
               </div>
-              
-              <div className="flex gap-2">
+              <div className="form-control w-full lg:max-w-md">
+                <label className="label hidden lg:flex">
+                  <span className="label-text text-xs font-semibold uppercase tracking-wide text-base-content/70">
+                    Search Queue
+                  </span>
+                </label>
+                <div className="input-group">
+                  <input 
+                    type="text" 
+                    placeholder="Search by name or application ID..." 
+                    className="input input-bordered flex-1"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    aria-label="Search applications"
+                  />
+                  <button className="btn btn-square">
+                    <Search className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:gap-4">
+              <div className="form-control w-full sm:w-40 lg:w-48">
+                <label className="label">
+                  <span className="label-text text-xs font-semibold uppercase tracking-wide text-base-content/70">
+                    Visa Type
+                  </span>
+                </label>
+                <select 
+                  className="select select-bordered"
+                  value={filterVisaType}
+                  onChange={(e) => setFilterVisaType(e.target.value)}
+                >
+                  <option value="all">All Types</option>
+                  {visaTypeOptions.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-control w-full sm:w-44 lg:w-48">
+                <label className="label">
+                  <span className="label-text text-xs font-semibold uppercase tracking-wide text-base-content/70">
+                    Status Filter
+                  </span>
+                </label>
                 <select 
                   className="select select-bordered"
                   value={filterStatus}
@@ -380,22 +468,49 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
                   <option value="approved">Approved</option>
                   <option value="rejected">Rejected</option>
                 </select>
-                
-                <button className="btn btn-outline">
-                  <Filter className="w-5 h-5" />
-                  More Filters
-                </button>
               </div>
-            </div>
-          </div>
-        </div>
 
-        {/* Applications Table */}
-        <div className="card bg-base-100 shadow">
-          <div className="card-body">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold">Application Queue</h3>
-              <span className="badge badge-outline">{filteredApplications.length} applications</span>
+              <div className="form-control w-full sm:flex-1 lg:max-w-sm">
+                <label className="label">
+                  <span className="label-text text-xs font-semibold uppercase tracking-wide text-base-content/70">
+                    Sort Queue
+                  </span>
+                </label>
+                <div className="join">
+                  <select
+                    className="select select-bordered join-item w-full"
+                    value={sortOption}
+                    onChange={(e) => {
+                      const value = e.target.value as 'none' | 'status' | 'priority' | 'submission'
+                      setSortOption(value)
+
+                      if (value === 'none') {
+                        setSortDirection('asc')
+                      } else if (value === 'submission') {
+                        setSortDirection('desc')
+                      } else {
+                        setSortDirection('asc')
+                      }
+                    }}
+                  >
+                    <option value="none">Default Order</option>
+                    <option value="status">Status First</option>
+                    <option value="priority">Priority Level</option>
+                    <option value="submission">Submission Time</option>
+                  </select>
+
+                  <button
+                    className="btn btn-outline join-item"
+                    disabled={sortOption === 'none'}
+                    onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                  >
+                    <ArrowUpDown className="w-4 h-4" />
+                    <span className="ml-1 text-sm">
+                      {sortDirection === 'asc' ? 'Asc' : 'Desc'}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -413,7 +528,7 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredApplications.map((app) => (
+                  {displayedApplications.map((app) => (
                     <tr key={app.id} className="hover">
                       <td>
                         <div className="font-mono text-sm">{app.id}</div>
