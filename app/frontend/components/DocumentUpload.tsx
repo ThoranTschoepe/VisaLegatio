@@ -9,6 +9,7 @@ import { api, apiUtils } from '@/utils/api'
 import { uploadService, UploadProgress } from '@/utils/uploadService'
 import { useAlertStore } from '@/lib/stores/alert.store'
 import { useUploadStore } from '@/lib/stores/upload.store'
+import AcknowledgementNotice from '@/components/AcknowledgementNotice'
 
 interface DocumentUploadProps {
   visaType: VisaType
@@ -52,9 +53,27 @@ export default function DocumentUpload({
   }>({ mandatory: [], optional: [] })
   const [isLoading, setIsLoading] = useState(true)
   const [backendAvailable, setBackendAvailable] = useState(true)
+  const [acknowledged, setAcknowledged] = useState(false)
+  const [showAcknowledgementError, setShowAcknowledgementError] = useState(false)
   const { showSuccess, showError, showWarning } = useAlertStore()
   const uploadStore = useUploadStore()
   const prevDocumentsRef = useRef<Document[]>([])
+
+  const ensureAcknowledged = useCallback(() => {
+    if (acknowledged) {
+      return true
+    }
+    setShowAcknowledgementError(true)
+    showWarning('Please acknowledge the AI summarization notice before uploading documents.')
+    return false
+  }, [acknowledged, showWarning])
+
+  const handleAcknowledgementChange = useCallback((value: boolean) => {
+    setAcknowledged(value)
+    if (value) {
+      setShowAcknowledgementError(false)
+    }
+  }, [])
 
   // Load document requirements and existing documents
   useEffect(() => {
@@ -116,6 +135,10 @@ export default function DocumentUpload({
   }
 
   const handleFileUpload = useCallback(async (file: File, docType: string) => {
+    if (!ensureAcknowledged()) {
+      return
+    }
+
     if (!backendAvailable) {
       showError('Backend not available. Cannot upload documents.')
       return
@@ -201,10 +224,14 @@ export default function DocumentUpload({
         return newProgress
       })
     }
-  }, [applicationId, onDocumentsChange, showSuccess, showError, backendAvailable])
+  }, [applicationId, backendAvailable, ensureAcknowledged, onDocumentsChange, showError, showSuccess])
 
   // Handle file drop (without using hooks)
   const handleFileDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[], docType: string) => {
+    if (!ensureAcknowledged()) {
+      return
+    }
+
     if (rejectedFiles.length > 0) {
       const error = rejectedFiles[0].errors[0]
       if (error.code === 'file-too-large') {
@@ -220,7 +247,7 @@ export default function DocumentUpload({
     if (acceptedFiles.length > 0) {
       handleFileUpload(acceptedFiles[0], docType)
     }
-  }, [handleFileUpload, showError])
+  }, [ensureAcknowledged, handleFileUpload, showError])
 
   const removeDocument = async (docType: string) => {
     if (!backendAvailable) {
@@ -334,14 +361,23 @@ export default function DocumentUpload({
       },
       maxSize: 10 * 1024 * 1024, // 10MB
       multiple: false,
-      disabled: !backendAvailable || uploading,
+      disabled: !backendAvailable || uploading || !acknowledged,
       onDrop: (acceptedFiles, rejectedFiles) => handleFileDrop(acceptedFiles, rejectedFiles, docType)
     })
+
+    const handleOpenFileDialog = () => {
+      if (!ensureAcknowledged()) {
+        return
+      }
+      open()
+    }
     
     return (
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-6 transition-all cursor-pointer ${
+        className={`border-2 border-dashed rounded-lg p-6 transition-all ${
+          acknowledged ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'
+        } ${
           isDragActive
             ? 'border-primary bg-primary/10 scale-105'
             : document?.verified
@@ -426,10 +462,10 @@ export default function DocumentUpload({
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    open()
+                    handleOpenFileDialog()
                   }}
                   className="btn btn-primary btn-sm"
-                  disabled={!backendAvailable}
+                  disabled={!backendAvailable || !acknowledged}
                 >
                   Replace
                 </button>
@@ -473,15 +509,15 @@ export default function DocumentUpload({
                   </div>
                   
                   <div className="space-y-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        open()
-                      }}
-                      disabled={!backendAvailable}
-                      className={`btn w-full disabled:opacity-50 disabled:cursor-not-allowed ${
-                        isMandatory 
-                          ? 'btn-error' 
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleOpenFileDialog()
+                  }}
+                  disabled={!backendAvailable || !acknowledged}
+                  className={`btn w-full disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isMandatory 
+                      ? 'btn-error' 
                           : 'btn-primary'
                       }`}
                     >
@@ -489,14 +525,14 @@ export default function DocumentUpload({
                       Choose File
                     </button>
                     
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        open()
-                      }}
-                      disabled={!backendAvailable}
-                      className="btn btn-outline w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleOpenFileDialog()
+                  }}
+                  disabled={!backendAvailable || !acknowledged}
+                  className="btn btn-outline w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                       <Camera className="w-4 h-4 inline mr-2" />
                       Take Photo
                     </button>
@@ -551,6 +587,13 @@ export default function DocumentUpload({
       </div>
 
       <div className="p-6">
+        <AcknowledgementNotice
+          checked={acknowledged}
+          onChange={handleAcknowledgementChange}
+          showError={showAcknowledgementError}
+          className="mb-6"
+        />
+
         {/* Processing Status Alert */}
         {processingBlocked && backendAvailable && (
           <div className="mb-6 bg-error/10 border border-error/20 rounded-lg p-4">
