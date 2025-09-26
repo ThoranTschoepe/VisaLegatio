@@ -152,6 +152,71 @@ class BiasWorkflowTests(unittest.TestCase):
         history = history_response.json().get('history', [])
         self.assertGreaterEqual(len(history), 1)
 
+    def test_bias_monitoring_overview_and_leaderboard(self):
+        overview_response = self.client.get('/api/bias-monitoring/overview?days_back=30')
+        self.assertEqual(overview_response.status_code, 200)
+        overview = overview_response.json()
+        self.assertIn('snapshotId', overview)
+        self.assertIn('metrics', overview)
+        metrics = overview['metrics']
+        self.assertIn('biasRate', metrics)
+        self.assertIn('commonBiasPatterns', metrics)
+
+        leaderboard_response = self.client.get('/api/bias-influence/leaderboard?days_back=30')
+        self.assertEqual(leaderboard_response.status_code, 200)
+        leaderboard = leaderboard_response.json()
+        self.assertIn('factors', leaderboard)
+        self.assertIn('model', leaderboard)
+        factors = leaderboard['factors']
+        self.assertIsInstance(factors, list)
+        model_meta = leaderboard['model']
+        self.assertIn('sampleSize', model_meta)
+        self.assertGreaterEqual(model_meta['sampleSize'], 0)
+
+        # Expect our seeded influence factors to be present and carry numeric weights
+        attribute_ids = {factor.get('attributeId') for factor in factors}
+        self.assertIn('origin_colombia', attribute_ids)
+        self.assertIn('doc_quantity_low', attribute_ids)
+
+        for factor in factors:
+            self.assertIn('coefficient', factor)
+            self.assertIn('sampleShare', factor)
+            self.assertIsInstance(factor['coefficient'], (int, float))
+            self.assertGreaterEqual(factor['sampleShare'], 0.0)
+            self.assertLessEqual(factor['sampleShare'], 1.0)
+
+        if not factors:
+            warnings = model_meta.get('warnings', [])
+            self.assertTrue(warnings)
+
+        attributes_response = self.client.get('/api/bias-influence/attributes')
+        self.assertEqual(attributes_response.status_code, 200)
+        categories = attributes_response.json().get('categories', [])
+        self.assertGreater(len(categories), 0)
+        self.assertIn('attributes', categories[0])
+
+    def test_bias_review_cadence_endpoint(self):
+        cadence_response = self.client.get('/api/bias-review/cadence')
+        self.assertEqual(cadence_response.status_code, 200)
+        cadence = cadence_response.json()
+        self.assertIn('bands', cadence)
+        self.assertIsInstance(cadence['bands'], list)
+        self.assertGreater(len(cadence['bands']), 0)
+        first_band = cadence['bands'][0]
+        self.assertIn('interval', first_band)
+        self.assertIn('reviewTime', first_band)
+        self.assertIn('viewTime', first_band)
+
+    def test_bias_influence_attributes_endpoint(self):
+        response = self.client.get('/api/bias-influence/attributes')
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        categories = payload.get('categories', [])
+        self.assertTrue(any(category.get('id') == 'origin_trends' for category in categories))
+        origin_category = next(category for category in categories if category.get('id') == 'origin_trends')
+        origin_ids = {attribute['id'] for attribute in origin_category.get('attributes', [])}
+        self.assertTrue({'origin_colombia', 'origin_kenya', 'origin_philippines'}.issubset(origin_ids))
+
 
 if __name__ == '__main__':
     unittest.main()

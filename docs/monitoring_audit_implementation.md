@@ -10,12 +10,16 @@ Both currently consume mock data. Backend APIs already exist (`/api/bias-review/
 ## Frontend Structure
 ### Bias Monitoring Panel
 - Fetches:
-  - `/api/bias-review/sample` → cases + review statistics.
-  - `/api/bias-monitoring/overview` → snapshot metrics + alerts (seeded).
+  - `/api/bias-review/sample` → cases + review statistics (deterministic sampling inside a window).
+  - `/api/bias-monitoring/overview` → snapshot metrics + alerts (auto-refreshes when stale).
+  - `/api/bias-influence/leaderboard` → drivers/buffers computed via logistic regression (falls back with warnings when prerequisites missing).
+  - `/api/bias-influence/attributes` → glossary of model features.
+  - `/api/bias-review/cadence` → risk-band review latency benchmarks.
 - Displays:
   - Summary cards (total rejected, sampled, reviewed, flagged findings).
   - Sample table (applications with status badges).
-  - Influence leaderboard (`BiasInfluenceDemo`), which consumes static demo data.
+  - Influence leaderboard (live data when modelling succeeds; otherwise surfaces backend warnings).
+  - Risk-adjusted review cadence table with optional fallbacks when analytics unavailable.
 
 ### Review Audit UI
 - Large screens render `ReviewAuditListDemo` (card list + detail panel, form-only demo).
@@ -56,7 +60,7 @@ Review audit DB → /api/review-audit/* → (future) ReviewAuditListDemo submiss
 
 ## Next Steps Checklist
 - [ ] Design influence API response format (driver/buffer arrays with percent & meta).
-- [ ] Wire `BiasInfluenceDemo` to use live data once ready.
+- [ ] Wire `InfluenceLeaderboard` to use live data once ready.
 - [ ] Replace ReviewAuditListDemo mock data with real queue fetch; remove legacy `BiasAuditQueue` once verified.
 - [ ] Persist senior comments/decisions in database.
 - [ ] Document production runbook (cron job scheduling, model retraining alerts).

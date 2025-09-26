@@ -135,6 +135,7 @@ app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"]
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(bias_review.router, prefix="/api/bias-review", tags=["Bias Review"])
 app.include_router(bias_monitoring.router, prefix="/api/bias-monitoring", tags=["Bias Monitoring"])
+app.include_router(bias_monitoring.influence_router, prefix="/api/bias-influence", tags=["Bias Influence"])
 app.include_router(review_audit.router, prefix="/api/review-audit", tags=["Review Audit"])
 
 # Health check endpoint

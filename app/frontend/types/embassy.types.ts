@@ -151,6 +151,63 @@ export interface BiasMonitoringSnapshot {
   metrics: BiasMonitoringMetrics
 }
 
+export interface BiasInfluenceFactor {
+  attributeId: string
+  displayLabel?: string
+  coefficient: number
+  oddsRatio: number
+  sampleShare: number
+  pValue?: number | null
+  delta: number
+  direction: 'driver' | 'buffer'
+  prevalenceWeight?: number | null
+  confidenceWeight?: number | null
+  occurrences?: number | null
+}
+
+export interface BiasInfluenceModelDiagnostics {
+  sampleSize: number
+  auc: number
+  refreshedAt?: string | null
+  windowDays?: number | null
+  metadata?: Record<string, any>
+  warnings?: string[]
+}
+
+export interface BiasInfluenceLeaderboard {
+  factors: BiasInfluenceFactor[]
+  model: BiasInfluenceModelDiagnostics
+}
+
+export interface BiasInfluenceAttribute {
+  id: string
+  label: string
+  explanation: string
+  categoryId?: string
+}
+
+export interface BiasInfluenceAttributeCategory {
+  id: string
+  title: string
+  attributes: BiasInfluenceAttribute[]
+}
+
+export interface BiasInfluenceAttributeCatalog {
+  categories: BiasInfluenceAttributeCategory[]
+}
+
+export interface BiasReviewCadenceBand {
+  interval: string
+  reviewTime: string
+  viewTime: string
+  cases?: number
+  updatedAt?: string
+}
+
+export interface BiasReviewCadenceResponse {
+  bands: BiasReviewCadenceBand[]
+}
+
 export interface BiasAuditDecision {
   id: string
   auditorId: string

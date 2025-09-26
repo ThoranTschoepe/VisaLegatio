@@ -7,8 +7,9 @@
 # Navigate to backend folder
 cd backend
 
-# Install dependencies
+# Install dependencies (add numpy if you want live influence coefficients)
 pip install -r requirements.txt
+pip install numpy  # optional but recommended for /bias-influence/leaderboard
 
 # Create uploads directory
 mkdir uploads
@@ -41,11 +42,23 @@ const API_BASE = 'http://localhost:8000/api'
 - `POST /api/chat` - Chat with AVA
 - `POST /api/officers/login` - Officer authentication
 - `GET /api/analytics` - Dashboard analytics
+- `GET /api/bias-review/sample` - Deterministic rejection sampling feed
+- `GET /api/bias-review/cadence` - Risk-band review cadence table
+- `GET /api/bias-monitoring/overview` - Latest monitoring snapshot (auto-refreshes)
+- `POST /api/bias-monitoring/snapshot` - Manual snapshot trigger
+- `GET /api/bias-influence/leaderboard` - Logistic influence leaderboard (requires numpy + scikit-learn)
+- `GET /api/bias-influence/attributes` - Attribute glossary used in the leaderboard
 
 ### 6. Database
 - SQLite database (`visaverge.db`) created automatically
 - Demo data seeded on first run
 - No additional setup required!
+
+### 7. Custom event dataset
+- Edit `docs/event_seed.json` to curate applications, influence attributes, and cadence rows for demos.
+- On startup the seed loader merges this file, so you can tailor the storyline without touching code.
+- Supports `bias_cases`, `attributes`, `cadence`, and `influence` (model + factors) to fully mock the monitoring experience.
+- Remove or rename the file if you want to fall back to the baked-in defaults.
 
 ## Architecture
 - **FastAPI** - Modern Python web framework

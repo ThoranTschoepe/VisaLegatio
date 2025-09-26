@@ -22,6 +22,10 @@ from database import (
     BiasReview,
     BiasReviewAudit,
     BiasMonitoringSnapshot,
+    BiasInfluenceAttribute,
+    BiasInfluenceModel,
+    BiasInfluenceFactor,
+    BiasReviewCadence,
 )
 from models import Question, QuestionValidation
 
@@ -1201,7 +1205,18 @@ def seed_demo_data():
                 "risk_score": 65,
                 "days_offset": 5,
                 "rejection_reason": "High risk score due to country of origin and limited travel history",
-                "review": None,
+                "review": {
+                    "officer_id": "john.davis",
+                    "result": "justified",
+                    "notes": "Risk scoring aligns with policy; requesting supporting travel history.",
+                    "ai_confidence": 68,
+                    "audit_status": "validated",
+                    "reviewed_days_ago": 2
+                },
+                "wealth_level": "middle",
+                "document_quantity": "low",
+                "invitation_letter": "no",
+                "origin_country": "Egypt",
             },
             {
                 "application_id": "VSV-240202-BIAS2",
@@ -1219,7 +1234,11 @@ def seed_demo_data():
                     "ai_confidence": 74,
                     "audit_status": "pending",
                     "reviewed_days_ago": 2
-                }
+                },
+                "wealth_level": "low",
+                "document_quantity": "medium",
+                "invitation_letter": "yes",
+                "origin_country": "Syria",
             },
             {
                 "application_id": "VSV-240203-BIAS3",
@@ -1240,10 +1259,14 @@ def seed_demo_data():
                     "audit": {
                         "auditor_id": "maria.schmidt",
                         "decision": "validated",
-                        "notes": "Double-checked documents; decision stands.",
-                        "days_ago": 2
+                    "notes": "Double-checked documents; decision stands.",
+                    "days_ago": 2
                     }
-                }
+                },
+                "wealth_level": "high",
+                "document_quantity": "high",
+                "invitation_letter": "yes",
+                "origin_country": "Russia",
             },
             {
                 "application_id": "VSV-240204-BIAS4",
@@ -1254,7 +1277,18 @@ def seed_demo_data():
                 "risk_score": 45,
                 "days_offset": 7,
                 "rejection_reason": "Name similarity to watchlist entry (false positive)",
-                "review": None,
+                "review": {
+                    "officer_id": "maria.schmidt",
+                    "result": "biased",
+                    "notes": "Manual verification cleared the watchlist match; rejection overturned.",
+                    "ai_confidence": 71,
+                    "audit_status": "pending",
+                    "reviewed_days_ago": 1
+                },
+                "wealth_level": "middle",
+                "document_quantity": "medium",
+                "invitation_letter": "no",
+                "origin_country": "China",
             },
             {
                 "application_id": "VSV-240205-BIAS5",
@@ -1272,9 +1306,177 @@ def seed_demo_data():
                     "ai_confidence": 69,
                     "audit_status": "pending",
                     "reviewed_days_ago": 4
-                }
+                },
+                "wealth_level": "middle",
+                "document_quantity": "high",
+                "invitation_letter": "yes",
+                "origin_country": "Mexico",
             },
         ]
+
+        attribute_seed = [
+            {
+                "id": "origin_colombia",
+                "category_id": "origin_trends",
+                "category_title": "Country of Origin",
+                "label": "Origin · Colombia",
+                "explanation": "Applications submitted by Colombian nationals in the monitoring window.",
+                "feature": {
+                    "type": "country_in",
+                    "path": "nationality",
+                    "values": ["Colombia"],
+                },
+            },
+            {
+                "id": "origin_kenya",
+                "category_id": "origin_trends",
+                "category_title": "Country of Origin",
+                "label": "Origin · Kenya",
+                "explanation": "Applications submitted by Kenyan nationals in the monitoring window.",
+                "feature": {
+                    "type": "country_in",
+                    "path": "nationality",
+                    "values": ["Kenya"],
+                },
+            },
+            {
+                "id": "origin_philippines",
+                "category_id": "origin_trends",
+                "category_title": "Country of Origin",
+                "label": "Origin · Philippines",
+                "explanation": "Applications submitted by Filipino nationals in the monitoring window.",
+                "feature": {
+                    "type": "country_in",
+                    "path": "nationality",
+                    "values": ["Philippines"],
+                },
+            },
+            {
+                "id": "doc_quantity_low",
+                "category_id": "documentation",
+                "category_title": "Document Quantity",
+                "label": "Document Quantity · Low",
+                "explanation": "Applications where the document intake remained below expected thresholds (self-declared).",
+                "feature": {
+                    "type": "answer_equals",
+                    "path": "document_quantity",
+                    "value": "low",
+                },
+            },
+            {
+                "id": "doc_quantity_high",
+                "category_id": "documentation",
+                "category_title": "Document Quantity",
+                "label": "Document Quantity · High",
+                "explanation": "Applications accompanied by comprehensive supporting documentation.",
+                "feature": {
+                    "type": "answer_equals",
+                    "path": "document_quantity",
+                    "value": "high",
+                },
+            },
+            {
+                "id": "wealth_level_low",
+                "category_id": "wealth_profile",
+                "category_title": "Wealth Level",
+                "label": "Wealth Level · Low",
+                "explanation": "Declared wealth level categorised as low in the intake questionnaire.",
+                "feature": {
+                    "type": "answer_equals",
+                    "path": "wealth_level",
+                    "value": "low",
+                },
+            },
+            {
+                "id": "wealth_level_middle",
+                "category_id": "wealth_profile",
+                "category_title": "Wealth Level",
+                "label": "Wealth Level · Middle",
+                "explanation": "Declared wealth level categorised as middle in the intake questionnaire.",
+                "feature": {
+                    "type": "answer_equals",
+                    "path": "wealth_level",
+                    "value": "middle",
+                },
+            },
+            {
+                "id": "wealth_level_high",
+                "category_id": "wealth_profile",
+                "category_title": "Wealth Level",
+                "label": "Wealth Level · High",
+                "explanation": "Declared wealth level categorised as high in the intake questionnaire.",
+                "feature": {
+                    "type": "answer_equals",
+                    "path": "wealth_level",
+                    "value": "high",
+                },
+            },
+            {
+                "id": "invitation_letter_yes",
+                "category_id": "documentation",
+                "category_title": "Document Quantity",
+                "label": "Invitation Letter · Provided",
+                "explanation": "Applicant supplied an invitation letter as part of the submission.",
+                "feature": {
+                    "type": "answer_equals",
+                    "path": "invitation_letter",
+                    "value": "yes",
+                },
+            },
+            {
+                "id": "invitation_letter_no",
+                "category_id": "documentation",
+                "category_title": "Document Quantity",
+                "label": "Invitation Letter · Not Provided",
+                "explanation": "Applicant did not include an invitation letter.",
+                "feature": {
+                    "type": "answer_equals",
+                    "path": "invitation_letter",
+                    "value": "no",
+                },
+            },
+        ]
+
+        cadence_seed = [
+            {
+                "interval": "0-25 (low risk)",
+                "review_time": "8m median",
+                "view_time": "1m 30s / document",
+                "cases": 12,
+            },
+            {
+                "interval": "25-50 (emerging risk)",
+                "review_time": "18m median",
+                "view_time": "3m 40s / document",
+                "cases": 24,
+            },
+            {
+                "interval": "50-70 (heightened risk)",
+                "review_time": "46m median",
+                "view_time": "7m 50s / document",
+                "cases": 15,
+            },
+            {
+                "interval": "70-100 (critical risk)",
+                "review_time": "1h 32m median",
+                "view_time": "14m 10s / document",
+                "cases": 9,
+            },
+        ]
+
+        seed_overrides_path = Path(__file__).resolve().parent.parent.parent / "docs" / "event_seed.json"
+        override_influence = None
+
+        if seed_overrides_path.exists():
+            try:
+                override_payload = json.loads(seed_overrides_path.read_text())
+                demo_bias_cases = override_payload.get("bias_cases", demo_bias_cases)
+                attribute_seed = override_payload.get("attributes", attribute_seed)
+                cadence_seed = override_payload.get("cadence", cadence_seed)
+                override_influence = override_payload.get("influence")
+                print(f"📁 Loaded event seed overrides from {seed_overrides_path}")
+            except Exception as override_error:
+                print(f"⚠️  Failed to parse event seed overrides: {override_error}")
 
         now = datetime.utcnow()
 
@@ -1298,6 +1500,14 @@ def seed_demo_data():
                     "nationality": case["country"],
                     "destination_country": "Germany"
                 }
+                if case.get("wealth_level"):
+                    answers["wealth_level"] = case["wealth_level"]
+                if case.get("document_quantity"):
+                    answers["document_quantity"] = case["document_quantity"]
+                if case.get("invitation_letter"):
+                    answers["invitation_letter"] = case["invitation_letter"]
+                if case.get("origin_country"):
+                    answers["origin_country"] = case["origin_country"]
                 application = Application(
                     id=case["application_id"],
                     user_id=user_id,
@@ -1360,51 +1570,91 @@ def seed_demo_data():
                 )
                 db.add(audit_entry)
 
-            reviewed_bias_cases = [item for item in bias_review_records if item[2]["result"] == "biased"]
-            total_reviews = len(bias_review_records)
+        should_seed_snapshot = db.query(BiasMonitoringSnapshot).count() == 0
 
-            bias_by_country = {}
-            bias_by_visa_type = {}
-            for case, _, review_data in bias_review_records:
-                if review_data["result"] != "biased":
-                    continue
-                bias_by_country[case["country"]] = bias_by_country.get(case["country"], 0) + 1
-                bias_by_visa_type[case["visa_type"]] = bias_by_visa_type.get(case["visa_type"], 0) + 1
+        if db.query(BiasInfluenceAttribute).count() == 0:
+            for entry in attribute_seed:
+                attribute_config = {
+                    "label": entry["label"],
+                    "explanation": entry["explanation"],
+                    "feature": entry["feature"],
+                }
+                db.add(
+                    BiasInfluenceAttribute(
+                        id=entry["id"],
+                        category_id=entry["category_id"],
+                        category_title=entry["category_title"],
+                        label=entry["label"],
+                        explanation=entry["explanation"],
+                        config=json.dumps(attribute_config),
+                    )
+                )
 
-            audit_breakdown = {}
-            for _, record, _ in bias_review_records:
-                audit_breakdown[record.audit_status] = audit_breakdown.get(record.audit_status, 0) + 1
+        if db.query(BiasReviewCadence).count() == 0:
+            for cadence in cadence_seed:
+                db.add(
+                    BiasReviewCadence(
+                        id=generate_id("cadence"),
+                        interval=cadence["interval"],
+                        review_time=cadence["review_time"],
+                        view_time=cadence["view_time"],
+                        cases=cadence.get("cases", 0),
+                        updated_at=now,
+                    )
+                )
 
-            snapshot_metrics = {
-                "total_rejected": db.query(Application).filter(Application.status == "rejected").count(),
-                "sampled_count": len(demo_bias_cases),
-                "reviewed_count": total_reviews,
-                "bias_detected_count": len(reviewed_bias_cases),
-                "bias_rate": round((len(reviewed_bias_cases) / total_reviews) * 100, 2) if total_reviews else 0,
-                "bias_by_country": bias_by_country,
-                "bias_by_visa_type": bias_by_visa_type,
-                "audit_status_breakdown": audit_breakdown,
-                "common_bias_patterns": [
-                    "Country of origin bias (35%)",
-                    "Name-based false positives (25%)",
-                    "Family association penalties (20%)",
-                    "Financial requirement misapplication (20%)",
-                ],
-                "alerts": ["Bias rate trending high — schedule focused audit"],
-                "window_days": 30,
-            }
+        db.flush()
 
-            snapshot = BiasMonitoringSnapshot(
-                id=generate_id("biasmon"),
-                generated_at=now,
-                total_rejected=snapshot_metrics["total_rejected"],
-                sampled_count=snapshot_metrics["sampled_count"],
-                reviewed_count=snapshot_metrics["reviewed_count"],
-                bias_detected_count=snapshot_metrics["bias_detected_count"],
-                bias_rate=snapshot_metrics["bias_rate"],
-                snapshot_data=json.dumps(snapshot_metrics)
-            )
-            db.add(snapshot)
+        try:
+            from services.bias_monitoring import BiasMonitoringService
+
+            service = BiasMonitoringService(db)
+            if should_seed_snapshot:
+                service.enqueue_snapshot(30)
+
+            if override_influence and override_influence.get("factors"):
+                window_days = override_influence.get("model", {}).get("window_days", 30)
+                model = BiasInfluenceModel(
+                    id=generate_id("biasmodel"),
+                    window_start=now - timedelta(days=window_days),
+                    window_end=now,
+                    window_days=window_days,
+                    sample_size=override_influence.get("model", {}).get("sample_size", len(demo_bias_cases)),
+                    auc=override_influence.get("model", {}).get("auc", 0.0),
+                    refreshed_at=now,
+                    model_metadata=json.dumps(override_influence.get("model", {}).get("metadata", {})),
+                    warnings=json.dumps(override_influence.get("model", {}).get("warnings", [])),
+                )
+                db.add(model)
+                db.flush()
+
+                for factor in override_influence.get("factors", []):
+                    db.add(
+                        BiasInfluenceFactor(
+                            id=generate_id("biasfactor"),
+                            model_id=model.id,
+                            attribute_id=factor.get("attribute_id"),
+                            coefficient=float(factor.get("coefficient", 0.0)),
+                            odds_ratio=float(factor.get("odds_ratio", 1.0)),
+                            sample_share=float(factor.get("sample_share", 0.0)),
+                            prevalence_weight=float(factor.get("prevalence_weight", 0.0)),
+                            p_value=factor.get("p_value"),
+                            delta=float(factor.get("delta", 0.0)),
+                            direction=factor.get("direction", "driver"),
+                            extra=json.dumps(
+                                {
+                                    "display_label": factor.get("display_label"),
+                                    "confidence_weight": factor.get("confidence_weight"),
+                                    "occurrences": factor.get("occurrences"),
+                                }
+                            ),
+                        )
+                    )
+                print("📊 Injected event influence leaderboard from overrides")
+            else:
+                service.get_influence_leaderboard(30)
+        except Exception as model_error:
+            print(f"⚠️  Influence model seeding skipped: {model_error}")
 
         db.commit()
         print("\n✅ Demo data seeded successfully with organized document files!")
@@ -1415,7 +1665,9 @@ def seed_demo_data():
         print("   💼 VSV-240104-G7H8 / DEMO999 (Work - James Wilson) - Minimal docs")
         print("\n📄 Document files organized in uploads/[application_id]/ directories")
         print("🔗 Documents are accessible via /uploads/[application_id]/[filename] URLs")
-        
+        print("📊 Bias monitoring endpoints ready: /api/bias-monitoring/overview, /api/bias-review/cadence")
+        print("📈 Influence leaderboard available at /api/bias-influence/leaderboard (install numpy + scikit-learn for coefficients)")
+
     except Exception as e:
         print(f"❌ Error seeding demo data: {e}")
         import traceback

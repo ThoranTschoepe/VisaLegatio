@@ -1,0 +1,26 @@
+Flagging Flow Overview
+======================
+
+Current behaviour
+-----------------
+- Embassy officers can flag individual uploaded documents from the Application Review screen (`app/frontend/components/Embassy/ApplicationReview.tsx`).
+- The flag modal (`DocumentFlagging.tsx`) calls the REST endpoints `POST /api/applications/{id}/flag-document` and `POST /api/applications/{id}/unflag-document` via `api.flagDocument` / `api.unflagDocument`.
+- Flags are stored in the `flagged_documents` table (SQLAlchemy model `FlaggedDocument` in `app/backend/database.py`). These records capture `document_id`, `application_id`, `reason`, `flagged_by_officer_id`, timestamps, and a `resolved` marker.
+- When an application payload is fetched (`GET /api/applications/{id}`) the backend assembles unresolved flags and returns them as `flagged_documents` in the response (`FlaggedDocumentResponse` in `app/backend/models.py`).
+- The frontend keeps a `flaggedDocumentIds` Set and renders warnings, summaries, and the modal based on the data exposed by `application.flaggedDocuments`.
+
+Audit UI status
+---------------
+- The review audit surface rendered at `/embassy/review-audit` still uses mock data (`ReviewAuditListDemo.tsx` / `ReviewAuditDemo.tsx`).
+- The live queue component that speaks to `/api/review-audit/*` (`BiasAuditQueue.tsx`) is no longer mounted, so audit reviewers never see the persisted document flags.
+- Backend audit routes (`app/backend/routes/review_audit.py`) only serialize `BiasReview` metadata; no document flag linkage is returned.
+
+Gaps before reviews can remember flags
+--------------------------------------
+1. **Persist review-level flags** – Extend the data model (new table or columns on `bias_reviews`) so bias reviews record which documents or reasons triggered escalation.
+2. **Expose flags through audit APIs** – Update `/api/review-audit/queue` and `/api/review-audit/{id}` responses to include the new flag metadata.
+3. **Hook the frontend to real data** – Replace the demo components with the live queue (`BiasAuditQueue`) or retrofit the demo UI to call the backend endpoints and display real flags.
+4. **Add client helpers** – Extend `api.ts` with methods for any new review-flag endpoints and decide when they are invoked (e.g. during bias review submission or after document flagging).
+5. **Synchronize document and review flags** – Define server logic that creates/updates review flags whenever document-level flags are set so audits stay in sync.
+
+Once these pieces are in place, flagged reviews can flow from the Application Review experience into the audit queue and reappear until they are resolved.

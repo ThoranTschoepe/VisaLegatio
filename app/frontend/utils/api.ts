@@ -6,6 +6,9 @@ import {
   BiasReviewStatistics,
   BiasMonitoringSnapshot,
   BiasAuditItem,
+  BiasInfluenceLeaderboard,
+  BiasInfluenceAttributeCatalog,
+  BiasReviewCadenceResponse,
 } from '@/types/embassy.types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -319,6 +322,24 @@ class APIClient {
     })
   }
 
+  async getBiasInfluenceLeaderboard(options: { daysBack?: number } = {}): Promise<BiasInfluenceLeaderboard> {
+    const params = new URLSearchParams()
+    if (options.daysBack !== undefined) params.append('days_back', String(options.daysBack))
+    const query = params.toString() ? `?${params.toString()}` : ''
+    const response = await this.request<any>(`/bias-influence/leaderboard${query}`)
+    return this.transformBiasInfluenceLeaderboard(response)
+  }
+
+  async getBiasInfluenceAttributes(): Promise<BiasInfluenceAttributeCatalog> {
+    const response = await this.request<any>('/bias-influence/attributes')
+    return this.transformBiasInfluenceAttributes(response)
+  }
+
+  async getBiasReviewCadence(): Promise<BiasReviewCadenceResponse> {
+    const response = await this.request<any>('/bias-review/cadence')
+    return this.transformBiasReviewCadence(response)
+  }
+
   async getReviewAuditQueue(options: { status?: string; limit?: number } = {}): Promise<BiasAuditItem[]> {
     const params = new URLSearchParams()
     if (options.status) params.append('status', options.status)
@@ -500,6 +521,66 @@ class APIClient {
         createdAt: audit.created_at,
       })),
     }
+  }
+
+  private transformBiasInfluenceLeaderboard(payload: any): BiasInfluenceLeaderboard {
+    const factors = (payload.factors || []).map((factor: any) => {
+      const pValue = factor.p_value ?? factor.pValue ?? null
+      return {
+        attributeId: factor.attribute_id ?? factor.attributeId,
+        displayLabel: factor.display_label ?? factor.displayLabel,
+        coefficient: Number(factor.coefficient ?? 0),
+        oddsRatio: Number(factor.odds_ratio ?? factor.oddsRatio ?? 1),
+        sampleShare: Number(factor.sample_share ?? factor.sampleShare ?? 0),
+        pValue: pValue !== null ? Number(pValue) : null,
+        delta: Number(factor.delta ?? 0),
+        direction: factor.direction === 'buffer' ? 'buffer' : 'driver',
+        prevalenceWeight: factor.prevalence_weight ?? factor.prevalenceWeight ?? null,
+        confidenceWeight: factor.confidence_weight ?? factor.confidenceWeight ?? null,
+        occurrences: factor.occurrences ?? factor.occurrences ?? null,
+      }
+    })
+
+    const modelPayload = payload.model || {}
+
+    return {
+      factors,
+      model: {
+        sampleSize: Number(modelPayload.sample_size ?? modelPayload.sampleSize ?? factors.length ?? 0),
+        auc: Number(modelPayload.auc ?? 0),
+        refreshedAt: modelPayload.refreshed_at ?? modelPayload.refreshedAt ?? null,
+        windowDays: modelPayload.window_days ?? modelPayload.windowDays ?? null,
+        metadata: modelPayload.metadata || {},
+        warnings: modelPayload.warnings || [],
+      },
+    }
+  }
+
+  private transformBiasInfluenceAttributes(payload: any): BiasInfluenceAttributeCatalog {
+    const categories = (payload.categories || []).map((category: any) => ({
+      id: category.id,
+      title: category.title,
+      attributes: (category.attributes || []).map((attribute: any) => ({
+        id: attribute.id,
+        label: attribute.label,
+        explanation: attribute.explanation,
+        categoryId: category.id,
+      })),
+    }))
+
+    return { categories }
+  }
+
+  private transformBiasReviewCadence(payload: any): BiasReviewCadenceResponse {
+    const bands = (payload.bands || []).map((band: any) => ({
+      interval: band.interval,
+      reviewTime: band.review_time ?? band.reviewTime,
+      viewTime: band.view_time ?? band.viewTime,
+      cases: band.cases,
+      updatedAt: band.updated_at ?? band.updatedAt,
+    }))
+
+    return { bands }
   }
 }
 

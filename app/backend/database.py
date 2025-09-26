@@ -4,6 +4,8 @@ from sqlalchemy import create_engine, Column, String, Integer, Float, Boolean, D
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from datetime import datetime
+from typing import Any, Dict
+import json
 import os
 
 # Database configuration
@@ -198,7 +200,24 @@ class BiasReviewAudit(Base):
     auditor = relationship("Officer")
 
 
-class BiasMonitoringSnapshot(Base):
+class JsonMixin:
+    """Provide convenience helpers for JSON-encoded text columns."""
+
+    @staticmethod
+    def _json_load(value: str, default: Any) -> Any:
+        if not value:
+            return default
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            return default
+
+    @staticmethod
+    def _json_dump(value: Any) -> str:
+        return json.dumps(value)
+
+
+class BiasMonitoringSnapshot(Base, JsonMixin):
     __tablename__ = "bias_monitoring_snapshots"
 
     id = Column(String, primary_key=True, index=True)
@@ -208,7 +227,99 @@ class BiasMonitoringSnapshot(Base):
     reviewed_count = Column(Integer, default=0)
     bias_detected_count = Column(Integer, default=0)
     bias_rate = Column(Float, default=0.0)
+    window_days = Column(Integer, default=30)
     snapshot_data = Column(Text)  # JSON payload with patterns, breakdowns, alert flags
+
+
+class BiasInfluenceAttribute(Base, JsonMixin):
+    __tablename__ = "bias_influence_attributes"
+
+    id = Column(String, primary_key=True, index=True)
+    category_id = Column(String, index=True)
+    category_title = Column(String)
+    label = Column(String, nullable=False)
+    explanation = Column(Text)
+    config = Column(Text)  # JSON payload mirroring docs/bias_influence_model.md
+
+    factors = relationship("BiasInfluenceFactor", back_populates="attribute")
+
+    def as_glossary_entry(self) -> Dict[str, Any]:
+        config = self._json_load(self.config, {})
+        return {
+            "id": self.id,
+            "label": config.get("label", self.label),
+            "explanation": config.get("explanation", self.explanation or ""),
+            "category_id": self.category_id,
+            "category_title": self.category_title,
+        }
+
+
+class BiasInfluenceModel(Base, JsonMixin):
+    __tablename__ = "bias_influence_models"
+
+    id = Column(String, primary_key=True, index=True)
+    window_start = Column(DateTime, nullable=False)
+    window_end = Column(DateTime, nullable=False)
+    window_days = Column(Integer, default=30)
+    sample_size = Column(Integer, default=0)
+    auc = Column(Float, default=0.0)
+    refreshed_at = Column(DateTime, default=datetime.utcnow, index=True)
+    model_metadata = Column(Text)  # JSON payload for diagnostics (class weights, etc.)
+    warnings = Column(Text)  # JSON array of warning strings
+
+    factors = relationship("BiasInfluenceFactor", back_populates="model", cascade="all, delete-orphan")
+
+    def metadata_dict(self) -> Dict[str, Any]:
+        return self._json_load(self.model_metadata, {})
+
+    def warnings_list(self) -> Any:
+        return self._json_load(self.warnings, [])
+
+
+class BiasInfluenceFactor(Base, JsonMixin):
+    __tablename__ = "bias_influence_factors"
+
+    id = Column(String, primary_key=True, index=True)
+    model_id = Column(String, ForeignKey("bias_influence_models.id"), nullable=False, index=True)
+    attribute_id = Column(String, ForeignKey("bias_influence_attributes.id"), nullable=False, index=True)
+    coefficient = Column(Float, default=0.0)
+    odds_ratio = Column(Float, default=1.0)
+    sample_share = Column(Float, default=0.0)
+    prevalence_weight = Column(Float, default=0.0)
+    p_value = Column(Float)
+    delta = Column(Float, default=0.0)
+    direction = Column(String, default="driver")
+    extra = Column(Text)  # JSON payload for additional metrics (confidence weight, etc.)
+
+    model = relationship("BiasInfluenceModel", back_populates="factors")
+    attribute = relationship("BiasInfluenceAttribute", back_populates="factors")
+
+    def as_leaderboard_entry(self) -> Dict[str, Any]:
+        extra = self._json_load(self.extra, {})
+        return {
+            "attribute_id": self.attribute_id,
+            "display_label": extra.get("display_label", self.attribute.label if self.attribute else ""),
+            "coefficient": self.coefficient,
+            "odds_ratio": self.odds_ratio,
+            "sample_share": self.sample_share,
+            "p_value": self.p_value,
+            "delta": self.delta,
+            "direction": self.direction,
+            "prevalence_weight": self.prevalence_weight,
+            "confidence_weight": extra.get("confidence_weight"),
+            "occurrences": extra.get("occurrences"),
+        }
+
+
+class BiasReviewCadence(Base):
+    __tablename__ = "bias_review_cadence"
+
+    id = Column(String, primary_key=True, index=True)
+    interval = Column(String, nullable=False)
+    review_time = Column(String, nullable=False)
+    view_time = Column(String, nullable=False)
+    cases = Column(Integer, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 # Database functions

@@ -62,13 +62,20 @@ buffer%_i = raw_i / Σ_{j in negative} raw_j × 100  (β_i < 0)
 ### Current Demo Layout
 - **Monitoring header** shows four numbers: total rejections in the window, sampled count, reviewed sample size, and flagged findings.
 - **Sample table** lists the rejection sample (ID, visa type, country, risk, review badge) and links into the detail modal.
-- **Influence leaderboard** (`ReviewAuditListDemo`) renders the two-column driver/buffer board described above.
+- **Influence & context column** combines the Influence Leaderboard (demo) with an Attribute catalog card. Analysts can move from high-level coefficients into a human-readable glossary without leaving the view, making it easier to brief stakeholders on why a factor appears.
+- **Risk-adjusted review cadence** lives in the opposing column. It benchmarks typical turnaround times for rejection reviews across automated risk score bands (0-25, 25-50, 50-70, 70-100) so officers can spot workload imbalances as they inspect bias signals.
 
 ## Operational Workflow
 1. Nightly job pulls reviewed cases from the operational database and refits the model.
 2. Persist coefficients, metadata (timestamps, diagnostics) in a `bias_influence_models` table.
 3. Expose a read API returning the current leaderboard, odds ratios, and trend deltas.
 4. Trigger alerts when influence scores rise above policy thresholds or when model diagnostics degrade.
+
+### Current implementation details
+- API surface: `GET /api/bias-influence/leaderboard` (with optional `days_back`), `GET /api/bias-influence/attributes` for the glossary, and `GET /api/bias-review/cadence` for the companion risk-band table.
+- The training pipeline prefers `scikit-learn` + `numpy`. When those dependencies or minimum sample sizes are missing, the endpoint responds with an empty `factors` array and populates `model.warnings` instead of raising errors.
+- Feature metadata is stored in `bias_influence_attributes`, keeping the glossary in sync with the engineered feature set. If the table is empty the frontend falls back to the static config in `app/frontend/data/biasInfluenceMock.ts` for demo readability.
+- Demo environments can bypass training entirely by supplying `docs/event_seed.json`, which seeds cases, attributes, cadence rows, and a mock influence model/factors for the leaderboard.
 
 ## Future Enhancements
 - Calibrate with Bayesian logistic regression to produce full posterior distributions for coefficients.
