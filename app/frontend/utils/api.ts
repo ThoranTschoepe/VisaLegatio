@@ -279,7 +279,9 @@ class APIClient {
     if (options.daysBack !== undefined) params.append('days_back', String(options.daysBack))
 
     const query = params.toString() ? `?${params.toString()}` : ''
-    const response = await this.request<{ cases: any[]; statistics: any }>(`/bias-review/sample${query}`)
+    const response = await this.request<{ cases: any[]; statistics: any }>(
+      `/bias-monitoring/sample${query}`,
+    )
 
     return {
       cases: response.cases.map(caseItem => this.transformBiasReviewCase(caseItem)),
@@ -291,7 +293,7 @@ class APIClient {
     applicationId: string,
     payload: { result: 'justified' | 'biased' | 'uncertain'; notes?: string; officer_id?: string; ai_confidence?: number }
   ): Promise<any> {
-    return await this.request(`/bias-review/review/${applicationId}`, {
+    return await this.request(`/bias-monitoring/review/${applicationId}`, {
       method: 'POST',
       body: JSON.stringify(payload),
     })
@@ -336,7 +338,7 @@ class APIClient {
   }
 
   async getBiasReviewCadence(): Promise<BiasReviewCadenceResponse> {
-    const response = await this.request<any>('/bias-review/cadence')
+    const response = await this.request<any>('/bias-monitoring/cadence')
     return this.transformBiasReviewCadence(response)
   }
 
