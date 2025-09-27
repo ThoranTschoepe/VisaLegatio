@@ -1,13 +1,56 @@
 """Bias monitoring analytics API using the shared monitoring service."""
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from typing import Any, Dict
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from services import get_bias_monitoring_service, refresh_bias_snapshot
+from services import (
+    BiasReviewSubmissionError,
+    get_bias_monitoring_service,
+    refresh_bias_snapshot,
+)
 
 router = APIRouter()
 influence_router = APIRouter()
+
+
+@router.get("/sample")
+async def get_bias_review_sample(
+    sample_rate: float = Query(1.0, description="Fraction of rejections to sample"),
+    days_back: int = Query(30, description="Days to look back for rejections"),
+    db: Session = Depends(get_db),
+):
+    """Return a deterministic sample of recent rejected applications for bias review."""
+
+    service = get_bias_monitoring_service(db)
+    return service.get_review_sample(sample_rate, days_back)
+
+
+@router.get("/cadence")
+async def get_bias_review_cadence(
+    db: Session = Depends(get_db),
+):
+    """Return the persisted review cadence analytics."""
+
+    service = get_bias_monitoring_service(db)
+    return service.get_review_cadence()
+
+
+@router.post("/review/{application_id}")
+async def submit_bias_review(
+    application_id: str,
+    review_data: Dict[str, Any],
+    db: Session = Depends(get_db),
+):
+    """Persist a bias review decision for a rejected application."""
+
+    service = get_bias_monitoring_service(db)
+    try:
+        return service.submit_review(application_id, review_data)
+    except BiasReviewSubmissionError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.get("/overview")

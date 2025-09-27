@@ -1665,7 +1665,7 @@ def seed_demo_data():
         print("   💼 VSV-240104-G7H8 / DEMO999 (Work - James Wilson) - Minimal docs")
         print("\n📄 Document files organized in uploads/[application_id]/ directories")
         print("🔗 Documents are accessible via /uploads/[application_id]/[filename] URLs")
-        print("📊 Bias monitoring endpoints ready: /api/bias-monitoring/overview, /api/bias-review/cadence")
+        print("📊 Bias monitoring endpoints ready: /api/bias-monitoring/overview, /api/bias-monitoring/cadence")
         print("📈 Influence leaderboard available at /api/bias-influence/leaderboard (install numpy + scikit-learn for coefficients)")
 
     except Exception as e:

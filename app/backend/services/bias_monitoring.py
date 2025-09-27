@@ -25,6 +25,7 @@ from database import (
     BiasReview,
     BiasReviewCadence,
     Document,
+    Officer,
     StatusUpdate,
 )
 from utils import generate_id
@@ -40,6 +41,15 @@ try:  # Optional p-value calculation support
     from scipy.stats import norm
 except Exception:  # pragma: no cover
     norm = None  # type: ignore
+
+
+class BiasReviewSubmissionError(Exception):
+    """Raised when a bias review submission fails validation."""
+
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
 
 
 class BiasMonitoringService:
@@ -134,6 +144,97 @@ class BiasMonitoringService:
         return {
             "cases": cases,
             "statistics": statistics_payload,
+        }
+
+    def submit_review(self, application_id: str, review_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Persist a bias review decision and return the serialized record."""
+
+        app = (
+            self.db.query(Application)
+            .filter(Application.id == application_id)
+            .first()
+        )
+        if not app:
+            raise BiasReviewSubmissionError(404, "Application not found")
+
+        if app.status != "rejected":
+            raise BiasReviewSubmissionError(400, "Can only review rejected applications")
+
+        officer_id = review_data.get("officer_id")
+        if officer_id:
+            officer_exists = (
+                self.db.query(Officer)
+                .filter(Officer.id == officer_id)
+                .first()
+            )
+            if not officer_exists:
+                raise BiasReviewSubmissionError(404, "Reviewing officer not found")
+
+        now = datetime.utcnow()
+        existing_review = (
+            self.db.query(BiasReview)
+            .filter(BiasReview.application_id == application_id)
+            .order_by(BiasReview.reviewed_at.desc())
+            .first()
+        )
+
+        if existing_review:
+            existing_review.result = review_data.get("result", existing_review.result)
+            existing_review.notes = review_data.get("notes", existing_review.notes)
+            existing_review.officer_id = officer_id or existing_review.officer_id
+            existing_review.ai_confidence = review_data.get("ai_confidence", existing_review.ai_confidence)
+            existing_review.reviewed_at = now
+            existing_review.audit_status = "pending"
+            existing_review.updated_at = now
+            bias_review_record = existing_review
+        else:
+            if not officer_id:
+                raise BiasReviewSubmissionError(400, "Officer ID is required for new reviews")
+            bias_review_record = BiasReview(
+                id=generate_id("biasreview"),
+                application_id=application_id,
+                officer_id=officer_id,
+                result=review_data.get("result"),
+                notes=review_data.get("notes"),
+                ai_confidence=review_data.get("ai_confidence"),
+                audit_status="pending",
+                reviewed_at=now,
+                created_at=now,
+                updated_at=now,
+            )
+            self.db.add(bias_review_record)
+
+        if review_data.get("result") == "biased":
+            status_update = StatusUpdate(
+                id=generate_id("status"),
+                application_id=application_id,
+                status="bias_review",
+                notes=f"Potential bias detected in rejection: {review_data.get('notes')}",
+                officer_id=officer_id,
+                timestamp=now,
+            )
+            self.db.add(status_update)
+
+        self.db.commit()
+        self.db.refresh(bias_review_record)
+
+        review_payload = self._augment_keys(
+            {
+                "id": bias_review_record.id,
+                "result": bias_review_record.result,
+                "notes": bias_review_record.notes,
+                "officer_id": bias_review_record.officer_id,
+                "reviewed_at": bias_review_record.reviewed_at.isoformat()
+                if bias_review_record.reviewed_at
+                else None,
+                "audit_status": bias_review_record.audit_status,
+                "ai_confidence": bias_review_record.ai_confidence,
+            }
+        )
+
+        return {
+            "message": "Bias review submitted successfully",
+            "review": review_payload,
         }
 
     # ------------------------------------------------------------------

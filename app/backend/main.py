@@ -15,7 +15,6 @@ from routes import (
     officers,
     analytics,
     documents,
-    bias_review,
     bias_monitoring,
     review_audit,
 )
@@ -133,7 +132,6 @@ app.include_router(chat.router, prefix="/api/chat", tags=["AI Chat"])
 app.include_router(officers.router, prefix="/api/officers", tags=["Officers"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
-app.include_router(bias_review.router, prefix="/api/bias-review", tags=["Bias Review"])
 app.include_router(bias_monitoring.router, prefix="/api/bias-monitoring", tags=["Bias Monitoring"])
 app.include_router(bias_monitoring.influence_router, prefix="/api/bias-influence", tags=["Bias Influence"])
 app.include_router(review_audit.router, prefix="/api/review-audit", tags=["Review Audit"])

@@ -42,8 +42,8 @@ const API_BASE = 'http://localhost:8000/api'
 - `POST /api/chat` - Chat with AVA
 - `POST /api/officers/login` - Officer authentication
 - `GET /api/analytics` - Dashboard analytics
-- `GET /api/bias-review/sample` - Deterministic rejection sampling feed
-- `GET /api/bias-review/cadence` - Risk-band review cadence table
+- `GET /api/bias-monitoring/sample` - Deterministic rejection sampling feed
+- `GET /api/bias-monitoring/cadence` - Risk-band review cadence table
 - `GET /api/bias-monitoring/overview` - Latest monitoring snapshot (auto-refreshes)
 - `POST /api/bias-monitoring/snapshot` - Manual snapshot trigger
 - `GET /api/bias-influence/leaderboard` - Logistic influence leaderboard (requires numpy + scikit-learn)

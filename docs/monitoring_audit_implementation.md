@@ -5,16 +5,16 @@ The demo consists of two senior-officer surfaces:
 - **Bias Monitoring (`app/frontend/components/Embassy/BiasMonitoringPanel.tsx`)** – sampling stats + influence leaderboard.
 - **Review-of-Review Audit (`app/frontend/components/Embassy/ReviewAuditListDemo.tsx` and `ReviewAuditDemo.tsx`)** – card list + detail drawer + decision actions.
 
-Both currently consume mock data. Backend APIs already exist (`/api/bias-review/sample`, `/api/bias-monitoring/overview`, `/api/review-audit/*`) but return seeded/ephemeral data. Moving beyond the demo requires replacing the mock wiring with live API payloads and persisting officer decisions.
+Both currently consume mock data. Backend APIs already exist (`/api/bias-monitoring/sample`, `/api/bias-monitoring/overview`, `/api/review-audit/*`) but return seeded/ephemeral data. Moving beyond the demo requires replacing the mock wiring with live API payloads and persisting officer decisions.
 
 ## Frontend Structure
 ### Bias Monitoring Panel
 - Fetches:
-  - `/api/bias-review/sample` → cases + review statistics (deterministic sampling inside a window).
+  - `/api/bias-monitoring/sample` → cases + review statistics (deterministic sampling inside a window).
   - `/api/bias-monitoring/overview` → snapshot metrics + alerts (auto-refreshes when stale).
   - `/api/bias-influence/leaderboard` → drivers/buffers computed via logistic regression (falls back with warnings when prerequisites missing).
   - `/api/bias-influence/attributes` → glossary of model features.
-  - `/api/bias-review/cadence` → risk-band review latency benchmarks.
+  - `/api/bias-monitoring/cadence` → risk-band review latency benchmarks.
 - Displays:
   - Summary cards (total rejected, sampled, reviewed, flagged findings).
   - Sample table (applications with status badges).
@@ -50,8 +50,8 @@ Both currently consume mock data. Backend APIs already exist (`/api/bias-review/
 
 ## Data Flow Diagram (high level)
 ```
-Seeded DB ─┬─> /api/bias-review/sample ─┬─> BiasMonitoringPanel
-           │                            └─> BiasReview (fairness queue)
+Seeded DB ─┬─> /api/bias-monitoring/sample ─┬─> BiasMonitoringPanel
+           │                            └─> Officer review submission
            │
            └─> /api/bias-monitoring/overview ──> BiasMonitoringPanel cards/alerts
 

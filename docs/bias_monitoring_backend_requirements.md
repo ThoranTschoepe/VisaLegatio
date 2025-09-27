@@ -6,19 +6,19 @@ Use it as the source of truth for the REST payloads, aggregation logic, and back
 
 ## 1. Endpoints to Implement
 
-- `GET /api/bias-review/sample`: provides the rejection sample table and headline statistics.
+- `GET /api/bias-monitoring/sample`: provides the rejection sample table and headline statistics.
 - `GET /api/bias-monitoring/overview`: supplies the snapshot metadata and high-level metric cards.
 - `GET /api/bias-monitoring/history` *(optional for later charts)*: returns past snapshots so the UI can show trends.
 - `POST /api/bias-monitoring/snapshot` *(admin trigger)*: refreshes monitoring metrics on demand.
 - `GET /api/bias-influence/leaderboard`: replaces `biasInfluenceMock.ts` for the Influence Leaderboard (drivers vs buffers).
 - `GET /api/bias-influence/attributes`: returns the attribute catalog glossary.
-- `GET /api/bias-review/cadence`: replaces the static risk-band cadence table.
+- `GET /api/bias-monitoring/cadence`: replaces the static risk-band cadence table.
 
 The `/api` prefix is already baked into the frontend API client (`api.ts`). The backend should mount these under the same prefix or configure the proxy accordingly.
 
 ## 2. Data Contracts
 
-### 2.1 Bias Review Sample (`GET /bias-review/sample`)
+### 2.1 Bias Review Sample (`GET /bias-monitoring/sample`)
 
 **Query params**
 
@@ -132,7 +132,7 @@ Returns structured metadata for each factor so the glossary card can be built dy
 }
 ```
 
-### 2.5 Risk-Adjusted Review Cadence (`GET /bias-review/cadence`)
+### 2.5 Risk-Adjusted Review Cadence (`GET /bias-monitoring/cadence`)
 
 Provides the data for the table that benchmarks review effort by automated risk score band.
 
@@ -177,7 +177,7 @@ The frontend currently only renders `interval`, `reviewTime`, and `viewTime`. Su
 
 5. **Cadence analytics**
    - Aggregate review cycle telemetry: median review duration and per-document view time by risk band.
-   - Surface through `/bias-review/cadence`; include `updatedAt` for freshness.
+  - Surface through `/bias-monitoring/cadence`; include `updatedAt` for freshness.
 
 6. **Authentication / officer context** *(if not already in place)*
    - Ensure endpoints support officer scoping (e.g., filter by embassy or role where required).
@@ -190,12 +190,12 @@ The frontend currently only renders `interval`, `reviewTime`, and `viewTime`. Su
   - `cadence` rows for risk-band review timing benchmarks.
   - `influence` (model metadata + factors) so the leaderboard displays curated drivers/buffers without needing scikit-learn/numpy at demo time.
 - Remove or rename the file to fall back to the baked-in defaults.
-- Deterministic sampling ensures `/bias-review/sample` returns the same subset within a window, matching the seeded scenarios during presentations.
+- Deterministic sampling ensures `/bias-monitoring/sample` returns the same subset within a window, matching the seeded scenarios during presentations.
 
 ## 4. Frontend Integration Checklist
 
 - Replace imports of `biasInfluenceMock.ts` with responses from the new `/bias-influence/*` endpoints once they are live.
-- Swap the mock cadence array in `BiasMonitoringPanel.tsx` with the payload from `/bias-review/cadence`.
+- Swap the mock cadence array in `BiasMonitoringPanel.tsx` with the payload from `/bias-monitoring/cadence`.
 - Update `api.ts` to call the real endpoints and remove any temporary transformations when the backend matches the contract above.
 - Add loading/error states if backend responses become paginated or include additional metadata.
 

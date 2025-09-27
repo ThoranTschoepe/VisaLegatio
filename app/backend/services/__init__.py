@@ -3,6 +3,7 @@
 from .gemini_service import gemini_service
 from .bias_monitoring import (
     BiasMonitoringService,
+    BiasReviewSubmissionError,
     get_bias_monitoring_service,
     refresh_bias_snapshot,
 )
@@ -10,6 +11,7 @@ from .bias_monitoring import (
 __all__ = [
     'gemini_service',
     'BiasMonitoringService',
+    'BiasReviewSubmissionError',
     'get_bias_monitoring_service',
     'refresh_bias_snapshot',
 ]

@@ -8,7 +8,6 @@ from . import chat
 from . import officers
 from . import analytics
 from . import documents
-from . import bias_review
 from . import bias_monitoring
 from . import review_audit
 
@@ -18,7 +17,6 @@ __all__ = [
     "officers",
     "analytics",
     "documents",
-    "bias_review",
     "bias_monitoring",
     "review_audit",
 ]

@@ -72,7 +72,7 @@ buffer%_i = raw_i / Σ_{j in negative} raw_j × 100  (β_i < 0)
 4. Trigger alerts when influence scores rise above policy thresholds or when model diagnostics degrade.
 
 ### Current implementation details
-- API surface: `GET /api/bias-influence/leaderboard` (with optional `days_back`), `GET /api/bias-influence/attributes` for the glossary, and `GET /api/bias-review/cadence` for the companion risk-band table.
+- API surface: `GET /api/bias-influence/leaderboard` (with optional `days_back`), `GET /api/bias-influence/attributes` for the glossary, and `GET /api/bias-monitoring/cadence` for the companion risk-band table.
 - The training pipeline prefers `scikit-learn` + `numpy`. When those dependencies or minimum sample sizes are missing, the endpoint responds with an empty `factors` array and populates `model.warnings` instead of raising errors.
 - Feature metadata is stored in `bias_influence_attributes`, keeping the glossary in sync with the engineered feature set. If the table is empty the frontend falls back to the static config in `app/frontend/data/biasInfluenceMock.ts` for demo readability.
 - Demo environments can bypass training entirely by supplying `docs/event_seed.json`, which seeds cases, attributes, cadence rows, and a mock influence model/factors for the leaderboard.

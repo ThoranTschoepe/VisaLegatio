@@ -90,7 +90,7 @@ class BiasWorkflowTests(unittest.TestCase):
     def test_bias_review_sample_and_submit(self):
         application_id = create_rejected_application()
 
-        sample_response = self.client.get('/api/bias-review/sample?sample_rate=1.0&days_back=90')
+        sample_response = self.client.get('/api/bias-monitoring/sample?sample_rate=1.0&days_back=90')
         self.assertEqual(sample_response.status_code, 200)
         sample_data = sample_response.json()
         self.assertIn('cases', sample_data)
@@ -104,7 +104,10 @@ class BiasWorkflowTests(unittest.TestCase):
             'officer_id': 'maria.schmidt',
             'ai_confidence': matched_cases[0]['ai_confidence'],
         }
-        review_response = self.client.post(f'/api/bias-review/review/{application_id}', json=review_payload)
+        review_response = self.client.post(
+            f'/api/bias-monitoring/review/{application_id}',
+            json=review_payload,
+        )
         self.assertEqual(review_response.status_code, 200)
 
         session = database.get_db_session()
@@ -196,7 +199,7 @@ class BiasWorkflowTests(unittest.TestCase):
         self.assertIn('attributes', categories[0])
 
     def test_bias_review_cadence_endpoint(self):
-        cadence_response = self.client.get('/api/bias-review/cadence')
+        cadence_response = self.client.get('/api/bias-monitoring/cadence')
         self.assertEqual(cadence_response.status_code, 200)
         cadence = cadence_response.json()
         self.assertIn('bands', cadence)
