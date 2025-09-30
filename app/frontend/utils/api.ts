@@ -733,25 +733,6 @@ export const apiUtils = {
     return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
   },
 
-  // Generate application ID
-  generateApplicationId(): string {
-    const timestamp = Date.now().toString().slice(-6)
-    const random = Math.random().toString(36).substring(2, 6).toUpperCase()
-    return `VSV-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${random}`
-  },
-
-  // Generate secure password
-  generateSecurePassword(): string {
-    const adjectives = ['Swift', 'Bright', 'Clear', 'Quick', 'Smart', 'Safe', 'Fast', 'Bold', 'Strong', 'Secure']
-    const nouns = ['Lion', 'Eagle', 'Tiger', 'Star', 'Moon', 'Sun', 'Wave', 'Wind', 'Rock', 'Tree']
-    const numbers = Math.floor(Math.random() * 999) + 100
-    
-    const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
-    const noun = nouns[Math.floor(Math.random() * nouns.length)]
-    
-    return `${adj}${noun}${numbers}`
-  },
-
   // Format error messages for users
   formatErrorMessage(error: any): string {
     if (error.message) {
