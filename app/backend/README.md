@@ -35,19 +35,64 @@ Update your frontend API calls to point to:
 const API_BASE = 'http://localhost:8000/api'
 ```
 
-### 5. Key Endpoints
-- `GET /api/applications` - Get all applications
-- `POST /api/applications` - Create new application
-- `PUT /api/applications/{id}` - Update application status
-- `POST /api/chat` - Chat with AVA
-- `POST /api/officers/login` - Officer authentication
-- `GET /api/analytics` - Dashboard analytics
-- `GET /api/bias-monitoring/sample` - Deterministic rejection sampling feed
-- `GET /api/bias-monitoring/cadence` - Risk-band review cadence table
-- `GET /api/bias-monitoring/overview` - Latest monitoring snapshot (auto-refreshes)
-- `POST /api/bias-monitoring/snapshot` - Manual snapshot trigger
-- `GET /api/bias-influence/leaderboard` - Logistic influence leaderboard (requires numpy + scikit-learn)
-- `GET /api/bias-influence/attributes` - Attribute glossary used in the leaderboard
+### 5. Key Endpoints (by router)
+
+**Applications** – `/api/applications`
+- `GET /` – list applications (supports `status`, `search` filters)
+- `GET /{application_id}` – fetch application with documents, flags, and history
+- `POST /` – create a new application
+- `PUT /{application_id}` – update status/notes for an application
+- `POST /{application_id}/verify` – password-protected status fetch for applicants
+- `GET /{visa_type}/questions` – dynamic form questions by visa type
+- `GET /{visa_type}/requirements` – document requirements for a visa type
+- `POST /{application_id}/documents` – notify the backend of uploaded documents (refreshes requirements)
+- `POST /{application_id}/flag-document` – flag a document (validates `flagCategoryCode`)
+- `POST /{application_id}/unflag-document` – resolve a document flag
+
+**Documents** – `/api/documents`
+- `POST /upload` – upload a document (streams to disk, triggers optional AI analysis)
+- `GET /{visa_type}/requirements` – document requirements lookup (duplicate of applications helper for convenience)
+- `GET /view/{application_id}/{document_name}` – inline file preview
+- `GET /download/{application_id}/{document_name}` – force file download
+- `GET /application/{application_id}` – list document metadata (legacy response model)
+- `GET /list/{application_id}` – list document metadata (JSON payload used by frontend)
+- `GET /files/{application_id}` – list file names residing on disk
+- `PUT /{document_id}/verify` – mark a document as verified
+- `DELETE /{application_id}/{document_type}` – remove a document by type
+
+**Review Audit** – `/api/review-audit`
+- `GET /queue` – pending + historical audit queue (includes allowed decisions)
+- `GET /{review_id}` – detailed bias review context with audit history
+- `POST /{review_id}/decision` – submit a senior decision (`decision_code`, notes)
+
+**Flags** – `/api/flags`
+- `GET /catalog` – canonical flag categories, decision options, and compatibility matrix
+
+**Bias Monitoring** – `/api/bias-monitoring`
+- `GET /sample` – deterministic rejection sampling feed
+- `GET /cadence` – risk-band review cadence table
+- `POST /review/{application_id}` – submit a frontline bias review
+- `GET /overview` – latest monitoring snapshot
+- `GET /history` – paginated monitoring history
+- `POST /snapshot` – manual snapshot trigger
+
+**Analytics** – `/api/analytics`
+- `GET /dashboard` – high-level analytics dashboard data
+- `GET /metrics/summary` – summary KPI metrics
+
+**Officers** – `/api/officers`
+- `POST /login` – officer authentication
+- `GET /profile/{officer_id}` – officer profile lookup
+
+**Chat** – `/api/chat`
+- `POST /` – chat with AVA
+- `GET /history/{session_id}` – retrieve chat history for a session
+### Flag Catalog & Review Audit Flow
+- Flags now map to `flag_categories` (e.g. `document_gap`, `identity_mismatch`, `document_authenticity`, `financial_concern`, `travel_intent_risk`, `compliance_alert`).
+- Senior outcomes are configured via `decision_categories` (e.g. `clear_to_proceed`, `request_additional_docs`, `escalate_to_policy`, `escalate_to_security`, `overturn_flag`, `refer_for_training`).
+- Compatibility rules live in `flag_decision_rules`; the backend validates any submitted decision against this matrix.
+- Frontend clients should call `/api/flags/catalog` at startup, cache the response, and drive decision dropdowns from `matrix[flagCode]`.
+- Legacy payloads using `decision` are still accepted but will be normalized to `decision_code` server-side.
 
 ### 6. Database
 - SQLite database (`visaverge.db`) created automatically

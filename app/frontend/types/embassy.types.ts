@@ -33,6 +33,7 @@ export interface EmbassyApplication {
   estimatedDays: number
   lastActivity: Date
   flaggedDocuments?: FlaggedDocument[]
+  resolvedFlagHistory?: FlaggedDocument[]
 }
 
 export interface FlaggedDocument {
@@ -45,7 +46,14 @@ export interface FlaggedDocument {
   flaggedAt: Date
   resolved: boolean
   resolvedAt?: Date
+  flagType?: string
   document?: EmbassyDocument
+  auditStatus?: string
+  auditNotes?: string
+  auditDecisionCode?: string
+  auditDecisionLabel?: string
+  auditedByOfficerId?: string
+  auditedAt?: Date
 }
 
 export interface EmbassyDocument {
@@ -211,9 +219,63 @@ export interface BiasReviewCadenceResponse {
 export interface BiasAuditDecision {
   id: string
   auditorId: string
-  decision: 'validated' | 'overturned' | 'escalated' | 'training_needed'
+  decisionCode: string
   notes?: string
   createdAt?: string
+}
+
+export interface BiasAuditFlagDocument {
+  id?: string
+  name?: string
+  type?: string
+  verified?: boolean
+}
+
+export interface BiasAuditFlag {
+  id: string
+  flagType: string
+  reason?: string
+  resolved: boolean
+  flaggedAt?: string
+  resolvedAt?: string
+  flaggedBy?: string
+  document?: BiasAuditFlagDocument | null
+  allowedDecisions?: string[]
+  decisionDetails?: FlagDecisionMatrixEntry[]
+}
+
+export interface BiasAuditFlagSummary {
+  total: number
+  active: number
+  types: string[]
+  activeTypes: string[]
+}
+
+export interface FlagCatalogCategory {
+  code: string
+  label: string
+  description?: string
+}
+
+export interface DecisionCatalogEntry {
+  code: string
+  label: string
+  description?: string
+  severity?: string
+}
+
+export interface FlagDecisionMatrixEntry {
+  code: string
+  label: string
+  description?: string
+  severity?: string
+  requiresFollowUp?: boolean
+}
+
+export interface FlagCatalog {
+  categories: FlagCatalogCategory[]
+  decisions: DecisionCatalogEntry[]
+  matrix: Record<string, FlagDecisionMatrixEntry[]>
 }
 
 export interface BiasAuditItem {
@@ -235,6 +297,10 @@ export interface BiasAuditItem {
     applicantName: string
   }
   audits: BiasAuditDecision[]
+  flags: BiasAuditFlag[]
+  flagSummary: BiasAuditFlagSummary
+  allowedDecisions?: Record<string, string[]>
+  decisionMatrix?: Record<string, FlagDecisionMatrixEntry[]>
 }
 
 // Mock data constants

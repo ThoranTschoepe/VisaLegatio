@@ -1,6 +1,6 @@
 # Review-of-Review Audit Console – Demo Notes
 
-This document explains the intent behind the `app/frontend/components/Embassy/BiasAuditQueue.tsx` page and outlines how senior officers should interact with the current demo UI.
+This document explains the intent behind the `app/frontend/components/Embassy/ReviewAudit.tsx` console and outlines how senior officers should interact with the current UI.
 
 ## What Lands in the Audit Console?
 The queue aggregates bias reviews that already received an initial officer assessment but still require senior oversight:
@@ -20,13 +20,13 @@ Senior staff can still filter to "All" if they want to browse the entire backlog
    - Current audit status badge and a one-line summary of the escalation reason.
 3. **Detail Drawer** – Selecting a card opens the inspection panel with:
    - Original notes, AI highlights, and applicant metadata.
-   - Senior decision options (`validated`, `overturned`, `escalated`, `training_needed`) and a comment textarea recorded in the audit log.
+   - Senior decision options (`clear_to_proceed`, `request_additional_docs`, `escalate_to_policy`, `escalate_to_security`, `overturn_flag`, `refer_for_training`) and a comment textarea recorded in the audit log.
    - Audit history timeline so officers can see previous actions on the same review.
 
 Upcoming improvements include decision checklists, comment templates, and post-decision follow-ups (notify policy, tag for retraining, etc.).
 
 ## Filters & Workflow Considerations
-- **Status Filter:** Provide quick toggles for `pending`, `validated`, `escalated`, `all` so leads can change perspective easily.
+- **Status Filter:** Provide quick toggles for `pending`, `clear_to_proceed`, `escalate_to_policy`, `escalate_to_security`, or `all` so leads can change perspective easily.
 - **Age Filter:** Highlight reviews older than a configurable threshold (e.g., 5 days) to prioritise stale items.
 - **Attribute Filters:** We can reuse influence-model data to surface filters like "High driver factor" or "High buffer factor" for cross-team investigations.
 
@@ -36,7 +36,7 @@ Upcoming improvements include decision checklists, comment templates, and post-d
 - **Extensibility:** The queue is driven by backend routing rules; adding new escalation paths (e.g., manual escalations, union grievances) should happen server-side without rewriting the front-end.
 
 ## Next Steps
-- Add a metrics banner summarising pending/validated/overturned counts.
+- Add a metrics banner summarising pending/escalated/overturn_flag counts.
 - Implement comment templates and decision checklists.
 - Support bulk triage (approve/overturn multiple similar cases) where policy allows.
 - Integrate with the bias influence model to show why a case was escalated (e.g., top driver factor).

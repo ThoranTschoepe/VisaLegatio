@@ -3,7 +3,7 @@
 ## Overview
 The demo consists of two senior-officer surfaces:
 - **Bias Monitoring (`app/frontend/components/Embassy/BiasMonitoringPanel.tsx`)** – sampling stats + influence leaderboard.
-- **Review-of-Review Audit (`app/frontend/components/Embassy/ReviewAuditListDemo.tsx` and `ReviewAuditDemo.tsx`)** – card list + detail drawer + decision actions.
+- **Review-of-Review Audit (`app/frontend/components/Embassy/ReviewAudit.tsx`)** – live queue, detail panel, and decision submission.
 
 Both currently consume mock data. Backend APIs already exist (`/api/bias-monitoring/sample`, `/api/bias-monitoring/overview`, `/api/review-audit/*`) but return seeded/ephemeral data. Moving beyond the demo requires replacing the mock wiring with live API payloads and persisting officer decisions.
 
@@ -22,9 +22,8 @@ Both currently consume mock data. Backend APIs already exist (`/api/bias-monitor
   - Risk-adjusted review cadence table with optional fallbacks when analytics unavailable.
 
 ### Review Audit UI
-- Large screens render `ReviewAuditListDemo` (card list + detail panel, form-only demo).
-- Small screens fall back to `ReviewAuditDemo` (legacy single-pane interaction).
-- Real queue component (`BiasAuditQueue.tsx`) is no longer used, but remains a reference implementation for API integration.
+- `ReviewAudit.tsx` unifies the audit queue experience across breakpoints, loading `/api/flags/catalog` once, caching the decision matrix, and applying compatibility rules per flag.
+- The earlier demo shells (`ReviewAuditListDemo`, `ReviewAuditDemo`) have been retired; check git history if you need the mock-only reference.
 
 ## Backend TODOs
 1. **Monitoring data**
@@ -38,8 +37,7 @@ Both currently consume mock data. Backend APIs already exist (`/api/bias-monitor
    - Implement pagination/limit for large queues.
 
 3. **Form submission**
-   - Hook `ReviewAuditListDemo` actions to real mutation endpoints (`/api/review-audit/{id}/decision`).
-   - Validate comment field, store decision history.
+   - Ensure `ReviewAudit.tsx` mutation flow covers validation, comment requirements, and audit history persistence.
 
 4. **Governance card**
    - Provide metrics (pending count, overdue count) so the dashboard card surfaces real numbers.
@@ -55,13 +53,13 @@ Seeded DB ─┬─> /api/bias-monitoring/sample ─┬─> BiasMonitoringPanel
            │
            └─> /api/bias-monitoring/overview ──> BiasMonitoringPanel cards/alerts
 
-Review audit DB → /api/review-audit/* → (future) ReviewAuditListDemo submission
+Review audit DB → /api/review-audit/* → ReviewAudit submission
 ```
 
 ## Next Steps Checklist
 - [ ] Design influence API response format (driver/buffer arrays with percent & meta).
 - [ ] Wire `InfluenceLeaderboard` to use live data once ready.
-- [ ] Replace ReviewAuditListDemo mock data with real queue fetch; remove legacy `BiasAuditQueue` once verified.
+- [ ] Add automated UI/regression coverage once `ReviewAudit.tsx` is fully wired to live data.
 - [ ] Persist senior comments/decisions in database.
 - [ ] Document production runbook (cron job scheduling, model retraining alerts).
 

@@ -116,7 +116,9 @@ export default function EmbassyDashboard({ officer, onLogout }: EmbassyDashboard
         documentsCount: app.documentsCount || 0,
         riskScore: app.riskScore || 0,
         estimatedDays: app.estimatedDays || 0,
-        lastActivity: new Date(app.lastActivity || app.updatedAt)
+        lastActivity: new Date(app.lastActivity || app.updatedAt),
+        flaggedDocuments: app.flaggedDocuments || [],
+        resolvedFlagHistory: app.resolvedFlagHistory || []
       }))
 
       setApplications(transformedApps)

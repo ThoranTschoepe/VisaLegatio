@@ -10,6 +10,7 @@ from . import analytics
 from . import documents
 from . import bias_monitoring
 from . import review_audit
+from . import flags
 
 __all__ = [
     "applications",
@@ -19,4 +20,5 @@ __all__ = [
     "documents",
     "bias_monitoring",
     "review_audit",
+    "flags",
 ]

@@ -20,7 +20,10 @@ from database import (
     Officer,
     StatusUpdate,
     BiasReview,
-    BiasReviewAudit,
+    ReviewAudit,
+    FlagCategory,
+    DecisionCategory,
+    FlagDecisionRule,
     BiasMonitoringSnapshot,
     BiasInfluenceAttribute,
     BiasInfluenceModel,
@@ -28,6 +31,198 @@ from database import (
     BiasReviewCadence,
 )
 from models import Question, QuestionValidation
+
+
+def seed_flag_catalog(db: Session) -> Dict[str, FlagCategory]:
+    """Ensure canonical flag/decision catalog entries exist for the flagging workflow."""
+
+    categories_seed = [
+        {
+            "code": "document_gap",
+            "label": "Document Gap",
+            "description": "Missing, expired, or incomplete applicant documentation.",
+        },
+        {
+            "code": "identity_mismatch",
+            "label": "Identity Mismatch",
+            "description": "Inconsistent identity attributes across documents or suspected identity fraud.",
+        },
+        {
+            "code": "document_authenticity",
+            "label": "Document Authenticity",
+            "description": "Potential tampering or unverifiable document security features.",
+        },
+        {
+            "code": "financial_concern",
+            "label": "Financial Concern",
+            "description": "Questions around funding sources, income stability, or affordability thresholds.",
+        },
+        {
+            "code": "travel_intent_risk",
+            "label": "Travel Intent Risk",
+            "description": "Purpose of travel, itinerary, or sponsorship details appear inconsistent.",
+        },
+        {
+            "code": "compliance_alert",
+            "label": "Compliance Alert",
+            "description": "Potential regulatory, sanctions, or security-list conflicts requiring escalation.",
+        },
+    ]
+
+    decisions_seed = [
+        {
+            "code": "clear_to_proceed",
+            "label": "Clear to Proceed",
+            "description": "Senior reviewer confirms the flag is resolved with no further action.",
+            "severity": "low",
+        },
+        {
+            "code": "request_clarification",
+            "label": "Request Clarification",
+            "description": "Ask the frontline officer for additional narrative context before closing.",
+            "severity": "medium",
+        },
+        {
+            "code": "request_additional_docs",
+            "label": "Request Additional Documents",
+            "description": "Require the applicant to supply specific evidence before progressing.",
+            "severity": "medium",
+        },
+        {
+            "code": "issue_conditional_approval",
+            "label": "Issue Conditional Approval",
+            "description": "Allow the case to move forward with monitoring conditions noted.",
+            "severity": "medium",
+        },
+        {
+            "code": "escalate_to_policy",
+            "label": "Escalate to Policy",
+            "description": "Engage policy or legal experts for interpretation before a final decision.",
+            "severity": "high",
+        },
+        {
+            "code": "escalate_to_security",
+            "label": "Escalate to Security & Compliance",
+            "description": "Transfer to security/compliance specialists for immediate risk handling.",
+            "severity": "critical",
+        },
+        {
+            "code": "overturn_flag",
+            "label": "Overturn Flag",
+            "description": "Senior reviewer disagrees with the flag and clears it from the record.",
+            "severity": "low",
+        },
+        {
+            "code": "refer_for_training",
+            "label": "Refer for Training",
+            "description": "Flag indicates a coaching opportunity for frontline reviewers.",
+            "severity": "low",
+        },
+    ]
+
+    compatibility_seed = {
+        ("document_gap", "clear_to_proceed"): False,
+        ("document_gap", "request_clarification"): True,
+        ("document_gap", "request_additional_docs"): True,
+        ("document_gap", "issue_conditional_approval"): True,
+        ("document_gap", "overturn_flag"): False,
+        ("document_gap", "refer_for_training"): True,
+        ("identity_mismatch", "clear_to_proceed"): False,
+        ("identity_mismatch", "request_additional_docs"): True,
+        ("identity_mismatch", "request_clarification"): True,
+        ("identity_mismatch", "escalate_to_policy"): True,
+        ("identity_mismatch", "escalate_to_security"): True,
+        ("identity_mismatch", "overturn_flag"): False,
+        ("identity_mismatch", "refer_for_training"): True,
+        ("document_authenticity", "clear_to_proceed"): False,
+        ("document_authenticity", "request_additional_docs"): True,
+        ("document_authenticity", "escalate_to_policy"): True,
+        ("document_authenticity", "escalate_to_security"): True,
+        ("financial_concern", "clear_to_proceed"): False,
+        ("financial_concern", "request_clarification"): True,
+        ("financial_concern", "request_additional_docs"): True,
+        ("financial_concern", "issue_conditional_approval"): True,
+        ("financial_concern", "escalate_to_policy"): True,
+        ("financial_concern", "refer_for_training"): True,
+        ("travel_intent_risk", "clear_to_proceed"): False,
+        ("travel_intent_risk", "request_clarification"): True,
+        ("travel_intent_risk", "request_additional_docs"): True,
+        ("travel_intent_risk", "issue_conditional_approval"): True,
+        ("travel_intent_risk", "escalate_to_policy"): True,
+        ("travel_intent_risk", "overturn_flag"): False,
+        ("travel_intent_risk", "refer_for_training"): True,
+        ("compliance_alert", "clear_to_proceed"): False,
+        ("compliance_alert", "escalate_to_policy"): True,
+        ("compliance_alert", "escalate_to_security"): True,
+        ("compliance_alert", "overturn_flag"): False,
+    }
+
+    category_lookup: Dict[str, FlagCategory] = {}
+    for entry in categories_seed:
+        category = (
+            db.query(FlagCategory)
+            .filter(FlagCategory.code == entry["code"])
+            .one_or_none()
+        )
+        if not category:
+            category = FlagCategory(**entry)
+            db.add(category)
+            db.flush()
+        else:
+            category.label = entry["label"]
+            category.description = entry["description"]
+        category_lookup[category.code] = category
+
+    decision_lookup: Dict[str, DecisionCategory] = {}
+    for entry in decisions_seed:
+        decision = (
+            db.query(DecisionCategory)
+            .filter(DecisionCategory.code == entry["code"])
+            .one_or_none()
+        )
+        if not decision:
+            decision = DecisionCategory(**entry)
+            db.add(decision)
+            db.flush()
+        else:
+            decision.label = entry["label"]
+            decision.description = entry["description"]
+            decision.severity = entry["severity"]
+        decision_lookup[decision.code] = decision
+
+    existing_rules = (
+        db.query(FlagDecisionRule)
+        .join(FlagCategory, FlagDecisionRule.flag_category_id == FlagCategory.id)
+        .join(DecisionCategory, FlagDecisionRule.decision_id == DecisionCategory.id)
+        .all()
+    )
+
+    pending_rules = compatibility_seed.copy()
+
+    for rule in existing_rules:
+        key = (rule.flag_category.code, rule.decision_category.code)
+        if key in compatibility_seed:
+            rule.requires_follow_up = compatibility_seed[key]
+            pending_rules.pop(key, None)
+        else:
+            db.delete(rule)
+
+    for (flag_code, decision_code), requires_follow_up in pending_rules.items():
+        category = category_lookup.get(flag_code)
+        decision = decision_lookup.get(decision_code)
+        if not category or not decision:
+            continue
+        db.add(
+            FlagDecisionRule(
+                flag_category_id=category.id,
+                decision_id=decision.id,
+                requires_follow_up=requires_follow_up,
+            )
+        )
+
+    db.flush()
+    return category_lookup
+
 
 def generate_id(prefix: str = "") -> str:
     """Generate a unique ID with optional prefix"""
@@ -955,6 +1150,8 @@ def seed_demo_data():
     db = get_db_session()
     
     try:
+        seed_flag_catalog(db)
+
         # Check if data already exists
         if db.query(Officer).count() > 0:
             print("📄 Demo data already exists, but checking for organized document files...")
@@ -1210,7 +1407,7 @@ def seed_demo_data():
                     "result": "justified",
                     "notes": "Risk scoring aligns with policy; requesting supporting travel history.",
                     "ai_confidence": 68,
-                    "audit_status": "validated",
+                    "audit_status": "clear_to_proceed",
                     "reviewed_days_ago": 2
                 },
                 "wealth_level": "middle",
@@ -1254,11 +1451,11 @@ def seed_demo_data():
                     "result": "justified",
                     "notes": "Missing critical business documents. Rejection is warranted.",
                     "ai_confidence": 82,
-                    "audit_status": "validated",
+                    "audit_status": "clear_to_proceed",
                     "reviewed_days_ago": 3,
                     "audit": {
                         "auditor_id": "maria.schmidt",
-                        "decision": "validated",
+                        "decision": "clear_to_proceed",
                     "notes": "Double-checked documents; decision stands.",
                     "days_ago": 2
                     }
@@ -1555,16 +1752,16 @@ def seed_demo_data():
 
             db.flush()
 
-            # Optional audit follow-up for validated cases
+            # Optional audit follow-up for cleared cases
             for case, record, review_data in bias_review_records:
                 audit_meta = review_data.get("audit")
                 if not audit_meta:
                     continue
-                audit_entry = BiasReviewAudit(
+                audit_entry = ReviewAudit(
                     id=generate_id("biasaudit"),
                     bias_review_id=record.id,
                     auditor_id=audit_meta["auditor_id"],
-                    decision=audit_meta.get("decision", "validated"),
+                    decision=audit_meta.get("decision", "clear_to_proceed"),
                     notes=audit_meta.get("notes"),
                     created_at=now - timedelta(days=audit_meta.get("days_ago", 1))
                 )

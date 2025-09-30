@@ -54,6 +54,7 @@ export interface VisaApplication {
   
   // Flagged documents (new: supports multiple)
   flaggedDocuments?: FlaggedDocument[]
+  resolvedFlagHistory?: FlaggedDocument[]
 }
 
 export interface Document {
@@ -104,7 +105,14 @@ export interface FlaggedDocument {
   flaggedAt: Date
   resolved: boolean
   resolvedAt?: Date
+  flagType?: string
   document?: Document
+  auditStatus?: string
+  auditNotes?: string
+  auditDecisionCode?: string
+  auditDecisionLabel?: string
+  auditedByOfficerId?: string
+  auditedAt?: Date
 }
 
 export type ApplicationStatus = 

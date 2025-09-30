@@ -96,7 +96,14 @@ class FlaggedDocumentResponse(BaseModel):
     flagged_at: datetime
     resolved: bool = False
     resolved_at: Optional[datetime] = None
+    flag_type: Optional[str] = None
     document: Optional[DocumentResponse] = None
+    audit_status: Optional[str] = None
+    audit_notes: Optional[str] = None
+    audit_decision_code: Optional[str] = None
+    audit_decision_label: Optional[str] = None
+    audited_by_officer_id: Optional[str] = None
+    audited_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -134,7 +141,8 @@ class ApplicationResponse(BaseModel):
 
     # List of flagged documents for this application
     flagged_documents: Optional[List[FlaggedDocumentResponse]] = []
-    
+    resolved_flag_history: Optional[List[FlaggedDocumentResponse]] = []
+
     # Relationships
     documents: Optional[List[DocumentResponse]] = []
     status_updates: Optional[List[StatusUpdateResponse]] = []
@@ -198,6 +206,7 @@ class FlagDocumentRequest(BaseModel):
     document_id: str
     reason: str
     officer_id: Optional[str] = None
+    flag_category_code: Optional[str] = None
 
 class UnflagDocumentRequest(BaseModel):
     flag_id: str

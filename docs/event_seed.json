@@ -18,7 +18,7 @@
         "result": "justified",
         "notes": "Risk scoring aligns with policy; requesting supporting travel history.",
         "ai_confidence": 68,
-        "audit_status": "validated",
+        "audit_status": "clear_to_proceed",
         "reviewed_days_ago": 2
       }
     },

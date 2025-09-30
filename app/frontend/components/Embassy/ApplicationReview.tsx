@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { debug, error as logError, warn as logWarn } from '@/lib/log'
-import { CheckCircle2, AlertTriangle, Eye, Maximize2, ExternalLink, AlertCircle, Brain, FileWarning, Flag } from 'lucide-react'
-import { EmbassyApplication, Officer, EmbassyDocument } from '@/types/embassy.types'
+import { CheckCircle2, AlertTriangle, Eye, Maximize2, ExternalLink, AlertCircle, Brain, FileWarning, Flag, ShieldCheck } from 'lucide-react'
+import { EmbassyApplication, Officer, EmbassyDocument, FlaggedDocument } from '@/types/embassy.types'
 import { api } from '@/utils/api'
 import { useAlertStore } from '@/lib/stores/alert.store'
 import { JOHN_DOE_ANALYSIS, JOHN_DOE_WARNINGS, DOCUMENT_NAMES, DOCUMENT_DESCRIPTIONS } from '@/lib/constants/mock-data.constants'
@@ -85,8 +85,121 @@ export default function ApplicationReview({
   const [showFlagModal, setShowFlagModal] = useState(false)
   const [flaggingDocument, setFlaggingDocument] = useState<DocumentWithUrls | null>(null)
   const [flaggedDocumentIds, setFlaggedDocumentIds] = useState<Set<string>>(new Set())
+  const [activeFlags, setActiveFlags] = useState<FlaggedDocument[]>(application.flaggedDocuments ?? [])
+  const [resolvedFlags, setResolvedFlags] = useState<FlaggedDocument[]>(application.resolvedFlagHistory ?? [])
+  const [resolvingFlagDocumentId, setResolvingFlagDocumentId] = useState<string | null>(null)
   
   const { showSuccess, showError } = useAlertStore()
+
+  const auditHistoryByDocumentId = useMemo(() => {
+    const map = new Map<string, FlaggedDocument>()
+
+    resolvedFlags.forEach(flag => {
+      if (flag.documentId) {
+        map.set(flag.documentId, flag)
+      }
+    })
+
+    activeFlags.forEach(flag => {
+      if (flag.documentId && (flag.auditDecisionCode || flag.auditNotes || flag.auditStatus)) {
+        map.set(flag.documentId, flag)
+      }
+    })
+
+    return map
+  }, [activeFlags, resolvedFlags])
+
+  const mostRecentAuditEntry = useMemo(() => {
+    const activeWithAudit = activeFlags.filter(flag => flag.auditDecisionCode || flag.auditNotes || flag.auditStatus)
+    const merged = [...activeWithAudit, ...resolvedFlags]
+
+    if (merged.length === 0) {
+      return undefined
+    }
+
+    merged.sort((a, b) => {
+      const aTime = a.auditedAt?.getTime() ?? a.resolvedAt?.getTime() ?? a.flaggedAt?.getTime() ?? 0
+      const bTime = b.auditedAt?.getTime() ?? b.resolvedAt?.getTime() ?? b.flaggedAt?.getTime() ?? 0
+      return bTime - aTime
+    })
+
+    return merged[0]
+  }, [activeFlags, resolvedFlags])
+
+  const auditedHistory = useMemo(
+    () => resolvedFlags.filter(flag => flag.auditDecisionCode || flag.auditNotes || flag.auditStatus),
+    [resolvedFlags]
+  )
+
+  const formatDecisionLabel = (entry?: FlaggedDocument) => {
+    if (!entry) return 'Reviewed'
+    if (entry.auditDecisionLabel) return entry.auditDecisionLabel
+    const decision = entry.auditDecisionCode || entry.auditStatus
+    if (!decision) return 'Reviewed'
+    return decision
+      .split('_')
+      .map(chunk => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+      .join(' ')
+  }
+
+  const getAuditPalette = (decision?: string) => {
+    switch (decision) {
+      case 'clear_to_proceed':
+        return {
+          container: 'bg-success/10 border-success/20',
+          icon: 'text-success',
+          text: 'text-success'
+        }
+      case 'overturn_flag':
+        return {
+          container: 'bg-error/10 border-error/20',
+          icon: 'text-error',
+          text: 'text-error'
+        }
+      case 'escalate_to_security':
+        return {
+          container: 'bg-error/10 border-error/20',
+          icon: 'text-error',
+          text: 'text-error'
+        }
+      case 'escalate_to_policy':
+      case 'request_additional_docs':
+      case 'request_clarification':
+      case 'issue_conditional_approval':
+        return {
+          container: 'bg-warning/10 border-warning/20',
+          icon: 'text-warning',
+          text: 'text-warning'
+        }
+      case 'refer_for_training':
+        return {
+          container: 'bg-info/10 border-info/20',
+          icon: 'text-info',
+          text: 'text-info'
+        }
+      default:
+        return {
+          container: 'bg-info/10 border-info/20',
+          icon: 'text-info',
+          text: 'text-info'
+        }
+    }
+  }
+
+  const getAuditIcon = (decision?: string) => {
+    switch (decision) {
+      case 'overturn_flag':
+        return AlertCircle
+      case 'escalate_to_policy':
+      case 'escalate_to_security':
+      case 'request_additional_docs':
+      case 'request_clarification':
+      case 'issue_conditional_approval':
+        return AlertTriangle
+      default:
+        return ShieldCheck
+    }
+  }
 
   // Check if this is John Doe's application
   const isJohnDoe = application.applicantName === 'John Doe' || application.id === 'VSV-240105-JDOE'
@@ -101,16 +214,20 @@ export default function ApplicationReview({
   // Load current flagged documents
   useEffect(() => {
   debug('📋 Application data changed, updating flagged documents:', application.flaggedDocuments)
-    if (application.flaggedDocuments && application.flaggedDocuments.length > 0) {
-      const flaggedIds = new Set(application.flaggedDocuments.map(f => f.documentId))
+    const currentFlags = application.flaggedDocuments ?? []
+    setActiveFlags(currentFlags)
+
+    if (currentFlags.length > 0) {
+      const flaggedIds = new Set(currentFlags.map(f => f.documentId))
       setFlaggedDocumentIds(flaggedIds)
   debug('✅ Set flagged document IDs:', flaggedIds)
     } else {
-      // If no flagged documents in application data, clear the state
       setFlaggedDocumentIds(new Set())
   debug('🧹 Cleared flagged document IDs')
     }
-  }, [application])
+
+    setResolvedFlags(application.resolvedFlagHistory ?? [])
+  }, [application.flaggedDocuments, application.resolvedFlagHistory])
 
   // Function to reload fresh application data including flagged documents
   const reloadApplicationData = async () => {
@@ -126,8 +243,14 @@ export default function ApplicationReview({
       const freshAppData = await api.getApplicationStatus(application.id)
       
       // Update flagged documents state with fresh data
-      if (freshAppData.flaggedDocuments && freshAppData.flaggedDocuments.length > 0) {
-        const flaggedIds = new Set(freshAppData.flaggedDocuments.map(f => f.documentId))
+      const refreshedActiveFlags = freshAppData.flaggedDocuments || []
+      const refreshedResolvedFlags = freshAppData.resolvedFlagHistory || []
+
+      setActiveFlags(refreshedActiveFlags)
+      setResolvedFlags(refreshedResolvedFlags)
+
+      if (refreshedActiveFlags.length > 0) {
+        const flaggedIds = new Set(refreshedActiveFlags.map(f => f.documentId))
         setFlaggedDocumentIds(flaggedIds)
   debug('✅ Updated flagged documents:', flaggedIds)
       } else {
@@ -620,6 +743,7 @@ export default function ApplicationReview({
 
   const handleUnflagDocument = async (flagId: string, documentId: string) => {
     try {
+      setResolvingFlagDocumentId(documentId)
       await api.unflagDocument(application.id, flagId)
       
       setFlaggedDocumentIds(prev => {
@@ -634,6 +758,8 @@ export default function ApplicationReview({
       await reloadApplicationData()
     } catch (error) {
       showError('Failed to remove flag')
+    } finally {
+      setResolvingFlagDocumentId(null)
     }
   }
 
@@ -1113,41 +1239,91 @@ export default function ApplicationReview({
                                     </button>
                                   </div>
 
-                                  {/* Currently Flagged Info */}
-                                  {selectedReq.uploaded && flaggedDocumentIds.has(selectedReq.uploaded.id) && 
-                                   application.flaggedDocuments?.find(flag => flag.documentId === selectedReq.uploaded?.id) && (
-                                    <div className="bg-warning/10 border border-warning/20 rounded-md p-3">
-                                      <div className="flex items-start gap-2">
-                                        <Flag className="w-4 h-4 text-warning mt-0.5" />
-                                        <div className="flex-1">
-                                          <p className="text-sm font-medium text-warning">Document Flagged</p>
-                                          {(() => {
-                                            const flag = application.flaggedDocuments?.find(f => f.documentId === selectedReq.uploaded?.id)
-                                            return (
-                                              <>
-                                                {flag?.reason && (
-                                                  <p className="text-xs text-warning mt-1">
-                                                    Reason: {flag.reason}
-                                                  </p>
-                                                )}
-                                                {flag?.flaggedAt && (
-                                                  <p className="text-xs text-warning mt-1">
-                                                    Flagged on: {new Date(flag.flaggedAt).toLocaleDateString()}
-                                                  </p>
-                                                )}
+                                  {/* Flag / Audit Guidance */}
+                                  {(() => {
+                                    if (!selectedReq.uploaded) return null
+
+                                    const docId = selectedReq.uploaded.id
+                                    const activeFlag = activeFlags.find(flag => flag.documentId === docId)
+                                    const isActiveFlag = Boolean(activeFlag && flaggedDocumentIds.has(docId))
+                                    const auditEntry = auditHistoryByDocumentId.get(docId)
+                                    const decisionCode = auditEntry?.auditDecisionCode || auditEntry?.auditStatus
+                                    const palette = getAuditPalette(decisionCode)
+                                    const AuditIcon = getAuditIcon(decisionCode)
+                                    const auditLabel = formatDecisionLabel(auditEntry)
+                                    const auditTimestamp = auditEntry?.auditedAt || auditEntry?.resolvedAt
+
+                                    if (isActiveFlag && activeFlag) {
+                                      return (
+                                        <div className="bg-warning/10 border border-warning/20 rounded-md p-3">
+                                          <div className="flex items-start gap-2">
+                                            <Flag className="w-4 h-4 text-warning mt-0.5" />
+                                            <div className="flex-1">
+                                              <p className="text-sm font-medium text-warning">Document Flagged</p>
+                                              {activeFlag.reason && (
+                                                <p className="text-xs text-warning mt-1">
+                                                  Reason: {activeFlag.reason}
+                                                </p>
+                                              )}
+                                              {activeFlag.flaggedAt && (
+                                                <p className="text-xs text-warning mt-1">
+                                                  Flagged on: {activeFlag.flaggedAt.toLocaleDateString()}
+                                                </p>
+                                              )}
+                                              {auditEntry && (
+                                                <div className="mt-3 border-t border-warning/20 pt-3">
+                                                  <p className="text-xs font-semibold text-warning uppercase tracking-wide">Senior review</p>
+                                                  <p className="text-xs text-warning mt-1">{auditLabel}</p>
+                                                  {auditEntry.auditNotes && (
+                                                    <p className="text-xs text-warning/80 mt-1">{auditEntry.auditNotes}</p>
+                                                  )}
+                                                  {auditTimestamp && (
+                                                    <p className="text-[11px] text-warning/60 mt-1">
+                                                      Reviewed {auditTimestamp.toLocaleString()}
+                                                    </p>
+                                                  )}
+                                                </div>
+                                              )}
+                                              <div className="mt-3 flex flex-wrap gap-2">
                                                 <button
-                                                  onClick={() => handleUnflagDocument(flag?.id || '', selectedReq.uploaded?.id || '')}
-                                                  className="text-xs text-warning underline hover:no-underline mt-2"
+                                                  onClick={() => handleUnflagDocument(activeFlag.id || '', docId)}
+                                                  className="btn btn-xs btn-warning"
+                                                  disabled={resolvingFlagDocumentId === docId}
                                                 >
-                                                  Remove flag
+                                                  {resolvingFlagDocumentId === docId ? 'Resolving…' : 'Resolve flag'}
                                                 </button>
-                                              </>
-                                            )
-                                          })()}
+                                              </div>
+                                            </div>
+                                          </div>
                                         </div>
-                                      </div>
-                                    </div>
-                                  )}
+                                      )
+                                    }
+
+                                    if (auditEntry) {
+                                      return (
+                                        <div className={`rounded-md p-3 border ${palette.container}`}>
+                                          <div className="flex items-start gap-2">
+                                            <AuditIcon className={`w-4 h-4 mt-0.5 ${palette.icon}`} />
+                                            <div className="flex-1">
+                                              <p className={`text-sm font-medium ${palette.text}`}>
+                                                Audited: {auditLabel}
+                                              </p>
+                                              {auditEntry.auditNotes && (
+                                                <p className="text-xs text-base-content/70 mt-1">{auditEntry.auditNotes}</p>
+                                              )}
+                                              {auditTimestamp && (
+                                                <p className="text-[11px] text-base-content/60 mt-1">
+                                                  Reviewed {auditTimestamp.toLocaleString()}
+                                                </p>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )
+                                    }
+
+                                    return null
+                                  })()}
 
                                   {/* Document Information */}
                                   <div className="bg-base-100 rounded-md p-3 border border-info/20">
@@ -1228,15 +1404,41 @@ export default function ApplicationReview({
                           <p className="text-warning text-sm mt-1">
                             You have flagged {flaggedDocumentIds.size === 1 ? 'a document' : 'documents'} for applicant attention
                           </p>
-                          {application.flaggedDocuments && application.flaggedDocuments.length > 0 && (
+                          {activeFlags.length > 0 && (
                             <div className="mt-2 space-y-1">
-                              {application.flaggedDocuments.map(flag => (
+                              {activeFlags.map(flag => (
                                 <p key={flag.id} className="text-warning text-xs">
                                   • {flag.document?.name || 'Unknown document'}: {flag.reason}
                                 </p>
                               ))}
                             </div>
                           )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {flaggedDocumentIds.size === 0 && auditedHistory.length > 0 && mostRecentAuditEntry && (
+                    <div className={`bg-info/10 border border-info/20 rounded-lg p-4`}>
+                      <div className="flex items-start gap-3">
+                        <ShieldCheck className="w-5 h-5 text-info mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-info text-sm">Senior audit guidance available</h4>
+                          <p className="text-info text-sm mt-1">
+                            {auditedHistory.length === 1
+                              ? 'One document has senior review notes.'
+                              : `${auditedHistory.length} documents include senior review notes.`}
+                          </p>
+                          <div className="mt-2 space-y-1">
+                            {auditedHistory.slice(0, 3).map(flag => (
+                              <p key={flag.id} className="text-info text-xs">
+                                • {flag.document?.name || 'Document'}: {formatDecisionLabel(flag)}
+                              </p>
+                            ))}
+                            {auditedHistory.length > 3 && (
+                              <p className="text-info text-[11px]">+{auditedHistory.length - 3} more</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1312,6 +1514,37 @@ export default function ApplicationReview({
                     Submit Decision
                     {decision === 'approve' && !canApprove && <AlertTriangle className="w-4 h-4 ml-2" />}
                   </button>
+
+                  {mostRecentAuditEntry && (() => {
+                    const decisionCode = mostRecentAuditEntry.auditDecisionCode || mostRecentAuditEntry.auditStatus
+                    const palette = getAuditPalette(decisionCode)
+                    const AuditIcon = getAuditIcon(decisionCode)
+                    const label = formatDecisionLabel(mostRecentAuditEntry)
+                    const reviewer = mostRecentAuditEntry.auditedByOfficerId
+                    const auditTimestamp = mostRecentAuditEntry.auditedAt || mostRecentAuditEntry.resolvedAt
+
+                    return (
+                      <div className={`mt-3 rounded-lg border ${palette.container} p-3`}>
+                        <div className="flex items-start gap-2">
+                          <AuditIcon className={`w-5 h-5 ${palette.icon} mt-0.5`} />
+                          <div className="flex-1">
+                            <p className={`text-sm font-semibold ${palette.text}`}>
+                              Senior review: {label}
+                            </p>
+                            {mostRecentAuditEntry.auditNotes && (
+                              <p className="text-xs text-base-content/70 mt-1">
+                                {mostRecentAuditEntry.auditNotes}
+                              </p>
+                            )}
+                            <p className="text-[11px] text-base-content/60 mt-1">
+                              {auditTimestamp ? `Reviewed ${auditTimestamp.toLocaleString()}` : 'Recent audit recorded'}
+                              {reviewer && ` · ${reviewer}`}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 {/* AI Insights */}
@@ -1371,7 +1604,8 @@ export default function ApplicationReview({
         applicationId={application.id}
         officer={officer}
         flaggedDocumentIds={flaggedDocumentIds}
-        flaggedDocuments={application.flaggedDocuments}
+        flaggedDocuments={activeFlags}
+        resolvedFlagHistory={resolvedFlags}
         onClose={() => setShowFlagModal(false)}
         onFlagSuccess={async (flaggedDocId) => {
           setFlaggedDocumentIds(prev => new Set([...prev, flaggedDocId]))

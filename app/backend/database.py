@@ -1,8 +1,19 @@
 # backend/database.py - Database configuration and models
 
-from sqlalchemy import create_engine, Column, String, Integer, Float, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy import (
+    create_engine,
+    Column,
+    String,
+    Integer,
+    Float,
+    Boolean,
+    DateTime,
+    Text,
+    ForeignKey,
+    UniqueConstraint,
+)
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session, relationship
+from sqlalchemy.orm import sessionmaker, Session, relationship, object_session
 from datetime import datetime
 from typing import Any, Dict
 import json
@@ -98,9 +109,37 @@ class StatusUpdate(Base):
     application = relationship("Application", back_populates="status_updates")
     officer = relationship("Officer", back_populates="status_updates")
 
+class FlagCategory(Base):
+    __tablename__ = "flag_categories"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String, unique=True, nullable=False, index=True)
+    label = Column(String, nullable=False)
+    description = Column(Text)
+
+    flagged_documents = relationship("FlaggedDocument", back_populates="category")
+    decision_rules = relationship(
+        "FlagDecisionRule", back_populates="flag_category", cascade="all, delete-orphan"
+    )
+
+
+class DecisionCategory(Base):
+    __tablename__ = "decision_categories"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String, unique=True, nullable=False, index=True)
+    label = Column(String, nullable=False)
+    description = Column(Text)
+    severity = Column(String)
+
+    decision_rules = relationship(
+        "FlagDecisionRule", back_populates="decision_category", cascade="all, delete-orphan"
+    )
+
+
 class FlaggedDocument(Base):
     __tablename__ = "flagged_documents"
-    
+
     id = Column(String, primary_key=True, index=True)
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
     document_id = Column(String, ForeignKey("documents.id"), nullable=False)
@@ -110,12 +149,53 @@ class FlaggedDocument(Base):
     flagged_at = Column(DateTime, default=datetime.utcnow)
     resolved = Column(Boolean, default=False)
     resolved_at = Column(DateTime)
-    
+    flag_category_id = Column(Integer, ForeignKey("flag_categories.id"), nullable=True)
+    bias_review_id = Column(String, ForeignKey("bias_reviews.id"), nullable=True, index=True)
+
     # Relationships
     user = relationship("User", back_populates="flagged_documents")
     document = relationship("Document", back_populates="flags")
     application = relationship("Application", back_populates="flagged_documents")
     flagged_by_officer = relationship("Officer", back_populates="flagged_documents")
+    category = relationship("FlagCategory", back_populates="flagged_documents")
+    bias_review = relationship("BiasReview", back_populates="flags")
+
+    @property
+    def flag_type(self) -> str:
+        return self.category.code if self.category else None
+
+    @flag_type.setter
+    def flag_type(self, code: str) -> None:
+        if code is None:
+            self.category = None
+            self.flag_category_id = None
+            return
+
+        session = object_session(self)
+        if session is None:
+            raise ValueError(
+                "FlaggedDocument must be attached to a session to set flag_type by code."
+            )
+
+        category = session.query(FlagCategory).filter(FlagCategory.code == code).one_or_none()
+        if category is None:
+            raise ValueError(f"Unknown flag category code '{code}'")
+
+        self.category = category
+
+
+class FlagDecisionRule(Base):
+    __tablename__ = "flag_decision_rules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    flag_category_id = Column(Integer, ForeignKey("flag_categories.id"), nullable=False)
+    decision_id = Column(Integer, ForeignKey("decision_categories.id"), nullable=False)
+    requires_follow_up = Column(Boolean, default=False)
+
+    __table_args__ = (UniqueConstraint("flag_category_id", "decision_id", name="uq_flag_decision"),)
+
+    flag_category = relationship("FlagCategory", back_populates="decision_rules")
+    decision_category = relationship("DecisionCategory", back_populates="decision_rules")
 
 class DocumentAnalysis(Base):
     __tablename__ = "document_analyses"
@@ -176,28 +256,38 @@ class BiasReview(Base):
     result = Column(String, nullable=False)  # justified, biased, uncertain
     notes = Column(Text)
     ai_confidence = Column(Integer)
-    audit_status = Column(String, default="pending")  # pending, validated, escalated, overturned
+    audit_status = Column(String, default="pending")  # pending or any decision code (e.g. clear_to_proceed, escalate_to_policy, overturn_flag)
     reviewed_at = Column(DateTime, default=datetime.utcnow)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     application = relationship("Application", backref="bias_reviews")
     officer = relationship("Officer", backref="bias_reviews")
-    audits = relationship("BiasReviewAudit", back_populates="review", cascade="all, delete-orphan")
+    audits = relationship("ReviewAudit", back_populates="review", cascade="all, delete-orphan")
+    flags = relationship("FlaggedDocument", back_populates="bias_review")
 
 
-class BiasReviewAudit(Base):
-    __tablename__ = "bias_review_audits"
+class ReviewAudit(Base):
+    __tablename__ = "review_audits"
 
     id = Column(String, primary_key=True, index=True)
     bias_review_id = Column(String, ForeignKey("bias_reviews.id"), nullable=False)
     auditor_id = Column(String, ForeignKey("officers.id"), nullable=False)
-    decision = Column(String, nullable=False)  # validated, overturned, escalated, training_needed
+    decision_code = Column(String, ForeignKey("decision_categories.code"), nullable=False)
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     review = relationship("BiasReview", back_populates="audits")
     auditor = relationship("Officer")
+    decision_category = relationship("DecisionCategory")
+
+    @property
+    def decision(self) -> str:
+        return self.decision_code
+
+    @decision.setter
+    def decision(self, value: str) -> None:
+        self.decision_code = value
 
 
 class JsonMixin:

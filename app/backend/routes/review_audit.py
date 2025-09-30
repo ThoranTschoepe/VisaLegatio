@@ -11,14 +11,40 @@ from database import (
     Application,
     Officer,
     BiasReview,
-    BiasReviewAudit,
+    ReviewAudit,
     StatusUpdate,
 )
 from utils import generate_id
 
 router = APIRouter()
 
-ALLOWED_DECISIONS = {"validated", "overturned", "escalated", "training_needed"}
+ALLOWED_DECISIONS = {
+    "clear_to_proceed",
+    "request_clarification",
+    "request_additional_docs",
+    "issue_conditional_approval",
+    "escalate_to_policy",
+    "escalate_to_security",
+    "overturn_flag",
+    "refer_for_training",
+}
+DECISION_NORMALIZATION = {
+    "clear_to_proceed": "clear_to_proceed",
+    "validated": "clear_to_proceed",
+    "request_clarification": "request_clarification",
+    "request_additional_docs": "request_additional_docs",
+    "request_more_docs": "request_additional_docs",
+    "issue_conditional_approval": "issue_conditional_approval",
+    "escalate_to_policy": "escalate_to_policy",
+    "escalated": "escalate_to_policy",
+    "escalate_policy": "escalate_to_policy",
+    "escalate_to_security": "escalate_to_security",
+    "escalate_security": "escalate_to_security",
+    "overturn_flag": "overturn_flag",
+    "overturned": "overturn_flag",
+    "refer_for_training": "refer_for_training",
+    "training_needed": "refer_for_training",
+}
 DEFAULT_LIMIT = 25
 
 
@@ -103,7 +129,12 @@ async def submit_review_audit_decision(
     if not review:
         raise HTTPException(status_code=404, detail="Bias review not found")
 
-    decision = payload.get("decision")
+    raw_decision = payload.get("decision_code") or payload.get("decision")
+    if not raw_decision:
+        raise HTTPException(status_code=400, detail="Decision value is required")
+
+    decision_key = str(raw_decision).lower()
+    decision = DECISION_NORMALIZATION.get(decision_key)
     if decision not in ALLOWED_DECISIONS:
         raise HTTPException(status_code=400, detail="Invalid decision value")
 
@@ -115,7 +146,7 @@ async def submit_review_audit_decision(
     notes = payload.get("notes")
     now = datetime.utcnow()
 
-    audit_record = BiasReviewAudit(
+    audit_record = ReviewAudit(
         id=generate_id("biasaudit"),
         bias_review_id=review_id,
         auditor_id=auditor_id,
@@ -128,7 +159,7 @@ async def submit_review_audit_decision(
     review.audit_status = decision
     review.updated_at = now
 
-    if decision == "overturned":
+    if decision == "overturn_flag":
         status_update = StatusUpdate(
             id=generate_id("status"),
             application_id=review.application_id,
@@ -138,12 +169,22 @@ async def submit_review_audit_decision(
             timestamp=now,
         )
         db.add(status_update)
-    elif decision == "escalated":
+    elif decision == "escalate_to_policy":
         status_update = StatusUpdate(
             id=generate_id("status"),
             application_id=review.application_id,
-            status="audit_escalated",
+            status="audit_escalated_policy",
             notes="Senior officer escalated the bias review for policy follow-up.",
+            officer_id=auditor_id,
+            timestamp=now,
+        )
+        db.add(status_update)
+    elif decision == "escalate_to_security":
+        status_update = StatusUpdate(
+            id=generate_id("status"),
+            application_id=review.application_id,
+            status="audit_escalated_security",
+            notes="Senior officer escalated the bias review to security & compliance.",
             officer_id=auditor_id,
             timestamp=now,
         )

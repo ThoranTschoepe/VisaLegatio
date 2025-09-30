@@ -17,6 +17,7 @@ from routes import (
     documents,
     bias_monitoring,
     review_audit,
+    flags,
 )
 from utils import seed_demo_data
 
@@ -135,6 +136,7 @@ app.include_router(documents.router, prefix="/api/documents", tags=["Documents"]
 app.include_router(bias_monitoring.router, prefix="/api/bias-monitoring", tags=["Bias Monitoring"])
 app.include_router(bias_monitoring.influence_router, prefix="/api/bias-influence", tags=["Bias Influence"])
 app.include_router(review_audit.router, prefix="/api/review-audit", tags=["Review Audit"])
+app.include_router(flags.router, prefix="/api/flags", tags=["Flags"])
 
 # Health check endpoint
 @app.get("/api/health")

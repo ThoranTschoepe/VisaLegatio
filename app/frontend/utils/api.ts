@@ -1,6 +1,6 @@
 // app/frontend/visaverge-user/utils/api.ts - Real document upload implementation
 
-import { ChatResponse, Question, VisaApplication, VisaType } from '@/types'
+import { ChatResponse, Question, VisaApplication, VisaType, FlaggedDocument } from '@/types'
 import {
   BiasReviewCase,
   BiasReviewStatistics,
@@ -9,6 +9,8 @@ import {
   BiasInfluenceLeaderboard,
   BiasInfluenceAttributeCatalog,
   BiasReviewCadenceResponse,
+  FlagCatalog,
+  FlagDecisionMatrixEntry,
 } from '@/types/embassy.types'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -43,26 +45,39 @@ class APIClient {
 
   // Flag a document (new endpoint)
   async flagDocument(
-    applicationId: string, 
+    applicationId: string,
     documentId: string,
     reason: string,
-    officerId?: string
-  ): Promise<{ message: string; flag_id: string; document_id: string; reason: string }> {
+    officerId?: string,
+    flagCategoryCode = 'document_gap'
+  ): Promise<{
+    message: string
+    flag_id: string
+    document_id: string
+    reason: string
+    flag_category_code?: string
+    application_status?: string
+  }> {
     return await this.request(`/applications/${applicationId}/flag-document`, {
       method: 'POST',
       body: JSON.stringify({
         document_id: documentId,
         reason: reason,
-        officer_id: officerId
+        officer_id: officerId,
+        flag_category_code: flagCategoryCode,
       }),
     })
+  }
+
+  async getFlagCatalog(): Promise<FlagCatalog> {
+    return await this.request('/flags/catalog')
   }
 
   // Unflag a document (new endpoint)
   async unflagDocument(
     applicationId: string,
     flagId: string
-  ): Promise<{ message: string; flag_id: string }> {
+  ): Promise<{ message: string; flag_id: string; application_status?: string }> {
     return await this.request(`/applications/${applicationId}/unflag-document`, {
       method: 'POST',
       body: JSON.stringify({
@@ -342,27 +357,46 @@ class APIClient {
     return this.transformBiasReviewCadence(response)
   }
 
-  async getReviewAuditQueue(options: { status?: string; limit?: number } = {}): Promise<BiasAuditItem[]> {
+  async getReviewAuditQueue(options: { status?: string; limit?: number } = {}): Promise<{
+    items: BiasAuditItem[]
+    decisionMatrix: Record<string, FlagDecisionMatrixEntry[]>
+    count: number
+  }> {
     const params = new URLSearchParams()
     if (options.status) params.append('status', options.status)
     if (options.limit) params.append('limit', String(options.limit))
     const query = params.toString() ? `?${params.toString()}` : ''
-    const response = await this.request<{ items: any[] }>(`/review-audit/queue${query}`)
-    return response.items.map(item => this.transformBiasAuditItem(item))
+    const response = await this.request<{
+      items?: any[]
+      count?: number
+      decisionMatrix?: Record<string, FlagDecisionMatrixEntry[]>
+    }>(`/review-audit/queue${query}`)
+    const decisionMatrix = response.decisionMatrix || {}
+    const items = (response.items || []).map(item => this.transformBiasAuditItem(item, decisionMatrix))
+    return {
+      items,
+      decisionMatrix,
+      count: response.count ?? items.length,
+    }
   }
 
   async getReviewAuditDetail(reviewId: string): Promise<BiasAuditItem> {
     const response = await this.request<any>(`/review-audit/${reviewId}`)
-    return this.transformBiasAuditItem(response)
+    const decisionMatrix = response.decisionMatrix || {}
+    return this.transformBiasAuditItem(response, decisionMatrix)
   }
 
   async submitReviewAuditDecision(
     reviewId: string,
-    payload: { decision: 'validated' | 'overturned' | 'escalated' | 'training_needed'; notes?: string; auditor_id: string }
+    payload: { decisionCode: string; notes?: string; auditor_id: string }
   ): Promise<any> {
     return await this.request(`/review-audit/${reviewId}/decision`, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        decision_code: payload.decisionCode,
+        notes: payload.notes,
+        auditor_id: payload.auditor_id,
+      }),
     })
   }
 
@@ -425,18 +459,30 @@ class APIClient {
       lastActivity: backendApp.last_activity ? new Date(backendApp.last_activity) : new Date(backendApp.updated_at),
       
       // Flagged documents (supports multiple)
-      flaggedDocuments: backendApp.flagged_documents?.map((flag: any) => ({
-        id: flag.id,
-        userId: flag.user_id,
-        documentId: flag.document_id,
-        applicationId: flag.application_id,
-        reason: flag.reason,
-        flaggedByOfficerId: flag.flagged_by_officer_id,
-        flaggedAt: new Date(flag.flagged_at),
-        resolved: flag.resolved,
-        resolvedAt: flag.resolved_at ? new Date(flag.resolved_at) : undefined,
-        document: flag.document
-      })) || []
+      flaggedDocuments: (backendApp.flagged_documents || []).map(flag => this.transformFlaggedDocument(flag)),
+      resolvedFlagHistory: (backendApp.resolved_flag_history || []).map(flag => this.transformFlaggedDocument(flag)),
+    }
+  }
+
+  private transformFlaggedDocument(payload: any): FlaggedDocument {
+    return {
+      id: payload.id,
+      userId: payload.user_id,
+      documentId: payload.document_id,
+      applicationId: payload.application_id,
+      reason: payload.reason,
+      flaggedByOfficerId: payload.flagged_by_officer_id,
+      flaggedAt: payload.flagged_at ? new Date(payload.flagged_at) : new Date(),
+      resolved: Boolean(payload.resolved),
+      resolvedAt: payload.resolved_at ? new Date(payload.resolved_at) : undefined,
+      flagType: payload.flag_type,
+      document: payload.document,
+      auditStatus: payload.audit_status,
+      auditNotes: payload.audit_notes,
+      auditDecisionCode: payload.audit_decision_code,
+      auditDecisionLabel: payload.audit_decision_label,
+      auditedByOfficerId: payload.audited_by_officer_id,
+      auditedAt: payload.audited_at ? new Date(payload.audited_at) : undefined,
     }
   }
 
@@ -496,7 +542,38 @@ class APIClient {
     }
   }
 
-  private transformBiasAuditItem(payload: any): BiasAuditItem {
+  private transformBiasAuditItem(
+    payload: any,
+    decisionMatrix: Record<string, FlagDecisionMatrixEntry[]> = {}
+  ): BiasAuditItem {
+    const flags = (payload.flags || []).map((flag: any) => ({
+      id: flag.id,
+      flagType: flag.flag_type,
+      reason: flag.reason,
+      resolved: Boolean(flag.resolved),
+      flaggedAt: flag.flagged_at,
+      resolvedAt: flag.resolved_at,
+      flaggedBy: flag.flagged_by,
+      document: flag.document
+        ? {
+            id: flag.document.id,
+            name: flag.document.name,
+            type: flag.document.type,
+            verified: flag.document.verified,
+          }
+        : null,
+      allowedDecisions: flag.allowed_decisions || [],
+      decisionDetails: (flag.allowed_decision_details || []).map((entry: any) => ({
+        code: entry.code,
+        label: entry.label,
+        description: entry.description,
+        severity: entry.severity,
+        requiresFollowUp: entry.requiresFollowUp,
+      })),
+    }))
+
+    const flagSummaryPayload = payload.flag_summary || {}
+
     return {
       review: {
         id: payload.review.id,
@@ -518,10 +595,19 @@ class APIClient {
       audits: (payload.audits || []).map((audit: any) => ({
         id: audit.id,
         auditorId: audit.auditor_id,
-        decision: audit.decision,
+        decisionCode: audit.decision,
         notes: audit.notes,
         createdAt: audit.created_at,
       })),
+      flags,
+      flagSummary: {
+        total: flagSummaryPayload.total ?? flags.length,
+        active: flagSummaryPayload.active ?? flags.filter(flag => !flag.resolved).length,
+        types: flagSummaryPayload.types || [],
+        activeTypes: flagSummaryPayload.active_types || [],
+      },
+      allowedDecisions: payload.allowed_decisions || {},
+      decisionMatrix,
     }
   }
 
