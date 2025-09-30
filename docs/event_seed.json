@@ -1,0 +1,309 @@
+{
+  "bias_cases": [
+    {
+      "application_id": "VSV-240201-BIAS1",
+      "user_id": "user-ahmed-hassan",
+      "applicant_name": "Ahmed Hassan",
+      "visa_type": "tourist",
+      "country": "Egypt",
+      "risk_score": 65,
+      "days_offset": 5,
+      "rejection_reason": "High risk score due to country of origin and limited travel history",
+      "wealth_level": "middle",
+      "document_quantity": "low",
+      "invitation_letter": "no",
+      "origin_country": "Egypt",
+      "review": {
+        "officer_id": "john.davis",
+        "result": "justified",
+        "notes": "Risk scoring aligns with policy; requesting supporting travel history.",
+        "ai_confidence": 68,
+        "audit_status": "clear_to_proceed",
+        "reviewed_days_ago": 2
+      }
+    },
+    {
+      "application_id": "VSV-240202-BIAS2",
+      "user_id": "user-fatima-al-rashid",
+      "applicant_name": "Fatima Al-Rashid",
+      "visa_type": "student",
+      "country": "Syria",
+      "risk_score": 72,
+      "days_offset": 4,
+      "rejection_reason": "Insufficient financial documentation despite scholarship",
+      "wealth_level": "low",
+      "document_quantity": "medium",
+      "invitation_letter": "yes",
+      "origin_country": "Syria",
+      "review": {
+        "officer_id": "john.davis",
+        "result": "biased",
+        "notes": "Applicant has a full scholarship. Financial requirements should be waived.",
+        "ai_confidence": 74,
+        "audit_status": "pending",
+        "reviewed_days_ago": 2
+      }
+    },
+    {
+      "application_id": "VSV-240206-EVENT1",
+      "user_id": "user-nadia-ibanez",
+      "applicant_name": "Nadia Ibáñez",
+      "visa_type": "business",
+      "country": "Colombia",
+      "risk_score": 62,
+      "days_offset": 2,
+      "rejection_reason": "Automated screening flagged insufficient sponsor documentation",
+      "wealth_level": "middle",
+      "document_quantity": "high",
+      "invitation_letter": "yes",
+      "origin_country": "Colombia",
+      "review": {
+        "officer_id": "maria.schmidt",
+        "result": "biased",
+        "notes": "Sponsor confirmation letter scanned in; auto-flag should be adjusted for Latin America portfolio.",
+        "ai_confidence": 71,
+        "audit_status": "pending",
+        "reviewed_days_ago": 1
+      }
+    }
+  ],
+  "attributes": [
+    {
+      "id": "origin_colombia",
+      "category_id": "origin_trends",
+      "category_title": "Country of Origin",
+      "label": "Origin · Colombia",
+      "explanation": "Applications submitted by Colombian nationals in the monitoring window.",
+      "feature": { "type": "country_in", "path": "nationality", "values": ["Colombia"] }
+    },
+    {
+      "id": "origin_kenya",
+      "category_id": "origin_trends",
+      "category_title": "Country of Origin",
+      "label": "Origin · Kenya",
+      "explanation": "Applications submitted by Kenyan nationals in the monitoring window.",
+      "feature": { "type": "country_in", "path": "nationality", "values": ["Kenya"] }
+    },
+    {
+      "id": "origin_philippines",
+      "category_id": "origin_trends",
+      "category_title": "Country of Origin",
+      "label": "Origin · Philippines",
+      "explanation": "Applications submitted by Filipino nationals in the monitoring window.",
+      "feature": { "type": "country_in", "path": "nationality", "values": ["Philippines"] }
+    },
+    {
+      "id": "doc_quantity_low",
+      "category_id": "documentation",
+      "category_title": "Document Quantity",
+      "label": "Document Quantity · Low",
+      "explanation": "Applications where document intake remained below expected thresholds.",
+      "feature": { "type": "answer_equals", "path": "document_quantity", "value": "low" }
+    },
+    {
+      "id": "doc_quantity_high",
+      "category_id": "documentation",
+      "category_title": "Document Quantity",
+      "label": "Document Quantity · High",
+      "explanation": "Applications accompanied by comprehensive supporting documentation.",
+      "feature": { "type": "answer_equals", "path": "document_quantity", "value": "high" }
+    },
+    {
+      "id": "wealth_level_low",
+      "category_id": "wealth_profile",
+      "category_title": "Wealth Level",
+      "label": "Wealth Level · Low",
+      "explanation": "Declared wealth level categorised as low in the intake questionnaire.",
+      "feature": { "type": "answer_equals", "path": "wealth_level", "value": "low" }
+    },
+    {
+      "id": "wealth_level_middle",
+      "category_id": "wealth_profile",
+      "category_title": "Wealth Level",
+      "label": "Wealth Level · Middle",
+      "explanation": "Declared wealth level categorised as middle in the intake questionnaire.",
+      "feature": { "type": "answer_equals", "path": "wealth_level", "value": "middle" }
+    },
+    {
+      "id": "wealth_level_high",
+      "category_id": "wealth_profile",
+      "category_title": "Wealth Level",
+      "label": "Wealth Level · High",
+      "explanation": "Declared wealth level categorised as high in the intake questionnaire.",
+      "feature": { "type": "answer_equals", "path": "wealth_level", "value": "high" }
+    },
+    {
+      "id": "invitation_letter_yes",
+      "category_id": "documentation",
+      "category_title": "Document Quantity",
+      "label": "Invitation Letter · Provided",
+      "explanation": "Applicant supplied an invitation letter as part of the submission.",
+      "feature": { "type": "answer_equals", "path": "invitation_letter", "value": "yes" }
+    },
+    {
+      "id": "invitation_letter_no",
+      "category_id": "documentation",
+      "category_title": "Document Quantity",
+      "label": "Invitation Letter · Not Provided",
+      "explanation": "Applicant did not include an invitation letter.",
+      "feature": { "type": "answer_equals", "path": "invitation_letter", "value": "no" }
+    }
+  ],
+  "cadence": [
+    {
+      "interval": "0-25 (low risk)",
+      "review_time": "6m median",
+      "view_time": "1m 10s / document",
+      "cases": 18
+    },
+    {
+      "interval": "25-50 (emerging risk)",
+      "review_time": "16m median",
+      "view_time": "3m 05s / document",
+      "cases": 25
+    },
+    {
+      "interval": "50-70 (heightened risk)",
+      "review_time": "42m median",
+      "view_time": "6m 45s / document",
+      "cases": 19
+    },
+    {
+      "interval": "70-100 (critical risk)",
+      "review_time": "1h 18m median",
+      "view_time": "12m 30s / document",
+      "cases": 11
+    }
+  ],
+  "influence": {
+    "model": {
+      "sample_size": 128,
+      "auc": 0.81,
+      "window_days": 30,
+      "metadata": {
+        "note": "Demo influence model seeded from event config",
+        "refresh_source": "event_seed.json"
+      },
+      "warnings": []
+    },
+    "factors": [
+      {
+        "attribute_id": "origin_colombia",
+        "display_label": "Origin · Colombia",
+        "coefficient": 0.45,
+        "odds_ratio": 1.57,
+        "sample_share": 0.22,
+        "prevalence_weight": 0.47,
+        "confidence_weight": 0.82,
+        "p_value": 0.028,
+        "delta": 2.9,
+        "direction": "driver",
+        "occurrences": 28
+      },
+      {
+        "attribute_id": "origin_kenya",
+        "display_label": "Origin · Kenya",
+        "coefficient": 0.21,
+        "odds_ratio": 1.23,
+        "sample_share": 0.17,
+        "prevalence_weight": 0.41,
+        "confidence_weight": 0.68,
+        "p_value": 0.061,
+        "delta": 1.1,
+        "direction": "driver",
+        "occurrences": 22
+      },
+      {
+        "attribute_id": "origin_philippines",
+        "display_label": "Origin · Philippines",
+        "coefficient": -0.18,
+        "odds_ratio": 0.84,
+        "sample_share": 0.19,
+        "prevalence_weight": 0.43,
+        "confidence_weight": 0.66,
+        "p_value": 0.074,
+        "delta": -0.8,
+        "direction": "buffer",
+        "occurrences": 24
+      },
+      {
+        "attribute_id": "doc_quantity_low",
+        "display_label": "Document Quantity · Low",
+        "coefficient": 0.58,
+        "odds_ratio": 1.79,
+        "sample_share": 0.33,
+        "prevalence_weight": 0.57,
+        "confidence_weight": 0.78,
+        "p_value": 0.023,
+        "delta": 3.4,
+        "direction": "driver",
+        "occurrences": 43
+      },
+      {
+        "attribute_id": "doc_quantity_high",
+        "display_label": "Document Quantity · High",
+        "coefficient": -0.41,
+        "odds_ratio": 0.66,
+        "sample_share": 0.29,
+        "prevalence_weight": 0.54,
+        "confidence_weight": 0.75,
+        "p_value": 0.031,
+        "delta": -2.5,
+        "direction": "buffer",
+        "occurrences": 38
+      },
+      {
+        "attribute_id": "wealth_level_low",
+        "display_label": "Wealth Level · Low",
+        "coefficient": 0.38,
+        "odds_ratio": 1.46,
+        "sample_share": 0.28,
+        "prevalence_weight": 0.53,
+        "confidence_weight": 0.71,
+        "p_value": 0.041,
+        "delta": 1.6,
+        "direction": "driver",
+        "occurrences": 36
+      },
+      {
+        "attribute_id": "wealth_level_high",
+        "display_label": "Wealth Level · High",
+        "coefficient": -0.27,
+        "odds_ratio": 0.76,
+        "sample_share": 0.24,
+        "prevalence_weight": 0.49,
+        "confidence_weight": 0.72,
+        "p_value": 0.039,
+        "delta": -1.8,
+        "direction": "buffer",
+        "occurrences": 31
+      },
+      {
+        "attribute_id": "invitation_letter_yes",
+        "display_label": "Invitation Letter Provided",
+        "coefficient": -0.34,
+        "odds_ratio": 0.71,
+        "sample_share": 0.47,
+        "prevalence_weight": 0.69,
+        "confidence_weight": 0.80,
+        "p_value": 0.026,
+        "delta": -2.4,
+        "direction": "buffer",
+        "occurrences": 60
+      },
+      {
+        "attribute_id": "invitation_letter_no",
+        "display_label": "Invitation Letter Not Provided",
+        "coefficient": 0.29,
+        "odds_ratio": 1.34,
+        "sample_share": 0.27,
+        "prevalence_weight": 0.52,
+        "confidence_weight": 0.69,
+        "p_value": 0.048,
+        "delta": 1.3,
+        "direction": "driver",
+        "occurrences": 34
+      }
+    ]
+  }
+}

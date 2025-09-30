@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+python-multipart
+python-jose[cryptography]
+passlib[bcrypt]
+python-dotenv
+reportlab
+Pillow
+google-genai
+aiofiles
+python-magic
+pypdfium2
+scikit-learn
